@@ -15,9 +15,14 @@ scenario_repo = ScenarioRepository(db)
 
 @router.post("/", response_model=Scenario, status_code=status.HTTP_201_CREATED)
 async def create_scenario(scenario: Scenario):
-    created = await scenario_repo.create(scenario)
-    logger.info(f"Сценарий создан: {created.name}")
-    return created
+    try:
+        created = await scenario_repo.create(scenario)
+        logger.info(f"Сценарий создан: {created.name}")
+        return created
+    except Exception as e:
+        import traceback
+        logger.error(f"Ошибка при создании сценария: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {e}")
 
 @router.get("/", response_model=List[Scenario])
 async def list_scenarios(skip: int = 0, limit: int = 100):

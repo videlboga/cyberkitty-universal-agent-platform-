@@ -243,4 +243,51 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - Удобная отладка
 - Не требуется пересборка Docker-образа
 
-**Для production и CI/CD используйте Docker!** 
+**Для production и CI/CD используйте Docker!**
+
+### Collections (универсальные коллекции/таблицы)
+```bash
+# Создать коллекцию
+curl -X POST http://localhost:8000/db/collections/ \
+  -H "Content-Type: application/json" \
+  -d '{"name": "my_collection"}'
+
+# Получить список коллекций
+curl http://localhost:8000/db/collections/
+
+# Добавить документ в коллекцию
+curl -X POST http://localhost:8000/db/collections/my_collection/items \
+  -H "Content-Type: application/json" \
+  -d '{"field1": "value1", "field2": 123}'
+
+# Получить все документы коллекции
+curl http://localhost:8000/db/collections/my_collection/items
+
+# Получить документ по id
+curl http://localhost:8000/db/collections/my_collection/items/<item_id>
+
+# Обновить документ
+curl -X PATCH http://localhost:8000/db/collections/my_collection/items/<item_id> \
+  -H "Content-Type: application/json" \
+  -d '{"field1": "new_value"}'
+
+# Удалить документ
+curl -X DELETE http://localhost:8000/db/collections/my_collection/items/<item_id>
+```
+
+### Telegram (интеграция)
+```bash
+# Проверить работоспособность Telegram-бота (healthcheck)
+curl http://localhost:8000/integration/telegram/health
+
+# Отправить сообщение в Telegram
+curl -X POST http://localhost:8000/integration/telegram/send \
+  -H "Content-Type: application/json" \
+  -d '{"chat_id":123456789,"text":"Привет из Universal Agent Platform!"}'
+```
+
+**Описание:**
+- Для работы Telegram-интеграции необходимо указать токен бота в конфиге backend (см. app/api/integration.py, Application.builder().token(...)).
+- Endpoint `/integration/telegram/health` проверяет доступность Telegram-бота через get_me.
+- Endpoint `/integration/telegram/send` отправляет сообщение в указанный chat_id.
+- Все логи интеграции пишутся в logs/llm_integration.log и logs/integration/telegram_send_test.log. 

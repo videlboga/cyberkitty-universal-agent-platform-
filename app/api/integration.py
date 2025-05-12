@@ -19,7 +19,7 @@ logger.add("logs/crm_integration.log", format="{time} {level} {message}", level=
 news_plugin = NewsPlugin()
 rag_plugin = RAGPlugin()
 # Тестовый токен Telegram-бота и chat_id для тестов
-TEST_TELEGRAM_BOT_TOKEN = "8020429038:AAEG2c_n9oOPjDdZwCEFgEHCTmoFGx-0ZnA"
+TEST_TELEGRAM_BOT_TOKEN = "7907324843:AAFeawcxcbcmGpKFk2H8XZWIIF6aHciPMAw"
 TEST_TELEGRAM_CHAT_ID = 648981358
 telegram_app = Application.builder().token(TEST_TELEGRAM_BOT_TOKEN).build()
 telegram_plugin = TelegramPlugin(telegram_app)
@@ -126,5 +126,5 @@ async def telegram_send(request: Request):
 
 @router.get("/telegram/health")
 async def telegram_health():
-    ok = telegram_plugin.healthcheck()
+    ok = await telegram_plugin.healthcheck()
     return {"status": "ok" if ok else "error"} 

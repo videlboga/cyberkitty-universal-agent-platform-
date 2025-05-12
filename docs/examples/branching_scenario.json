@@ -1,24 +1,28 @@
 {
-  "name": "Опрос: положительное или отрицательное число",
-  "steps": [
-    {
-      "type": "input",
-      "text": "Введите число",
-      "next_step": 1
-    },
-    {
-      "type": "branch",
-      "condition": "context['x'] > 0",
-      "branches": {"if": 2, "else": 3},
-      "text": "Проверка x"
-    },
-    {
-      "type": "message",
-      "text": "Вы ввели положительное число!"
-    },
-    {
-      "type": "message",
-      "text": "Вы ввели ноль или отрицательное число."
-    }
+  "name": "Индивидуальный план обучения",
+  "nodes": [
+    {"id": "start", "type": "start", "label": "Старт"},
+    {"id": "q1", "type": "input", "label": "Какая ваша цель обучения?", "output_var": "goal"},
+    {"id": "q2", "type": "input", "label": "Сколько времени в неделю вы готовы уделять?", "output_var": "time_per_week"},
+    {"id": "rag_query", "type": "rag_query", "label": "Запрос к RAG", "input_vars": ["goal"], "output_var": "rag_chunks"},
+    {"id": "llm_generate_plan", "type": "llm_generate_plan", "label": "Генерация плана через LLM", "input_vars": ["rag_chunks", "goal", "time_per_week"], "output_var": "plan"},
+    {"id": "save_plan", "type": "save_to_collection", "label": "Сохранить план", "collection": "plans", "input_var": "plan"},
+    {"id": "send_telegram", "type": "send_telegram", "label": "Отправить план в Telegram", "input_var": "plan"},
+    {"id": "agent_menu", "type": "menu", "label": "Выберите агента", "options": [
+      {"label": "Коуч", "target": "coach"},
+      {"label": "Лайфхакер", "target": "lifehacker"},
+      {"label": "Ментор", "target": "mentor"},
+      {"label": "Дайджест", "target": "digest"},
+      {"label": "Эксперт", "target": "expert"}
+    ]}
+  ],
+  "edges": [
+    {"from": "start", "to": "q1"},
+    {"from": "q1", "to": "q2"},
+    {"from": "q2", "to": "rag_query"},
+    {"from": "rag_query", "to": "llm_generate_plan"},
+    {"from": "llm_generate_plan", "to": "save_plan"},
+    {"from": "save_plan", "to": "send_telegram"},
+    {"from": "send_telegram", "to": "agent_menu"}
   ]
 } 

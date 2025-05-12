@@ -1,0 +1,55 @@
+// Universal Agent Platform CursorRules
+// Специфические правила для платформы ИИ-агентов (FastAPI, MongoDB, Celery, React, BPMN.js)
+
+// Общие рекомендации
+- Всегда используй Markdown для документации и README
+- README.md должен содержать: название, краткое описание, структуру, примеры запуска, переменные окружения, curl-примеры для API
+- Документация API должна автогенерироваться через Swagger/OpenAPI
+- Все логи должны писаться в папку logs/ по типу событий (errors, audit, integration, events и т.д.)
+- Для Python-кода: black, isort, flake8, docstrings Google-style
+- Для JS/TS: eslint, prettier, jsdoc
+- Покрытие тестами >80% (pytest, coverage, e2e)
+- Все тестовые логи — в logs/unit_tests.log, logs/integration_tests.log
+- В корне должен быть DEVELOPMENT_PLAN.md с чек-листом задач и прогресса
+
+// Архитектура и структура
+- Backend: FastAPI, Pydantic, Celery, MongoDB (motor), Redis, loguru
+- Frontend: React (Next.js), TypeScript, Ant Design/MUI, BPMN.js
+- Контейнеризация: Docker, docker-compose, .env.example
+- Все сервисы должны иметь healthcheck endpoint
+- Все интеграции реализуются через плагины (plugin.py, PluginBase)
+- Логика сценариев — через state machine, поддержка триггеров (on_command, on_event, on_schedule)
+- Все сценарии и шаги должны быть сериализуемы в JSON/YAML/BPMN
+
+// Логирование
+- Используй loguru для Python, JSON-формат логов
+- Все логи — только в папку logs/, с ротацией и сжатием
+- Логи интеграций: logs/llm_integration.log, logs/rag_integration.log, logs/crm_integration.log
+- Логи запусков агентов: logs/agent_launch.log
+- Логи ошибок: logs/errors.log
+- Логи аудита: logs/audit.log
+
+// Тестирование
+- Для каждого endpoint — unit- и интеграционные тесты
+- E2E-тесты для пользовательских сценариев (создание пользователя, запуск сценария)
+- Все тестовые логи — в logs/unit_tests.log, logs/integration_tests.log
+
+// Документация
+- Документация хранится в docs/, автогенерация OpenAPI/Swagger
+- Примеры сценариев, плагинов, гайды — отдельными файлами
+- README.md должен содержать curl-примеры для всех API
+
+// CI/CD
+- Используй pre-commit для black, isort, flake8, eslint, prettier
+- Автоматический запуск тестов и линтеров через GitHub Actions
+- Генерация отчёта о покрытии тестами
+- Проверка логов и healthcheck после деплоя
+
+// Безопасность
+- Реализуй RBAC, аутентификацию (OAuth2/JWT), rate limiting
+- Все секреты — только в .env (не коммитить в git)
+- Логи подозрительных активностей — logs/security.log
+
+// План разработки
+- DEVELOPMENT_PLAN.md обязателен, структура задач — чек-лист с прогрессом
+- Все новые задачи и изменения фиксировать в DEVELOPMENT_PLAN.md 

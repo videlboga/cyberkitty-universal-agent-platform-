@@ -1,0 +1,35 @@
+# Исключить логи и временные файлы
+logs/
+*.log
+*.tmp
+*.bak
+
+# Исключить кэш Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Исключить виртуальные окружения
+.venv/
+venv/
+
+# Исключить данные и артефакты
+/data/
+*.db
+*.sqlite3
+
+# Исключить git-репозиторий
+.git/
+
+# Исключить node_modules и фронтенд-билды
+node_modules/
+build/
+dist/
+frontend/.next/
+frontend/node_modules/
+frontend/build/
+
+# Исключить IDE-файлы
+.idea/
+.vscode/ 

@@ -1,16 +1,37 @@
-venv/
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# Virtual environment
+.venv
+venv
+ENV
+env
+
+# IDE / Editor specific
+.idea/
+.vscode/
+*.swp
+
+# Log files
+logs/
+*.log
+
+# Data generated at runtime / large assets / backups
+data/
+backup/
+
+# Secrets - ensure .env.example is tracked instead
+.env
+
+# OS specific
+.DS_Store
+Thumbs.db
+
 *.sqlite3
 *.db
-*.log
-logs/
-.env
-.env.*
-.DS_Store
-.idea/
 *.egg-info/
 dist/
 build/
@@ -18,7 +39,6 @@ node_modules/
 frontend/node_modules/
 coverage*
 .pytest_cache/
-*.swp
 *.bak
 *.tmp
 *.old

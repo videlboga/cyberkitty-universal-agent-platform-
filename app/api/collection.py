@@ -1,14 +1,16 @@
-from fastapi import APIRouter, HTTPException, status, Body
+from fastapi import APIRouter, Request, Query, HTTPException, status, Body
 from motor.motor_asyncio import AsyncIOMotorClient
 from loguru import logger
 import os
 from bson import ObjectId
+import json
 from typing import Any, Dict, List
+from app.utils.id_helper import to_object_id, safe_object_id, sanitize_id, sanitize_ids, handle_id_query, ensure_mongo_id
 
 router = APIRouter(prefix="/db/collections", tags=["collections"])
 
 os.makedirs("logs", exist_ok=True)
-logger.add("logs/audit.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True)
+logger.add("logs/collections.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True)
 logger.add("logs/errors.log", format="{time} {level} {message}", level="ERROR", rotation="10 MB", compression="zip", serialize=True)
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/universal_agent")
@@ -17,44 +19,57 @@ db = client.get_default_database()
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_collection(data: Dict[str, Any] = Body(...)):
-    """Создать новую коллекцию по имени."""
+    """Создать коллекцию."""
     name = data.get("name")
     if not name:
-        logger.error({"event": "create_collection", "error": "name required", "data": data})
-        raise HTTPException(status_code=400, detail="name required")
+        logger.error({"event": "create_collection", "error": "name required"})
+        raise HTTPException(status_code=400, detail="'name' field is required")
+    
     if name in await db.list_collection_names():
-        logger.warning({"event": "create_collection", "error": "already exists", "name": name})
-        raise HTTPException(status_code=409, detail="Collection already exists")
+        logger.error({"event": "create_collection", "error": "already exists", "name": name})
+        raise HTTPException(status_code=400, detail="Collection already exists")
+    
     await db.create_collection(name)
     logger.info({"event": "create_collection", "name": name})
-    return {"status": "ok", "name": name}
+    return {"name": name}
 
 @router.get("/", response_model=List[str])
 async def list_collections():
     """Получить список всех коллекций."""
-    names = await db.list_collection_names()
-    logger.info({"event": "list_collections", "count": len(names)})
-    return names
+    collections = await db.list_collection_names()
+    logger.info({"event": "list_collections", "count": len(collections)})
+    return collections
 
 @router.post("/{name}/items", status_code=status.HTTP_201_CREATED)
 async def create_item(name: str, item: Dict[str, Any] = Body(...)):
-    """Создать документ в коллекции."""
+    """Создать документ в коллекции. _id будет совпадать с id, если id присутствует."""
     if name not in await db.list_collection_names():
         logger.error({"event": "create_item", "error": "collection not found", "name": name})
         raise HTTPException(status_code=404, detail="Collection not found")
-    result = await db[name].insert_one(item)
-    logger.info({"event": "create_item", "collection": name, "id": str(result.inserted_id)})
-    return {"id": str(result.inserted_id), **item}
+    # Централизовано: всегда ensure_mongo_id
+    result = await db[name].insert_one(ensure_mongo_id(item))
+    item_id = str(result.inserted_id)
+    logger.info({"event": "create_item", "collection": name, "id": item_id})
+    return {"id": item_id}
 
 @router.get("/{name}/items", response_model=List[Dict[str, Any]])
-async def list_items(name: str, skip: int = 0, limit: int = 100):
+async def list_items(name: str, skip: int = 0, limit: int = 100, filter: str = Query(None)):
     """Получить все документы коллекции."""
     if name not in await db.list_collection_names():
         logger.error({"event": "list_items", "error": "collection not found", "name": name})
         raise HTTPException(status_code=404, detail="Collection not found")
-    docs = await db[name].find().skip(skip).limit(limit).to_list(length=limit)
-    for d in docs:
-        d["id"] = str(d.pop("_id"))
+    
+    query = {}
+    if filter:
+        try:
+            query = json.loads(filter)
+        except json.JSONDecodeError:
+            logger.error({"event": "list_items", "error": "invalid filter", "filter": filter})
+            raise HTTPException(status_code=400, detail="Invalid filter JSON")
+    
+    docs = await db[name].find(query).skip(skip).limit(limit).to_list(length=limit)
+    docs = sanitize_ids(docs)  # Используем нашу утилиту
+    
     logger.info({"event": "list_items", "collection": name, "count": len(docs)})
     return docs
 
@@ -64,26 +79,34 @@ async def get_item(name: str, item_id: str):
     if name not in await db.list_collection_names():
         logger.error({"event": "get_item", "error": "collection not found", "name": name})
         raise HTTPException(status_code=404, detail="Collection not found")
-    doc = await db[name].find_one({"_id": ObjectId(item_id)})
+    
+    # Поддержка поиска как по ObjectId, так и по другим полям (name, slug)
+    query = handle_id_query(item_id, db[name])
+    doc = await db[name].find_one(query)
+    
     if not doc:
         logger.error({"event": "get_item", "error": "not found", "id": item_id})
         raise HTTPException(status_code=404, detail="Item not found")
-    doc["id"] = str(doc.pop("_id"))
+    
+    doc = sanitize_id(doc)  # Используем нашу утилиту
+    
     logger.info({"event": "get_item", "collection": name, "id": item_id})
     return doc
 
 @router.patch("/{name}/items/{item_id}", response_model=Dict[str, Any])
 async def update_item(name: str, item_id: str, data: Dict[str, Any] = Body(...)):
-    """Обновить документ по id."""
+    """Обновить документ по id. _id будет совпадать с id, если id присутствует."""
     if name not in await db.list_collection_names():
         logger.error({"event": "update_item", "error": "collection not found", "name": name})
         raise HTTPException(status_code=404, detail="Collection not found")
-    await db[name].update_one({"_id": ObjectId(item_id)}, {"$set": data})
-    doc = await db[name].find_one({"_id": ObjectId(item_id)})
-    if not doc:
+    # Централизовано: всегда ensure_mongo_id
+    query = handle_id_query(item_id, db[name])
+    result = await db[name].update_one(query, {"$set": ensure_mongo_id(data)})
+    if result.matched_count == 0:
         logger.error({"event": "update_item", "error": "not found", "id": item_id})
         raise HTTPException(status_code=404, detail="Item not found")
-    doc["id"] = str(doc.pop("_id"))
+    doc = await db[name].find_one(query)
+    doc = sanitize_id(doc)
     logger.info({"event": "update_item", "collection": name, "id": item_id})
     return doc
 
@@ -93,9 +116,15 @@ async def delete_item(name: str, item_id: str):
     if name not in await db.list_collection_names():
         logger.error({"event": "delete_item", "error": "collection not found", "name": name})
         raise HTTPException(status_code=404, detail="Collection not found")
-    result = await db[name].delete_one({"_id": ObjectId(item_id)})
+    
+    # Поддержка удаления как по ObjectId, так и по другим полям (name, slug)
+    query = handle_id_query(item_id, db[name])
+    
+    result = await db[name].delete_one(query)
+    
     if result.deleted_count != 1:
         logger.error({"event": "delete_item", "error": "not found", "id": item_id})
         raise HTTPException(status_code=404, detail="Item not found")
+    
     logger.info({"event": "delete_item", "collection": name, "id": item_id})
     return None 

@@ -1,0 +1,1 @@
+{"id": "llm_dialog_scenario_001", "name": "Диалог с LLM (ответ в Telegram)", "description": "Сценарий: пользователь пишет — LLM отвечает, ответ отправляется в Telegram", "steps": [{"type": "llm_query", "prompt": "{message}", "output_var": "llm_reply"}, {"type": "telegram_message", "message": "{llm_reply}", "chat_id": "{chat_id}"}]}

@@ -1,0 +1,64 @@
+{
+  "name": "Тестовый LLM бот (исправленный)",
+  "description": "Простой тестовый сценарий для проверки связки Telegram + LLM с исправленным форматом ветвлений",
+  "created_at": "2025-05-14T15:30:00Z",
+  "steps": [
+    {
+      "id": "welcome",
+      "type": "telegram_message",
+      "message": "👋 Привет! Это тестовый бот для проверки связки Telegram + LLM.\n\nНапиши любой вопрос, и я постараюсь на него ответить с помощью языковой модели.",
+      "next_step": 1
+    },
+    {
+      "id": "wait_for_query",
+      "type": "input",
+      "prompt": "Ваш вопрос:",
+      "output_var": "user_query",
+      "next_step": 2
+    },
+    {
+      "id": "process_query",
+      "type": "llm_query",
+      "prompt": "{user_query}",
+      "system_prompt": "Ты - полезный ассистент, который отвечает кратко и по существу на русском языке. Обязательно отвечай на русском языке.",
+      "model": "openai/gpt-3.5-turbo",
+      "temperature": 0.7,
+      "max_tokens": 300,
+      "output_var": "llm_response",
+      "next_step": 3
+    },
+    {
+      "id": "send_response",
+      "type": "telegram_message",
+      "message": "🤖 Ответ:\n\n{llm_response.response}",
+      "next_step": 4
+    },
+    {
+      "id": "ask_continue",
+      "type": "telegram_message",
+      "message": "\n\nХотите задать еще один вопрос? (да/нет)",
+      "next_step": 5
+    },
+    {
+      "id": "wait_for_continue",
+      "type": "input",
+      "prompt": "Да или нет?",
+      "output_var": "continue_response",
+      "next_step": 6
+    },
+    {
+      "id": "check_continue",
+      "type": "branch",
+      "condition": "continue_response is not None and continue_response.lower() in ['да', 'yes', '+', 'конечно', 'хочу']",
+      "branches": {
+        "if": 1,
+        "else": 7
+      }
+    },
+    {
+      "id": "end_conversation",
+      "type": "telegram_message",
+      "message": "Спасибо за тестирование! Тест связки Telegram + LLM завершен успешно."
+    }
+  ]
+} 

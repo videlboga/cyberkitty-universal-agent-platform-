@@ -7,6 +7,7 @@ class Scenario(BaseModel):
     name: Optional[str] = None
     steps: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     bpmn_xml: Optional[str] = None
+    required_plugins: Optional[List[str]] = Field(default_factory=list)
     created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
     extra: Optional[Dict[str, Any]] = None
 

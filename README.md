@@ -1,3 +1,60 @@
+# Universal Agent Platform - MVP
+
+## Быстрый запуск MVP
+
+1. **Клонируйте репозиторий:**
+   ```bash
+   git clone https://github.com/yourusername/universal_agent_system.git
+   cd universal_agent_system
+   ```
+
+2. **Настройте переменные окружения:**
+   ```bash
+   cp .env.example .env
+   # Отредактируйте .env согласно вашим требованиям
+   ```
+
+3. **Запустите с Docker:**
+   ```bash
+   docker-compose up -d
+   ```
+
+   После запуска:
+   - API доступен по адресу: http://localhost:8000
+   - Swagger документация: http://localhost:8000/docs
+   - MongoDB доступна на порте 27017
+   - Redis доступен на порте 6380
+   - Telegram-бот запущен автоматически
+
+4. **Проверьте работоспособность:**
+   ```bash
+   # Проверка API
+   curl http://localhost:8000/health
+   
+   # Проверка Telegram-бота
+   curl http://localhost:8000/integration/telegram/health
+   
+   # Проверка RAG-интеграции
+   curl -X POST http://localhost:8000/integration/rag/query \
+     -H "Content-Type: application/json" \
+     -d '{"query": "Что такое RAG?"}'
+   ```
+
+5. **Используйте Telegram-бота:**
+   - Найдите бота в Telegram по имени из .env
+   - Отправьте команду /start для начала работы
+   - Выберите агента через меню
+
+## MVP Возможности
+- Базовая работа с коллекциями (CRUD)
+- Интеграция с Telegram
+- Простые агенты и сценарии
+- Интеграция с внешним RAG-сервисом
+- Healthcheck эндпоинты
+- Логирование всех действий
+
+---
+
 # Universal Agent Platform
 
 ## Быстрый старт
@@ -165,10 +222,19 @@ curl -X POST http://localhost:8000/agents/<agent_id>/step \
 # Поиск через внешний RAG
 curl -X POST http://localhost:8000/integration/rag/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "Что такое RAG?"}'
+  -d '{"query": "Что такое RAG?", "top_k": 3}'
 ```
 
-**RAG_URL** — адрес внешнего сервиса (по умолчанию http://92.242.60.87:5002/api)
+**RAG_URL** — адрес внешнего сервиса (по умолчанию http://rag.cyberkitty.tech/api)
+
+**Формат запроса к внешнему RAG:**
+```json
+{
+  "data": ["Ваш запрос", количество_результатов],
+  "fn_index": 0,
+  "session_hash": "уникальный_идентификатор"
+}
+```
 
 **Пример ответа:**
 ```json
@@ -291,3 +357,91 @@ curl -X POST http://localhost:8000/integration/telegram/send \
 - Endpoint `/integration/telegram/health` проверяет доступность Telegram-бота через get_me.
 - Endpoint `/integration/telegram/send` отправляет сообщение в указанный chat_id.
 - Все логи интеграции пишутся в logs/llm_integration.log и logs/integration/telegram_send_test.log. 
+
+## Менеджер агентов
+
+Платформа поддерживает систему мультиагентов через `AgentManagerPlugin`, который позволяет переключаться между различными агентами в рамках одного диалога.
+
+```bash
+# Получить доступные агенты из менеджера агентов
+curl -X GET "http://localhost:8000/agents/available" -H "Content-Type: application/json"
+
+# Запустить сценарий меню агентов
+curl -X POST "http://localhost:8000/agent-actions/manager/run" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "user123",
+    "input_data": {
+      "message": "start"
+    }
+  }'
+```
+
+## Система уведомлений
+
+Платформа включает планировщик задач для отправки регулярных уведомлений.
+
+```bash
+# Проверить статус планировщика
+curl -X GET "http://localhost:8000/scheduler/status" -H "Content-Type: application/json"
+
+# Запустить планировщик
+curl -X POST "http://localhost:8000/scheduler/start" -H "Content-Type: application/json"
+
+# Остановить планировщик
+curl -X POST "http://localhost:8000/scheduler/stop" -H "Content-Type: application/json"
+
+# Отправить тестовое уведомление
+curl -X POST "http://localhost:8000/scheduler/test-notification" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "user123",
+    "agent_id": "lifehacker",
+    "message": "Тестовое уведомление от системы"
+  }'
+```
+
+## Мультиагентная система обучения
+
+Платформа реализует комплексную систему обучения с несколькими специализированными агентами:
+
+1. **Коуч** - помогает с рефлексией по прогрессу обучения, анализирует успехи и дает рекомендации
+2. **Лайфхакер** - делится полезными советами по работе с нейросетями и инструментами ИИ
+3. **Ментор** - отвечает на вопросы по теории и практике нейросетей, использует RAG для точных ответов
+4. **Дайджест** - присылает релевантные новости и обновления из мира нейросетей
+5. **Эксперт** - помогает с решением конкретных задач и проектов
+
+Все агенты управляются через единый интерфейс `AgentManagerPlugin`, который позволяет:
+- Переключаться между агентами в рамках одного диалога
+- Сохранять контекст общения при переключении
+- Возвращаться в главное меню агентов
+- Получать персонализированные ответы от каждого агента
+
+```bash
+# Запустить сценарий менеджера агентов
+curl -X POST "http://localhost:8000/agent-actions/manager/run" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "user123",
+    "input_data": {
+      "message": "start"
+    }
+  }'
+```
+
+## Типы поддерживаемых шагов в сценариях
+
+Платформа поддерживает различные типы шагов в сценариях:
+
+- **message** - отображение текстового сообщения
+- **input** - получение ввода от пользователя
+- **branch** - условное ветвление сценария
+- **rag_search** - поиск информации через RAG
+- **telegram_message** - отправка сообщения через Telegram
+- **process_user_profile** - обработка профиля пользователя
+- **generate_learning_plan** - генерация плана обучения
+- **agent_menu** - меню выбора агентов
+- **switch_agent** - переключение на другого агента
+- **return_to_menu** - возврат в главное меню агентов
+
+Все сценарии исполняются через `ScenarioExecutor`, который координирует работу плагинов и обработчиков шагов. 

@@ -1,10 +1,18 @@
 import httpx
 import os
 from typing import Any, Dict
+from loguru import logger
+from datetime import datetime
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_URL = os.getenv("OPENROUTER_URL", "https://openrouter.ai/api/v1/chat/completions")
 OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
+
+# Проверка наличия API ключа
+if not OPENROUTER_API_KEY:
+    logger.error("OPENROUTER_API_KEY не найден в переменных окружения")
+else:
+    logger.info(f"OPENROUTER_API_KEY найден: {OPENROUTER_API_KEY[:5]}...{OPENROUTER_API_KEY[-5:] if len(OPENROUTER_API_KEY) > 10 else ''}")
 
 HEADERS = {
     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -12,18 +20,50 @@ HEADERS = {
 }
 
 async def openrouter_chat(prompt: str, model: str = "openai/gpt-3.5-turbo", **kwargs) -> Dict[str, Any]:
-    payload = {
-        "model": model,
-        "messages": [{"role": "user", "content": prompt}],
-        **kwargs
-    }
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(OPENROUTER_URL, headers=HEADERS, json=payload, timeout=60)
-        resp.raise_for_status()
-        return resp.json()
+    if not OPENROUTER_API_KEY:
+        logger.error("Невозможно выполнить запрос к OpenRouter: отсутствует API ключ")
+        return {"error": "API key not found"}
+    
+    try:
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            **kwargs
+        }
+        logger.debug(f"Отправка запроса к OpenRouter: модель={model}, длина запроса={len(prompt)}")
+        # --- Новый блок: логируем curl-команду ---
+        import json as _json
+        curl_cmd = (
+            f"curl -X POST {OPENROUTER_URL} "
+            f"-H 'Authorization: Bearer {OPENROUTER_API_KEY}' "
+            f"-H 'Content-Type: application/json' "
+            f"-d '{_json.dumps(payload, ensure_ascii=False)}'"
+        )
+        with open("logs/llm_curl.log", "a", encoding="utf-8") as f:
+            f.write(f"\n[{model}] {datetime.now().isoformat()}\n{curl_cmd}\n")
+        # --- Конец блока ---
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(OPENROUTER_URL, headers=HEADERS, json=payload, timeout=60)
+            resp.raise_for_status()
+            result = resp.json()
+            logger.debug("Запрос к OpenRouter выполнен успешно")
+            return result
+    except Exception as e:
+        logger.error(f"Ошибка при запросе к OpenRouter: {e}")
+        return {"error": str(e)}
 
 async def openrouter_models() -> Dict[str, Any]:
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(OPENROUTER_MODELS_URL, headers=HEADERS, timeout=30)
-        resp.raise_for_status()
-        return resp.json() 
+    if not OPENROUTER_API_KEY:
+        logger.error("Невозможно получить список моделей OpenRouter: отсутствует API ключ")
+        return {"error": "API key not found"}
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(OPENROUTER_MODELS_URL, headers=HEADERS, timeout=30)
+            resp.raise_for_status()
+            result = resp.json()
+            logger.debug("Список моделей OpenRouter получен успешно")
+            return result
+    except Exception as e:
+        logger.error(f"Ошибка при получении списка моделей OpenRouter: {e}")
+        return {"error": str(e)} 

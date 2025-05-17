@@ -1,0 +1,180 @@
+{
+  "name": "Создание индивидуального плана обучения нейросетям",
+  "steps": [
+    {
+      "type": "message",
+      "text": "Привет! Я помогу вам создать индивидуальный план обучения нейросетям. Для этого задам несколько вопросов.",
+      "next_step": 1
+    },
+    {
+      "type": "options",
+      "text": "Какой у вас опыт работы с нейросетями и искусственным интеллектом?",
+      "output_var": "experience",
+      "options": [
+        {"label": "Новичок (никогда не работал с нейросетями)", "value": "beginner"},
+        {"label": "Начинающий (использовал готовые решения)", "value": "intermediate"},
+        {"label": "Продвинутый (разрабатывал собственные проекты)", "value": "advanced"}
+      ],
+      "next_step": 2
+    },
+    {
+      "type": "multiple_options",
+      "text": "Какие области нейросетей вас интересуют больше всего? (выберите до 3 вариантов)",
+      "output_var": "interests",
+      "max_selections": 3,
+      "options": [
+        {"label": "Компьютерное зрение", "value": "computer_vision"},
+        {"label": "Обработка естественного языка", "value": "nlp"},
+        {"label": "Генеративные модели", "value": "generative_models"},
+        {"label": "Рекомендательные системы", "value": "recommender_systems"},
+        {"label": "Автоматизация бизнес-процессов", "value": "business_automation"},
+        {"label": "Медицина и здравоохранение", "value": "healthcare"},
+        {"label": "Финансы и трейдинг", "value": "finance"}
+      ],
+      "next_step": 3
+    },
+    {
+      "type": "multiple_options",
+      "text": "Какие цели вы хотите достичь в изучении нейросетей?",
+      "output_var": "learning_goals",
+      "max_selections": 2,
+      "options": [
+        {"label": "Понять основные принципы работы", "value": "understand_basics"},
+        {"label": "Научиться использовать готовые решения", "value": "use_existing_solutions"},
+        {"label": "Создавать собственные модели", "value": "create_own_models"},
+        {"label": "Применять в своей профессиональной области", "value": "apply_professionally"},
+        {"label": "Начать карьеру в области нейросетей", "value": "career_change"}
+      ],
+      "next_step": 4
+    },
+    {
+      "type": "options",
+      "text": "Какой формат обучения вам больше подходит?",
+      "output_var": "learning_style",
+      "options": [
+        {"label": "Теоретический (статьи, книги, лекции)", "value": "theoretical"},
+        {"label": "Практический (проекты, задачи, кейсы)", "value": "practical"},
+        {"label": "Смешанный (теория + практика)", "value": "mixed"}
+      ],
+      "next_step": 5
+    },
+    {
+      "type": "options",
+      "text": "Сколько времени в неделю вы готовы уделять обучению?",
+      "output_var": "available_time",
+      "options": [
+        {"label": "Менее 5 часов", "value": "less_than_5"},
+        {"label": "5-10 часов", "value": "5_to_10"},
+        {"label": "10-20 часов", "value": "10_to_20"},
+        {"label": "Более 20 часов", "value": "more_than_20"}
+      ],
+      "next_step": 6
+    },
+    {
+      "type": "options",
+      "text": "Хотите ли вы получать уведомления с подсказками и рекомендациями?",
+      "output_var": "notifications",
+      "options": [
+        {"label": "Да, ежедневно", "value": "daily"},
+        {"label": "Да, еженедельно", "value": "weekly"},
+        {"label": "Нет, только по запросу", "value": "on_demand"}
+      ],
+      "next_step": 7
+    },
+    {
+      "type": "message",
+      "text": "Спасибо за ответы! Теперь я создам для вас индивидуальный план обучения на основе ваших предпочтений.",
+      "next_step": 8
+    },
+    {
+      "type": "process_user_profile",
+      "input_vars": ["experience", "interests", "learning_goals", "learning_style", "available_time", "notifications"],
+      "output_var": "user_profile",
+      "next_step": 9
+    },
+    {
+      "type": "save_to_collection",
+      "collection": "users",
+      "input_var": "user_profile",
+      "next_step": 10
+    },
+    {
+      "type": "rag_query",
+      "input_vars": ["user_profile"],
+      "query_template": "Сгенерируй подробный план обучения по нейросетям для пользователя со следующими параметрами: - Интересы: {interests} - Цели обучения: {learning_goals} - Уровень опыта: {experience_level} - Предпочитаемый стиль обучения: {preferred_learning_style} - Доступное время в неделю: {available_time_per_week}. План должен содержать: 1. Краткое описание 2. Ожидаемые результаты 3. Список модулей (5-7 модулей) 4. Для каждого модуля - название, описание, ключевые темы, основные навыки, примерное время на изучение 5. Рекомендуемые ресурсы и материалы",
+      "output_var": "plan_text",
+      "next_step": 11
+    },
+    {
+      "type": "process_learning_plan",
+      "input_vars": ["plan_text", "user_profile"],
+      "output_var": "learning_plan",
+      "next_step": 12
+    },
+    {
+      "type": "save_to_collection",
+      "collection": "learning_plans",
+      "input_var": "learning_plan",
+      "next_step": 13
+    },
+    {
+      "type": "send_telegram",
+      "text": "Ваш индивидуальный план обучения готов! Вот основные модули:\n\n{module_list}\n\nПодробное описание каждого модуля и рекомендуемые материалы вы можете найти в личном кабинете.",
+      "input_vars": ["learning_plan"],
+      "next_step": 14
+    },
+    {
+      "type": "message",
+      "text": "Теперь вы можете начать обучение или общаться с любым из наших специализированных агентов:",
+      "next_step": 15
+    },
+    {
+      "type": "menu",
+      "text": "Выберите агента для общения:",
+      "options": [
+        {"label": "Коуч - поможет с рефлексией по прогрессу", "target": "coach"},
+        {"label": "Лайфхакер - поделится полезными советами", "target": "lifehacker"},
+        {"label": "Ментор - ответит на вопросы", "target": "mentor"},
+        {"label": "Дайджест - пришлет релевантные новости", "target": "digest"},
+        {"label": "Эксперт - поможет с решением конкретных задач", "target": "expert"}
+      ]
+    }
+  ],
+  "extra": {
+    "nodes": [
+      {"id": "welcome", "type": "message", "label": "Приветствие"},
+      {"id": "experience", "type": "options", "label": "Опыт работы", "output_var": "experience"},
+      {"id": "interests", "type": "multiple_options", "label": "Интересы", "output_var": "interests"},
+      {"id": "learning_goals", "type": "multiple_options", "label": "Цели обучения", "output_var": "learning_goals"},
+      {"id": "learning_style", "type": "options", "label": "Стиль обучения", "output_var": "learning_style"},
+      {"id": "available_time", "type": "options", "label": "Доступное время", "output_var": "available_time"},
+      {"id": "notifications", "type": "options", "label": "Уведомления", "output_var": "notifications"},
+      {"id": "thank_you", "type": "message", "label": "Благодарность"},
+      {"id": "process_profile", "type": "process_user_profile", "label": "Обработка профиля", "output_var": "user_profile"},
+      {"id": "save_profile", "type": "save_to_collection", "label": "Сохранение профиля", "collection": "users"},
+      {"id": "rag_query", "type": "rag_query", "label": "Запрос к RAG", "output_var": "plan_text"},
+      {"id": "process_plan", "type": "process_learning_plan", "label": "Обработка плана", "output_var": "learning_plan"},
+      {"id": "save_plan", "type": "save_to_collection", "label": "Сохранение плана", "collection": "learning_plans"},
+      {"id": "send_plan", "type": "send_telegram", "label": "Отправка плана"},
+      {"id": "intro_agents", "type": "message", "label": "Представление агентов"},
+      {"id": "select_agent", "type": "menu", "label": "Выбор агента"}
+    ],
+    "edges": [
+      {"from": "welcome", "to": "experience"},
+      {"from": "experience", "to": "interests"},
+      {"from": "interests", "to": "learning_goals"},
+      {"from": "learning_goals", "to": "learning_style"},
+      {"from": "learning_style", "to": "available_time"},
+      {"from": "available_time", "to": "notifications"},
+      {"from": "notifications", "to": "thank_you"},
+      {"from": "thank_you", "to": "process_profile"},
+      {"from": "process_profile", "to": "save_profile"},
+      {"from": "save_profile", "to": "rag_query"},
+      {"from": "rag_query", "to": "process_plan"},
+      {"from": "process_plan", "to": "save_plan"},
+      {"from": "save_plan", "to": "send_plan"},
+      {"from": "send_plan", "to": "intro_agents"},
+      {"from": "intro_agents", "to": "select_agent"}
+    ]
+  }
+} 

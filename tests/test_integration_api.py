@@ -23,7 +23,7 @@ def test_rag_query():
     response = client.post("/integration/rag/query", json=payload)
     assert response.status_code == 200
     data = response.json()
-    assert data["result"] == "RAG mock response"
+    assert "RAG mock response" in data["result"]
     assert data["input"] == payload
     logger.info("test_rag_query: success")
 

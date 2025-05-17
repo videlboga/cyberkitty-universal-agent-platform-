@@ -1,0 +1,191 @@
+{
+  "name": "Менеджер агентов",
+  "description": "Главное меню для выбора агентов и управления ими",
+  "steps": [
+    {
+      "type": "message",
+      "text": "Добро пожаловать в систему агентов для обучения нейросетям!",
+      "next_step": 1
+    },
+    {
+      "type": "agent_menu",
+      "text": "Выберите агента, с которым хотите поговорить:",
+      "agents": [
+        {
+          "id": "coach",
+          "name": "Коуч",
+          "description": "помогает с рефлексией по прогрессу"
+        },
+        {
+          "id": "lifehacker",
+          "name": "Лайфхакер",
+          "description": "делится полезными советами"
+        },
+        {
+          "id": "mentor",
+          "name": "Ментор",
+          "description": "отвечает на вопросы"
+        },
+        {
+          "id": "digest",
+          "name": "Дайджест",
+          "description": "присылает релевантные новости"
+        },
+        {
+          "id": "expert",
+          "name": "Эксперт",
+          "description": "помогает с решением задач"
+        }
+      ],
+      "next_step": 2
+    },
+    {
+      "type": "branch",
+      "condition": "context.selected_agent != null",
+      "branches": {
+        "true": 3,
+        "false": 1
+      }
+    },
+    {
+      "type": "switch_agent",
+      "agent_id": "{selected_agent}",
+      "welcome_message": "Вы общаетесь с агентом: {agent_name}. Чем могу помочь?",
+      "next_step": 4
+    },
+    {
+      "type": "input",
+      "text": "Введите ваш запрос или выберите действие:",
+      "output_var": "user_input",
+      "buttons": [
+        {
+          "text": "Вернуться в меню",
+          "callback_data": "menu"
+        }
+      ],
+      "next_step": 5
+    },
+    {
+      "type": "branch",
+      "condition": "context.user_input == '/menu' || context.callback_data == 'menu'",
+      "branches": {
+        "true": 6,
+        "false": 7
+      }
+    },
+    {
+      "type": "return_to_menu",
+      "text": "Вы вернулись в главное меню. Выберите агента:",
+      "next_step": 1
+    },
+    {
+      "type": "branch",
+      "condition": "context.agent_id == 'coach'",
+      "branches": {
+        "true": 10,
+        "false": 8
+      }
+    },
+    {
+      "type": "branch",
+      "condition": "context.agent_id == 'lifehacker'",
+      "branches": {
+        "true": 11,
+        "false": 9
+      }
+    },
+    {
+      "type": "branch",
+      "condition": "context.agent_id == 'mentor'",
+      "branches": {
+        "true": 12,
+        "false": 13
+      }
+    },
+    {
+      "type": "telegram_message",
+      "text": "Я ваш коуч. Сейчас проанализирую ваш прогресс обучения и дам рекомендации по улучшению. Ваш запрос: {user_input}",
+      "next_step": 4
+    },
+    {
+      "type": "telegram_message",
+      "text": "Я ваш лайфхакер. Вот полезный совет по использованию нейросетей: {user_input}",
+      "next_step": 4
+    },
+    {
+      "type": "rag_query",
+      "query": "{user_input}",
+      "output_var": "rag_results",
+      "next_step": 14
+    },
+    {
+      "type": "branch",
+      "condition": "context.agent_id == 'digest'",
+      "branches": {
+        "true": 15,
+        "false": 16
+      }
+    },
+    {
+      "type": "telegram_message",
+      "text": "Результаты поиска по вашему запросу: {rag_results}",
+      "next_step": 4
+    },
+    {
+      "type": "telegram_message",
+      "text": "Я ваш дайджест. Вот новости по теме нейросетей за последнюю неделю: {user_input}",
+      "next_step": 4
+    },
+    {
+      "type": "telegram_message",
+      "text": "Я эксперт и помогу решить вашу задачу. Расскажите подробнее о проблеме: {user_input}",
+      "next_step": 4
+    }
+  ],
+  "extra": {
+    "nodes": [
+      {"id": "welcome", "type": "message", "label": "Приветствие"},
+      {"id": "menu", "type": "agent_menu", "label": "Меню агентов"},
+      {"id": "check_agent", "type": "branch", "label": "Проверка выбора агента"},
+      {"id": "switch", "type": "switch_agent", "label": "Переключение агента"},
+      {"id": "input", "type": "input", "label": "Ввод запроса"},
+      {"id": "check_menu", "type": "branch", "label": "Проверка возврата в меню"},
+      {"id": "return_menu", "type": "return_to_menu", "label": "Возврат в меню"},
+      {"id": "check_coach", "type": "branch", "label": "Проверка агента Коуч"},
+      {"id": "check_lifehacker", "type": "branch", "label": "Проверка агента Лайфхакер"},
+      {"id": "check_mentor", "type": "branch", "label": "Проверка агента Ментор"},
+      {"id": "coach_reply", "type": "telegram_message", "label": "Ответ коуча"},
+      {"id": "lifehacker_reply", "type": "telegram_message", "label": "Ответ лайфхакера"},
+      {"id": "rag_query", "type": "rag_query", "label": "RAG-запрос"},
+      {"id": "check_digest", "type": "branch", "label": "Проверка агента Дайджест"},
+      {"id": "mentor_reply", "type": "telegram_message", "label": "Ответ ментора"},
+      {"id": "digest_reply", "type": "telegram_message", "label": "Ответ дайджеста"},
+      {"id": "expert_reply", "type": "telegram_message", "label": "Ответ эксперта"}
+    ],
+    "edges": [
+      {"from": "welcome", "to": "menu"},
+      {"from": "menu", "to": "check_agent"},
+      {"from": "check_agent", "to": "switch", "label": "true"},
+      {"from": "check_agent", "to": "menu", "label": "false"},
+      {"from": "switch", "to": "input"},
+      {"from": "input", "to": "check_menu"},
+      {"from": "check_menu", "to": "return_menu", "label": "true"},
+      {"from": "check_menu", "to": "check_coach", "label": "false"},
+      {"from": "return_menu", "to": "menu"},
+      {"from": "check_coach", "to": "coach_reply", "label": "true"},
+      {"from": "check_coach", "to": "check_lifehacker", "label": "false"},
+      {"from": "check_lifehacker", "to": "lifehacker_reply", "label": "true"},
+      {"from": "check_lifehacker", "to": "check_mentor", "label": "false"},
+      {"from": "check_mentor", "to": "rag_query", "label": "true"},
+      {"from": "check_mentor", "to": "check_digest", "label": "false"},
+      {"from": "rag_query", "to": "mentor_reply"},
+      {"from": "mentor_reply", "to": "input"},
+      {"from": "check_digest", "to": "digest_reply", "label": "true"},
+      {"from": "check_digest", "to": "expert_reply", "label": "false"},
+      {"from": "coach_reply", "to": "input"},
+      {"from": "lifehacker_reply", "to": "input"},
+      {"from": "digest_reply", "to": "input"},
+      {"from": "expert_reply", "to": "input"}
+    ]
+  }
+} 

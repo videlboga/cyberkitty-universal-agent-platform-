@@ -9,6 +9,13 @@ from app.plugins.rag_plugin import RAGPlugin
 from app.plugins.telegram_plugin import TelegramPlugin
 from telegram.ext import Application
 
+# --- Добавлено для ScenarioExecutor ---
+from motor.motor_asyncio import AsyncIOMotorClient
+from app.db.scenario_repository import ScenarioRepository
+from app.db.agent_repository import AgentRepository
+from app.core.scenario_executor import ScenarioExecutor
+# --- Конец добавлений для ScenarioExecutor ---
+
 router = APIRouter(prefix="/integration", tags=["integration"])
 
 os.makedirs("logs", exist_ok=True)
@@ -24,14 +31,68 @@ rag_plugin = RAGPlugin()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TEST_TELEGRAM_CHAT_ID = int(os.getenv("TEST_TELEGRAM_CHAT_ID", "0"))
 
-if not TELEGRAM_BOT_TOKEN:
-    logger.warning("TELEGRAM_BOT_TOKEN не найден в переменных окружения. Используется тестовый токен.")
-    # Тестовый токен для разработки
-    TELEGRAM_BOT_TOKEN = "8020429038:AAEvO8SW0sD5u7ZSdizYruy8JpXXDrjVuxI"
-    TEST_TELEGRAM_CHAT_ID = 648981358
+# --- Инициализация ScenarioExecutor и его зависимостей ---
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/") # Убираем имя БД из URI по умолчанию
+MONGODB_DATABASE_NAME = os.getenv("MONGODB_DATABASE_NAME", "universal_agent_platform") # Согласованное имя БД по умолчанию
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000") # Для ScenarioExecutor, если он понадобится
 
-telegram_app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-telegram_plugin = TelegramPlugin(telegram_app)
+db_client = AsyncIOMotorClient(MONGO_URI)
+db = db_client[MONGODB_DATABASE_NAME] # Явно используем имя БД
+
+scenario_repo = ScenarioRepository(db)
+agent_repo = AgentRepository(db)
+
+# Сначала инициализируем Telegram компоненты, так как telegram_plugin нужен для ScenarioExecutor
+if not TELEGRAM_BOT_TOKEN: # Проверяем, что токен не пустой и не None
+    logger.warning("TELEGRAM_BOT_TOKEN не найден в переменных окружения или является пустой строкой. Telegram интеграция будет неактивна.")
+    telegram_app = None
+    telegram_plugin = None
+else:
+    try:
+        # Пытаемся инициализировать только с реальным токеном
+        telegram_app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+        telegram_plugin = TelegramPlugin(telegram_app) # Создаем экземпляр TelegramPlugin
+        logger.info("TelegramPlugin инициализирован в integration.py с предоставленным токеном.")
+    except Exception as e:
+        logger.error(f"Ошибка инициализации Telegram Application или Plugin с токеном '{TELEGRAM_BOT_TOKEN[:6]}...': {e}. Telegram-интеграция может не работать.")
+        telegram_app = None 
+        telegram_plugin = None
+
+
+# Теперь инициализируем ScenarioExecutor, передавая ему telegram_plugin
+scenario_executor = ScenarioExecutor(
+    scenario_repo=scenario_repo, 
+    agent_repo=agent_repo,
+    api_base_url=API_BASE_URL,
+    telegram_plugin=telegram_plugin  # Передаем созданный плагин
+)
+logger.info("ScenarioExecutor инициализирован в integration.py")
+# --- Конец инициализации ScenarioExecutor ---
+
+
+# Убираем эту логику отсюда, так как TELEGRAM_BOT_TOKEN уже проверен выше
+# if not TELEGRAM_BOT_TOKEN:
+#     logger.warning("TELEGRAM_BOT_TOKEN не найден в переменных окружения. Используется тестовый токен.")
+#     # Тестовый токен для разработки - ОСТОРОЖНО, НЕ КОММИТИТЬ РЕАЛЬНЫЙ ТОКЕН!
+#     TELEGRAM_BOT_TOKEN = "YOUR_DUMMY_DEVELOPMENT_TOKEN" # Замените на ваш DUMMY токен, если нужно
+#     # TEST_TELEGRAM_CHAT_ID = 648981358 # Если используется выше
+
+# Убираем создание telegram_app и telegram_plugin отсюда, они созданы выше
+# telegram_app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+
+# --- Связываем ScenarioExecutor с telegram_app ---
+
+# Проверяем, что telegram_app успешно создался
+if telegram_app:
+    telegram_app.bot_data["scenario_executor"] = scenario_executor
+    logger.info("ScenarioExecutor добавлен в telegram_app.bot_data")
+else:
+    logger.warning("telegram_app не был инициализирован, ScenarioExecutor не добавлен в bot_data.")
+# --- Конец связывания ---
+
+
+# Убираем создание telegram_plugin отсюда, он создан выше и передан в ScenarioExecutor
+# telegram_plugin = TelegramPlugin(telegram_app)
 
 @router.get("/llm/models")
 async def llm_models():

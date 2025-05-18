@@ -98,11 +98,12 @@ def handle_id_query(id_or_name: str, collection):
         return {"_id": obj_id}
     else:
         # Ищем сначала по _id как есть (для строковых ID),
-        # затем по имени или slug
+        # затем по имени или slug, а также по scenario_id
         return {"$or": [
             {"_id": id_or_name},
             {"name": id_or_name}, 
-            {"slug": id_or_name}
+            {"slug": id_or_name},
+            {"scenario_id": id_or_name}
         ]}
 
 def ensure_mongo_id(doc):

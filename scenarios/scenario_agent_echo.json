@@ -1,0 +1,54 @@
+{
+  "scenario_id": "scenario_agent_echo",
+  "name": "Эхо-Агент",
+  "description": "Повторяет введенное пользователем сообщение.",
+  "version": "1.0",
+  "steps": [
+    {
+      "step_id": "ask_for_input",
+      "type": "telegram_send_message",
+      "name": "Запросить ввод",
+      "params": {
+        "text": "Привет! Я Эхо-Агент. Напиши что-нибудь, и я повторю."
+      },
+      "next_step_id": "wait_for_text_input"
+    },
+    {
+      "step_id": "wait_for_text_input",
+      "type": "input", 
+      "name": "Ожидание текстового ввода",
+      "params": {
+        "input_type": "text", 
+        "variable_name": "user_echo_input" 
+      },
+      "next_step_id": "echo_message"
+    },
+    {
+      "step_id": "echo_message",
+      "type": "telegram_send_message",
+      "name": "Отправить эхо-сообщение",
+      "params": {
+        "text": "Вы сказали: {user_echo_input}" 
+      },
+      "next_step_id": "offer_return_to_main_menu_echo"
+    },
+    {
+      "step_id": "offer_return_to_main_menu_echo",
+      "type": "telegram_send_message",
+      "name": "Предложить вернуться в меню",
+      "params": {
+        "text": "Хотите вернуться в главное меню?",
+        "inline_keyboard": [
+          [
+            {"text": "↩️ Главное меню", "callback_data": "run_scenario:scenario_main_menu"}
+          ]
+        ]
+      },
+      "next_step_id": null
+    }
+  ],
+  "initial_context": {},
+  "error_handling": {
+    "default_next_step_id": "offer_return_to_main_menu_echo" 
+  }
+} 

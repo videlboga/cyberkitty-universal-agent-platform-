@@ -44,13 +44,15 @@ class SchedulerService:
         # Получаем значения из переменных окружения, если они не указаны явно
         self.api_base_url = api_base_url or os.getenv("API_URL", "http://localhost:8000")
         self.mongo_uri = mongo_uri or os.getenv("MONGO_URI", "mongodb://localhost:27017")
+        self.db_name = os.getenv("MONGODB_DATABASE_NAME", "agent_platform")
         
         # Логируем используемые значения для диагностики
         logger.info(f"SchedulerService: используется API URL: {self.api_base_url}")
         logger.info(f"SchedulerService: используется MongoDB URI: {self.mongo_uri}")
+        logger.info(f"SchedulerService: используется MongoDB DATABASE NAME: {self.db_name}")
         
         self.mongo_client = AsyncIOMotorClient(self.mongo_uri)
-        self.db = self.mongo_client.agent_platform
+        self.db = self.mongo_client[self.db_name]
         self.dialog_state_manager = DialogStateManager(self.api_base_url)
         self.user_profile_manager = UserProfileManager(self.api_base_url)
         self.scheduler_running = False

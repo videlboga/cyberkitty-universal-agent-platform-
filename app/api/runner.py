@@ -9,6 +9,9 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 from typing import Optional, Dict, Any
 
+# Импортируем telegram_plugin из integration.py
+from app.api.integration import telegram_plugin 
+
 router = APIRouter(prefix="/agent-actions", tags=["runner"])
 
 os.makedirs("logs", exist_ok=True)
@@ -20,8 +23,12 @@ db = client.get_default_database()
 agent_repo = AgentRepository(db)
 scenario_repo = ScenarioRepository(db)
 
-# Инициализируем исполнитель сценариев
-scenario_executor = ScenarioExecutor(scenario_repo=scenario_repo, agent_repo=agent_repo)
+# Инициализируем исполнитель сценариев, передавая telegram_plugin
+scenario_executor = ScenarioExecutor(
+    scenario_repo=scenario_repo, 
+    agent_repo=agent_repo,
+    telegram_plugin=telegram_plugin # Добавляем telegram_plugin
+)
 
 @router.post("/{agent_id}/run", status_code=status.HTTP_200_OK)
 async def run_agent(agent_id: str, input_data: dict = None):

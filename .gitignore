@@ -24,7 +24,6 @@ data/
 backup/
 
 # Secrets - ensure .env.example is tracked instead
-.env
 
 # OS specific
 .DS_Store

@@ -1,0 +1,32 @@
+{
+  "scenario_id": "scenario_main_menu",
+  "name": "Главное Меню",
+  "description": "Отображает главное меню выбора агентов.",
+  "version": "1.0",
+  "steps": [
+    {
+      "step_id": "show_agent_menu",
+      "type": "telegram_send_message",
+      "name": "Показать меню выбора агента",
+      "params": {
+        "text": "Добро пожаловать! Выберите, с кем бы вы хотели пообщаться, или действие:",
+        "inline_keyboard": [
+          [
+            {"text": "🗣️ Эхо-Агент", "callback_data": "run_scenario:scenario_agent_echo"}
+          ],
+          [
+            {"text": "👋 Приветствие и Выход", "callback_data": "run_scenario:scenario_agent_greet_and_end"}
+          ],
+          [
+            {"text": "❌ Закрыть меню (пример события)", "callback_data": "event:close_menu"}
+          ]
+        ]
+      },
+      "next_step_id": null 
+    }
+  ],
+  "initial_context": {},
+  "error_handling": {
+    "default_next_step_id": null
+  }
+} 

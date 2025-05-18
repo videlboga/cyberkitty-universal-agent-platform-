@@ -40,7 +40,7 @@ class ScenarioRepository:
         return result
 
     async def update(self, scenario_id: str, data: dict) -> Optional[Scenario]:
-        query = handle_id_query(scenario_id)
+        query = handle_id_query(scenario_id, self.collection)
         data_to_set = {k: v for k, v in data.items() if k != "_id" and k != "id"}
         
         result = await self.collection.update_one(query, {"$set": data_to_set})

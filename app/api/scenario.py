@@ -8,9 +8,11 @@ import os
 
 router = APIRouter(prefix="/scenarios", tags=["scenarios"])
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/universal_agent")
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+MONGODB_DATABASE_NAME = os.getenv("MONGODB_DATABASE_NAME", "universal_agent_platform")
+
 client = AsyncIOMotorClient(MONGO_URI)
-db = client.get_default_database()
+db = client[MONGODB_DATABASE_NAME]
 scenario_repo = ScenarioRepository(db)
 
 @router.post("/", response_model=Scenario, status_code=status.HTTP_201_CREATED)

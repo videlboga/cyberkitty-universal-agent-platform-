@@ -36,7 +36,8 @@ class ScenarioExecutor:
     def __init__(self,
                  scenario_repo: ScenarioRepository,
                  agent_repo: AgentRepository,
-                 api_base_url: str = "http://localhost:8000"):
+                 api_base_url: str = "http://localhost:8000",
+                 telegram_plugin: Optional[TelegramPlugin] = None):
         """
         Инициализация исполнителя сценариев
         
@@ -44,10 +45,12 @@ class ScenarioExecutor:
             scenario_repo: Репозиторий для доступа к сценариям.
             agent_repo: Репозиторий для доступа к агентам.
             api_base_url: Базовый URL API для доступа к коллекциям и интеграциям.
+            telegram_plugin: Опциональный экземпляр TelegramPlugin.
         """
         self.scenario_repo = scenario_repo
         self.agent_repo = agent_repo
         self.api_base_url = api_base_url
+        self.telegram_plugin = telegram_plugin
         self.step_handlers = {}
         self.plugins = []
         
@@ -68,7 +71,6 @@ class ScenarioExecutor:
         self.step_handlers["input"] = self.handle_input
         self.step_handlers["branch"] = self.handle_branch
         self.step_handlers["rag_search"] = self.handle_rag_search
-        self.step_handlers["telegram_message"] = self.handle_telegram_message
         # Добавляем обработчики для шагов типа 'action' и 'end'
         self.step_handlers["action"] = self.handle_action
         self.step_handlers["start"] = self.handle_start
@@ -80,17 +82,6 @@ class ScenarioExecutor:
         """Инициализация плагинов и регистрация их обработчиков"""
         self.rag_plugin = RAGPlugin()
         
-        # Используем реальный токен из переменных окружения
-        if not TELEGRAM_BOT_TOKEN:
-            logger.warning("TELEGRAM_BOT_TOKEN не найден в переменных окружения. Telegram интеграция не будет работать.")
-            telegram_token = "dummy_token"
-        else:
-            telegram_token = TELEGRAM_BOT_TOKEN
-            logger.info(f"Используем токен Telegram из переменных окружения: {telegram_token[:6]}...{telegram_token[-6:] if len(telegram_token) > 12 else ''}")
-        
-        telegram_app = Application.builder().token(telegram_token).build()
-        self.telegram_plugin = TelegramPlugin(telegram_app)
-        
         self.learning_plan_plugin = LearningPlanPlugin(api_base_url=self.api_base_url)
         self.agent_manager_plugin = AgentManagerPlugin(api_base_url=self.api_base_url)
         self.llm_plugin = LLMPlugin()
@@ -100,7 +91,13 @@ class ScenarioExecutor:
         self.agent_manager_plugin.register_step_handlers(self.step_handlers)
         self.llm_plugin.register_step_handlers(self.step_handlers)
         
-        logger.info("Инициализированы плагины и их обработчики")
+        if self.telegram_plugin:
+            self.telegram_plugin.register_step_handlers(self.step_handlers)
+            logger.info("Обработчики TelegramPlugin зарегистрированы.")
+        else:
+            logger.warning("TelegramPlugin не был предоставлен ScenarioExecutor, интеграция с Telegram через ScenarioExecutor не будет работать для обработчиков шагов.")
+            
+        logger.info("Инициализированы плагины и их обработчики (кроме Telegram, если не был предоставлен).")
     
     async def handle_message(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -180,52 +177,6 @@ class ScenarioExecutor:
         
         return context
     
-    async def handle_telegram_message(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Обработчик шага типа telegram_message - отправка сообщения через Telegram
-        
-        Args:
-            step_data: Данные шага (тип, chat_id, message, ...)
-            context: Контекст сценария
-            
-        Returns:
-            Dict: Обновленный контекст
-        """
-        chat_id = step_data.get("chat_id")
-        message = step_data.get("message", "")
-        
-        # Если chat_id не указан явно, ищем его в контексте
-        if not chat_id and "chat_id" in context:
-            chat_id = context.get("chat_id")
-        
-        # Подстановка переменных из контекста в сообщение
-        if isinstance(message, str) and "{" in message and "}" in message:
-            for key, value in context.items():
-                placeholder = "{" + key + "}"
-                if placeholder in message:
-                    message = message.replace(placeholder, str(value))
-        
-        output_var = step_data.get("output_var", "telegram_result")
-        
-        # --- Проверка наличия chat_id ---
-        if not chat_id or chat_id in (None, "", "{chat_id}"):
-            logger.error(f"[CRITICAL] chat_id отсутствует или некорректен перед отправкой в Telegram! Этап: telegram_message, context: {context}")
-            context[output_var] = {"error": "chat_id отсутствует или некорректен на этапе telegram_message", "context": context}
-            return context
-        # --- Конец проверки ---
-        # --- Расширенное логирование для отладки chat_id ---
-        logger.info(f"[DEBUG] Перед отправкой в Telegram: chat_id={chat_id!r}, message={message!r}, context={context}")
-        # --- Конец блока логирования ---
-        try:
-            result = await self.telegram_plugin.send_message(chat_id, message)
-            context[output_var] = result
-            logger.info(f"Отправлено сообщение в Telegram: chat_id={chat_id}, длина сообщения={len(message)}")
-        except Exception as e:
-            logger.error(f"Ошибка при отправке сообщения в Telegram: {e}")
-            context[output_var] = {"error": str(e)}
-        
-        return context
-    
     async def handle_action(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """
         Обрабатывает шаг типа action: выполнение действия через плагины
@@ -238,30 +189,52 @@ class ScenarioExecutor:
             Dict[str, Any]: Обновленный контекст
         """
         try:
-            # Получаем тип действия и его параметры
             action_type = step_data.get("action_type")
-            params = step_data.get("params", {})
+            params = step_data.get("params", {}) # Это параметры для действия
+            # step_data может содержать и другие поля, специфичные для шага "action", 
+            # но не являющиеся параметрами самого действия (например, output_var)
             
             if not action_type:
-                logger.warning("Шаг action не содержит тип действия")
+                logger.warning("Шаг action не содержит тип действия (action_type)")
+                context["__step_error__"] = "Шаг action не содержит action_type"
                 return context
             
-            # Если action_type совпадает с telegram_message, используем соответствующий обработчик
-            if action_type == "telegram_message" or action_type == "send_message":
-                # Передаем параметры в формате, ожидаемом handle_telegram_message
-                telegram_step = {
-                    "chat_id": params.get("chat_id") or context.get("chat_id"),
-                    "text": params.get("text") or ""
-                }
-                return await self.handle_telegram_message(telegram_step, context)
+            # Если action_type совпадает с telegram_send_message, используем соответствующий обработчик из TelegramPlugin
+            if action_type == "telegram_send_message":
+                # Параметры для telegram_send_message должны быть внутри params
+                # step_data для handle_step_send_message это и есть params в данном случае
+                logger.info(f"Шаг action вызывает telegram_send_message с параметрами: {{params}}")
+                # Убедимся, что chat_id передается, если он есть в общем контексте и не указан в params
+                if "chat_id" not in params and "chat_id" in context:
+                    params["chat_id"] = context["chat_id"]
+
+                if self.telegram_plugin: # Проверяем наличие плагина перед вызовом
+                    return await self.telegram_plugin.handle_step_send_message(params, context)
+                else:
+                    logger.error("Попытка выполнить telegram_send_message, но TelegramPlugin не инициализирован в ScenarioExecutor.")
+                    context["__step_error__"] = "TelegramPlugin не инициализирован."
+                    return context
             
-            # Для других типов действий логируем и просто возвращаем контекст
-            logger.info(f"Выполнение действия типа {action_type}")
+            # Для других типов действий можно также проверять наличие зарегистрированных обработчиков
+            # или использовать общую логику, если предполагается, что action_type - это имя метода в каком-либо плагине.
+            # Пока что, для неизвестных action_type, логируем и возвращаем контекст.
+            # Эта логика может быть расширена для поддержки большего количества generic actions.
+            
+            logger.info(f"Выполнение общего действия типа '{action_type}' не реализовано напрямую в handle_action. Проверьте тип шага.")
+            # Если предполагается, что action_type - это какой-то другой зарегистрированный тип шага,
+            # то сценарий должен использовать 'type: action_type' вместо 'type: action, action_type: action_type'
+            
+            # Если есть другие плагины, которые регистрируют действия под своими именами,
+            # они должны регистрировать их в self.step_handlers, и тогда шаг должен быть type: plugin_action_name
+            
+            # По умолчанию, если action_type не telegram_send_message и не другой специальный, считаем ошибкой конфигурации шага
+            context["__step_error__"] = f"Неизвестный action_type '{action_type}' в шаге 'action'. Зарегистрируйте его или используйте соответствующий 'type'."
+            logger.warning(context["__step_error__"])
             return context
                 
         except Exception as e:
-            logger.error(f"Ошибка при обработке шага action: {e}")
-            context["__step_error__"] = str(e) # Добавляем информацию об ошибке в контекст
+            logger.error(f"Ошибка при обработке шага action (action_type: {step_data.get('action_type')}): {e}", exc_info=True)
+            context["__step_error__"] = str(e)
             return context
     
     async def handle_start(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
@@ -436,3 +409,49 @@ class ScenarioExecutor:
 
         logger.info(f"Завершено выполнение шага execute_sub_scenario для '{sub_scenario_id}'. Обновленный родительский контекст: {parent_context}")
         return parent_context 
+
+    async def run_scenario_by_id(self, scenario_id: str, context: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+        """
+        Загружает сценарий по ID из репозитория и выполняет его.
+        
+        Args:
+            scenario_id: ID сценария для загрузки и выполнения.
+            context: Исходный контекст (опционально).
+            
+        Returns:
+            Финальный контекст после выполнения всех шагов, или None в случае ошибки загрузки сценария.
+        """
+        logger.info(f"Запрос на выполнение сценария по ID: '{scenario_id}'")
+        if context is None:
+            context = {} # Инициализируем пустой контекст, если не предоставлен
+
+        # Добавляем scenario_id в контекст, если его там нет, или если он отличается
+        # Это может быть полезно для логирования или внутренней логики
+        if context.get("scenario_id") != scenario_id:
+            context["scenario_id"] = scenario_id # Может перезаписать, если уже был другой
+
+        try:
+            scenario_model = await self.scenario_repo.get_by_id(scenario_id)
+            if not scenario_model:
+                logger.error(f"Сценарий с ID '{scenario_id}' не найден в репозитории.")
+                # В этом случае, возможно, стоит вернуть ошибку в контексте или возбудить исключение,
+                # чтобы вызывающий код мог это обработать.
+                # Пока просто возвращаем None, указывая на неудачу запуска.
+                # Вызывающий код в TelegramPlugin должен будет это проверить.
+                return None 
+            
+            scenario_dict = scenario_model.model_dump(exclude_none=True)
+            
+            # Перед выполнением, убедимся, что критически важные данные для Telegram есть в контексте, если они нужны
+            # Например, user_id и chat_id. Они должны были быть добавлены вызывающим кодом (TelegramPlugin).
+            if "user_id" not in context or "chat_id" not in context:
+                logger.warning(f"При запуске сценария '{scenario_id}' в контексте отсутствуют 'user_id' или 'chat_id'. Контекст: {context}")
+                # Это не обязательно фатальная ошибка для самого executor, но может быть проблемой для шагов сценария
+            
+            logger.info(f"Сценарий '{scenario_id}' (Имя: {scenario_dict.get('name', 'N/A')}) загружен. Начальный контекст: {context}")
+            
+            return await self.execute_scenario(scenario_dict, context)
+        except Exception as e:
+            logger.error(f"Критическая ошибка во время загрузки или выполнения сценария по ID '{scenario_id}': {e}", exc_info=True)
+            # Также возвращаем None или обрабатываем ошибку иначе
+            return None 

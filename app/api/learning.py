@@ -9,6 +9,9 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import json
 
+# Импортируем telegram_plugin из integration.py
+from app.api.integration import telegram_plugin
+
 router = APIRouter(prefix="/learning", tags=["learning"])
 
 # Настройка логирования
@@ -22,8 +25,12 @@ db = client.get_default_database()
 scenario_repo = ScenarioRepository(db)
 agent_repo = AgentRepository(db)
 
-# Инициализация исполнителя сценариев
-scenario_executor = ScenarioExecutor(scenario_repo=scenario_repo, agent_repo=agent_repo)
+# Инициализация исполнителя сценариев, передавая telegram_plugin
+scenario_executor = ScenarioExecutor(
+    scenario_repo=scenario_repo, 
+    agent_repo=agent_repo,
+    telegram_plugin=telegram_plugin
+)
 
 # Модели данных
 class UserProfile(BaseModel):

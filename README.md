@@ -445,3 +445,152 @@ curl -X POST "http://localhost:8000/agent-actions/manager/run" \
 - **return_to_menu** - возврат в главное меню агентов
 
 Все сценарии исполняются через `ScenarioExecutor`, который координирует работу плагинов и обработчиков шагов. 
+
+## API Endpoints
+
+### Пользователи (`/users`)
+- `POST /users/` - Создание пользователя
+- `GET /users/` - Список пользователей
+- `GET /users/{user_id}` - Получение пользователя по ID
+- `DELETE /users/{user_id}` - Удаление пользователя
+
+### Сценарии (`/scenarios`)
+- `POST /scenarios/` - Создание/обновление сценария
+- `GET /scenarios/` - Список сценариев
+- `GET /scenarios/{scenario_id}` - Получение сценария по ID
+- `DELETE /scenarios/{scenario_id}` - Удаление сценария
+
+### Агенты (`/agents`)
+- `POST /agents/` - Создание агента
+- `GET /agents/` - Список агентов
+- `GET /agents/{agent_id}` - Получение агента по ID
+
+### Планировщик (`/scheduler`)
+- `GET /scheduler/status` - Статус планировщика
+- `POST /scheduler/start` - Запуск планировщика
+- `POST /scheduler/stop` - Остановка планировщика
+- `POST /scheduler/test-notification` - Тестовое уведомление
+- `POST /scheduler/tasks` - Создание задачи
+
+### Интеграции (`/integration`)
+- `GET /integration/llm/models` - Список моделей LLM
+- `POST /integration/llm/query` - Запрос к LLM
+- `POST /integration/crm/query` - Запрос к CRM
+- `POST /integration/crm/amocrm/query` - Запрос к amoCRM
+- `POST /integration/telegram/send` - Отправка сообщения в Telegram
+- `POST /integration/telegram/send_test` - Тестовая отправка в Telegram
+- `POST /integration/mongodb/save_test` - Тестовое сохранение в MongoDB
+
+### Коллекции (`/db/collections`)
+- `POST /db/collections/` - Создание коллекции
+- `GET /db/collections/` - Список коллекций
+- `POST /db/collections/{name}/items` - Создание документа
+- `GET /db/collections/{name}/items` - Список документов
+- `GET /db/collections/{name}/items/{item_id}` - Получение документа
+- `PATCH /db/collections/{name}/items/{item_id}` - Обновление документа
+- `DELETE /db/collections/{name}/items/{item_id}` - Удаление документа
+
+### Обучение (`/learning`)
+- `POST /learning/onboard` - Запуск онбординга пользователя
+
+### Запуск сценариев (`/runner`)
+- `POST /runner/{agent_id}/execute` - Выполнение сценария 
+
+## Примеры использования API
+
+### Создание пользователя
+```bash
+curl -X POST "http://localhost:8000/users/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "first_name": "Иван",
+    "last_name": "Иванов",
+    "username": "ivan"
+  }'
+```
+
+### Создание сценария
+```bash
+curl -X POST "http://localhost:8000/scenarios/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scenario_id": "onboarding",
+    "name": "Онбординг пользователя",
+    "description": "Сценарий для первичного знакомства с платформой",
+    "steps": [
+      {
+        "type": "message",
+        "content": "Добро пожаловать! Я помогу вам начать работу с платформой."
+      }
+    ]
+  }'
+```
+
+### Создание агента
+```bash
+curl -X POST "http://localhost:8000/agents/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Менеджер",
+    "description": "Агент для управления задачами",
+    "scenario_id": "task_manager"
+  }'
+```
+
+### Запуск планировщика
+```bash
+curl -X POST "http://localhost:8000/scheduler/start"
+```
+
+### Создание задачи в планировщике
+```bash
+curl -X POST "http://localhost:8000/scheduler/tasks" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "user123",
+    "trigger_type": "once",
+    "trigger_config": {
+      "datetime": "2024-03-20T10:00:00Z"
+    },
+    "action_type": "send_notification",
+    "action_config": {
+      "text": "Напоминание о встрече"
+    }
+  }'
+```
+
+### Отправка сообщения через Telegram
+```bash
+curl -X POST "http://localhost:8000/integration/telegram/send" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chat_id": "123456789",
+    "text": "Привет! Это тестовое сообщение."
+  }'
+```
+
+### Запуск онбординга
+```bash
+curl -X POST "http://localhost:8000/learning/onboard" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "user123",
+    "chat_id": "123456789",
+    "language": "ru",
+    "first_name": "Иван",
+    "last_name": "Иванов",
+    "username": "ivan"
+  }'
+```
+
+### Выполнение сценария
+```bash
+curl -X POST "http://localhost:8000/runner/manager/execute" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "context": {
+      "user_id": "user123",
+      "chat_id": "123456789"
+    }
+  }' 

@@ -3,9 +3,10 @@ import json
 import uuid
 from typing import Dict, Any, List, Optional, Union, Tuple
 from loguru import logger
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, timezone
 import asyncio
 import requests
+import httpx
 import pytz
 from app.utils.dialog_state import DialogStateManager
 from app.utils.user_profile import UserProfileManager
@@ -86,105 +87,107 @@ class SchedulerService:
         logger.info("Планировщик остановлен")
     
     async def _scheduler_loop(self):
-        """Основной цикл планировщика для проверки и выполнения задач"""
+        """
+        Основной цикл планировщика
+        """
         while self.scheduler_running:
             try:
-                # Получаем текущее время
-                now = datetime.now()
+                # Получаем текущее время с timezone
+                now = datetime.now(timezone.utc)
                 
-                # Проверяем все задачи
+                # Проверяем каждую задачу
                 for task_id, task in list(self.scheduled_tasks.items()):
-                    # Пропускаем отключенные задачи
-                    if not task.get("enabled", True):
-                        continue
-                    
-                    # Проверяем, должна ли задача выполниться сейчас
-                    if await self._should_trigger(task, now):
-                        # Проверяем, не выполнялась ли задача недавно
-                        if not self._was_recently_executed(task_id, task, now):
-                            # Выполняем действие
-                            await self._execute_action(task)
-                            # Отмечаем выполнение
-                            self._mark_executed(task_id, now)
+                    try:
+                        # Проверяем, должен ли сработать триггер
+                        if await self._should_trigger(task, now):
+                            logger.info(f"Задача {task_id}: триггер сработал, проверка _was_recently_executed...")
+                            was_recent = self._was_recently_executed(task_id, task, now)
+                            logger.info(f"Задача {task_id}: _was_recently_executed вернула: {was_recent}")
+                            if not was_recent:
+                                logger.info(f"Задача {task_id}: ЗАПУСК _execute_action")
+                                # Запускаем действие задачи
+                                await self._execute_action(task)
+                                # Отмечаем задачу как выполненную
+                                self._mark_executed(task_id, now)
+                                logger.info(f"Задача {task_id}: _execute_action и _mark_executed ВЫПОЛНЕНЫ")
+                            else:
+                                logger.info(f"Задача {task_id}: ПРОПУСК _execute_action из-за _was_recently_executed")
+                    except Exception as e:
+                        logger.error(f"Ошибка при обработке задачи {task_id}: {e}")
                 
-                # Ждем перед следующей проверкой (60 секунд)
-                await asyncio.sleep(60)
+                # Ждем до следующей проверки
+                await asyncio.sleep(60)  # Проверяем каждую минуту
                 
             except Exception as e:
                 logger.error(f"Ошибка в цикле планировщика: {e}")
                 await asyncio.sleep(60)  # Ждем 1 минуту перед повторной попыткой
     
+    def _parse_datetime(self, datetime_str: str) -> datetime:
+        """
+        Парсит строку datetime с учетом timezone
+        
+        Args:
+            datetime_str: Строка с датой и временем
+            
+        Returns:
+            datetime: Объект datetime с timezone
+        """
+        try:
+            # Пробуем сначала ISO формат
+            dt = datetime.fromisoformat(datetime_str)
+            if dt.tzinfo is None:
+                # Если timezone не указан, используем UTC
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+        except ValueError:
+            try:
+                # Пробуем стандартный формат
+                dt = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M:%S")
+                # Добавляем UTC timezone
+                return dt.replace(tzinfo=timezone.utc)
+            except ValueError as e:
+                raise ValueError(f"Неверный формат даты и времени: {datetime_str}") from e
+
     async def _should_trigger(self, task: Dict[str, Any], now: datetime) -> bool:
         """
-        Проверяет, должен ли сработать триггер для задачи
+        Проверяет, должен ли сработать триггер задачи
         
         Args:
             task: Конфигурация задачи
-            now: Текущее время
+            now: Текущее время (с timezone)
             
         Returns:
-            bool: True если триггер должен сработать, иначе False
+            bool: True если триггер должен сработать
         """
+        if not task.get("enabled", True):
+            return False
+        
         trigger_type = task.get("trigger_type")
-        config = task.get("trigger_config", {})
+        trigger_config = task.get("trigger_config", {})
         
-        # Проверка наличия необходимых полей
-        if not trigger_type:
-            logger.warning(f"Задача {task.get('id', 'неизвестно')} не содержит тип триггера")
-            return False
-            
-        if not config:
-            logger.warning(f"Задача {task.get('id', 'неизвестно')} не содержит конфигурацию триггера")
+        if not trigger_type or not trigger_config:
             return False
         
-        if trigger_type == "daily":
-            # Ежедневный триггер
-            time_str = config.get("time", "09:00")
-            target_time = self._parse_time(time_str)
-            margin_minutes = config.get("margin_minutes", 5)
-            
-            return self._is_time_match(now.time(), target_time, margin_minutes)
-            
-        elif trigger_type == "weekly":
-            # Еженедельный триггер
-            day = config.get("day", "monday").lower()
-            time_str = config.get("time", "10:00")
-            target_time = self._parse_time(time_str)
-            margin_minutes = config.get("margin_minutes", 5)
-            
-            current_day = now.strftime("%A").lower()
-            return current_day == day and self._is_time_match(now.time(), target_time, margin_minutes)
-            
-        elif trigger_type == "monthly":
-            # Ежемесячный триггер
-            day = config.get("day", 1)
-            time_str = config.get("time", "10:00")
-            target_time = self._parse_time(time_str)
-            margin_minutes = config.get("margin_minutes", 5)
-            
-            return now.day == day and self._is_time_match(now.time(), target_time, margin_minutes)
-            
-        elif trigger_type == "once":
-            # Одноразовый триггер
-            datetime_str = config.get("datetime")
+        if trigger_type == "once":
+            datetime_str = trigger_config.get("datetime")
             task_id = task.get("id", "неизвестно")
             
             if not datetime_str:
                 logger.warning(f"Задача {task_id}: отсутствует параметр datetime в конфигурации триггера")
                 return False
-                
+            
             try:
                 # Обработка специального значения "now"
                 if datetime_str == "now":
                     logger.info(f"Задача {task_id}: обнаружено значение datetime = 'now', заменяем на текущее время")
                     
-                    # Получаем текущее время в формате ISO без микросекунд
+                    # Получаем текущее время в формате ISO с timezone
                     current_time = now.replace(microsecond=0).isoformat()
                     
                     # Если задача имеет ID, обновляем ее конфигурацию
                     if task_id != "неизвестно":
                         # Сохраняем старые параметры конфигурации
-                        updated_config = config.copy()
+                        updated_config = trigger_config.copy()
                         updated_config["datetime"] = current_time
                         
                         # Запускаем асинхронное обновление в базе данных без ожидания результата
@@ -201,23 +204,12 @@ class SchedulerService:
                     # Сигнализируем о необходимости запуска задачи
                     return True
                 
-                # Парсинг datetime в разных форматах с проверкой на валидность
-                try:
-                    # Сначала пробуем fromisoformat
-                    target_datetime = datetime.fromisoformat(datetime_str)
-                except ValueError as e:
-                    logger.error(f"Ошибка при обработке триггера once: {e}")
-                    try:
-                        # Если не получилось, пробуем стандартный strptime
-                        target_datetime = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M:%S")
-                    except ValueError:
-                        # Если и это не сработало, логируем ошибку и возвращаем False
-                        logger.error(f"Задача {task_id}: невозможно преобразовать datetime '{datetime_str}' в допустимый формат")
-                        return False
+                # Парсим datetime с учетом timezone
+                target_datetime = self._parse_datetime(datetime_str)
                 
                 # Вычисляем разницу в секундах между текущим и целевым временем
                 diff_seconds = (now - target_datetime).total_seconds()
-                margin_seconds = config.get("margin_seconds", 300)  # 5 минут по умолчанию
+                margin_seconds = trigger_config.get("margin_seconds", 300)  # 5 минут по умолчанию
                 
                 # Проверяем, находится ли текущее время в пределах допустимой погрешности
                 is_valid_time_window = 0 <= diff_seconds <= margin_seconds
@@ -227,16 +219,41 @@ class SchedulerService:
                 
                 return is_valid_time_window
                 
-            except Exception as e:
+            except ValueError as e:
                 logger.error(f"Ошибка при обработке триггера once: {e}")
-                import traceback
-                logger.debug(f"Трассировка: {traceback.format_exc()}")
                 return False
+            
+        elif trigger_type == "daily":
+            # Ежедневный триггер
+            time_str = trigger_config.get("time", "09:00")
+            target_time = self._parse_time(time_str)
+            margin_minutes = trigger_config.get("margin_minutes", 5)
+            
+            return self._is_time_match(now.time(), target_time, margin_minutes)
+            
+        elif trigger_type == "weekly":
+            # Еженедельный триггер
+            day = trigger_config.get("day", "monday").lower()
+            time_str = trigger_config.get("time", "10:00")
+            target_time = self._parse_time(time_str)
+            margin_minutes = trigger_config.get("margin_minutes", 5)
+            
+            current_day = now.strftime("%A").lower()
+            return current_day == day and self._is_time_match(now.time(), target_time, margin_minutes)
+            
+        elif trigger_type == "monthly":
+            # Ежемесячный триггер
+            day = trigger_config.get("day", 1)
+            time_str = trigger_config.get("time", "10:00")
+            target_time = self._parse_time(time_str)
+            margin_minutes = trigger_config.get("margin_minutes", 5)
+            
+            return now.day == day and self._is_time_match(now.time(), target_time, margin_minutes)
             
         elif trigger_type == "interval":
             # Триггер с интервалом
-            interval_minutes = config.get("interval_minutes", 60)  # 60 минут по умолчанию
-            start_time = config.get("start_time")
+            interval_minutes = trigger_config.get("interval_minutes", 60)  # 60 минут по умолчанию
+            start_time = trigger_config.get("start_time")
             task_id = task.get("id", "неизвестно")
             
             # Если указано время начала, проверяем, прошло ли оно
@@ -245,11 +262,11 @@ class SchedulerService:
                     # Парсинг start_time в разных форматах с проверкой на валидность
                     try:
                         # Сначала пробуем fromisoformat
-                        start_datetime = datetime.fromisoformat(start_time)
+                        start_datetime = self._parse_datetime(start_time)
                     except ValueError:
                         try:
                             # Если не получилось, пробуем стандартный strptime
-                            start_datetime = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+                            start_datetime = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
                         except ValueError:
                             # Если и это не сработало, логируем ошибку и используем текущее время
                             logger.error(f"Задача {task_id}: невозможно преобразовать start_time '{start_time}' в допустимый формат. Используем текущее время.")
@@ -320,47 +337,31 @@ class SchedulerService:
     
     def _was_recently_executed(self, task_id: str, task: Dict[str, Any], now: datetime) -> bool:
         """
-        Проверяет, выполнялась ли задача недавно
+        Проверяет, не была ли задача недавно выполнена
         
         Args:
             task_id: ID задачи
             task: Конфигурация задачи
-            now: Текущее время
+            now: Текущее время (с timezone)
             
         Returns:
-            bool: True если задача недавно выполнялась, иначе False
+            bool: True если задача была недавно выполнена
         """
-        trigger_type = task.get("trigger_type")
-        
-        # Получаем время последнего выполнения
         last_execution = self._get_last_execution_time(task_id)
         if not last_execution:
+            logger.info(f"Задача {task_id} (_was_recently_executed): нет last_execution, возвращаем False")
             return False
         
-        # Проверка в зависимости от типа триггера
-        if trigger_type == "daily":
-            # Проверяем, выполнялась ли задача сегодня
-            return last_execution.date() == now.date()
-            
-        elif trigger_type == "weekly":
-            # Проверяем, выполнялась ли задача на этой неделе
-            # (считаем неделю с понедельника)
-            start_of_week = now.date() - timedelta(days=now.weekday())
-            return last_execution.date() >= start_of_week
-            
-        elif trigger_type == "monthly":
-            # Проверяем, выполнялась ли задача в этом месяце
-            return last_execution.year == now.year and last_execution.month == now.month
-            
-        elif trigger_type == "once":
-            # Для одноразового триггера: если выполнялась хоть раз, больше не выполняем
-            return True
-            
-        elif trigger_type == "interval":
-            # Для интервального триггера проверка выполняется в _should_trigger
-            return False
+        # Получаем интервал между выполнениями
+        trigger_config = task.get("trigger_config", {})
+        min_interval = trigger_config.get("min_interval_minutes", 1)  # 1 минута по умолчанию
         
-        return False
+        # Вычисляем разницу во времени
+        time_diff = (now - last_execution).total_seconds() / 60
+        
+        result = time_diff < min_interval
+        logger.info(f"Задача {task_id} (_was_recently_executed): last_execution: {last_execution}, min_interval: {min_interval}, time_diff: {time_diff:.2f} мин, результат: {result}")
+        return result
     
     def _get_last_execution_time(self, task_id: str) -> Optional[datetime]:
         """
@@ -383,7 +384,7 @@ class SchedulerService:
         
         Args:
             task_id: ID задачи
-            execution_time: Время выполнения
+            execution_time: Время выполнения (с timezone)
         """
         self.task_history[task_id] = execution_time
         
@@ -430,6 +431,7 @@ class SchedulerService:
         
         try:
             if action_type == "run_agent":
+                # Передаем action_config напрямую в _run_agent
                 await self._run_agent(action_config)
             elif action_type == "send_notification":
                 await self._send_notification(action_config)
@@ -442,12 +444,13 @@ class SchedulerService:
     
     async def _run_agent(self, config: Dict[str, Any]):
         """
-        Запускает агента с указанными параметрами
+        Запускает агента с указанной конфигурацией
         
         Args:
             config: Конфигурация для запуска агента
         """
         try:
+            # Получаем параметры из конфигурации
             agent_id = config.get("agent_id")
             user_id = config.get("user_id")
             chat_id = config.get("chat_id")
@@ -456,47 +459,51 @@ class SchedulerService:
                 logger.error("Не указаны обязательные параметры agent_id или user_id")
                 return
             
-            # Если chat_id не указан, пытаемся получить его из профиля пользователя
+            # Если chat_id не указан, используем user_id
             if not chat_id:
-                profile = await self.user_profile_manager.get_profile(user_id)
-                chat_id = profile.get("chat_id", user_id)
+                chat_id = user_id
             
-            # Отправляем сообщение через Telegram
-            message_text = config.get("message_text", f"Уведомление от агента {agent_id}")
-            notification_type = config.get("notification_type", "general")
+            # Запускаем агента через API
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.api_base_url}/agent-actions/{agent_id}/execute",
+                    json={
+                        "context": {
+                            "user_id": user_id,
+                            "chat_id": chat_id,
+                            **config.get("context", {})
+                        }
+                    }
+                )
             
-            # Вызываем API для запуска агента
-            response = requests.post(
-                f"{self.api_base_url}/agent-actions/{agent_id}/execute",
-                json={
-                    "user_id": user_id,
-                    "chat_id": chat_id,
-                    "notification_type": notification_type,
-                    "message": message_text
-                }
-            )
+            logger.info(f"[DEBUG _run_agent] response.text={response.text}")
             
             if response.status_code == 200:
                 logger.info(f"Агент {agent_id} успешно запущен для пользователя {user_id}")
             else:
                 logger.error(f"Ошибка при запуске агента: {response.status_code}")
+                logger.error(f"Ответ сервера: {response.text}")
                 
-                # Если не удалось запустить агента, отправляем хотя бы сообщение
-                telegram_response = requests.post(
-                    f"{self.api_base_url}/integration/telegram/send",
-                    json={
-                        "chat_id": chat_id,
-                        "text": message_text
-                    }
-                )
+                # Уведомление об ошибке также должно использовать httpx
+                async with httpx.AsyncClient() as client:
+                    telegram_response = await client.post(
+                        f"{self.api_base_url}/integration/telegram/send",
+                        json={
+                            "chat_id": chat_id,
+                            "text": f"Scheduled agent {agent_id} could not be started properly. See logs."
+                        }
+                    )
+                logger.info(f"[DEBUG _run_agent] telegram_response.status_code={telegram_response.status_code}")
+                logger.info(f"[DEBUG _run_agent] telegram_response.text={telegram_response.text}")
                 
                 if telegram_response.status_code == 200:
                     logger.info(f"Отправлено сообщение пользователю {user_id} через Telegram")
                 else:
                     logger.error(f"Ошибка при отправке сообщения через Telegram: {telegram_response.status_code}")
+                    logger.error(f"Ответ Telegram: {telegram_response.text}")
                     
         except Exception as e:
-            logger.error(f"Ошибка при запуске агента: {e}")
+            logger.error(f"Ошибка при запуске агента: {e}", exc_info=True)
     
     async def _send_notification(self, config: Dict[str, Any]):
         """
@@ -566,110 +573,42 @@ class SchedulerService:
     
     async def _validate_task_config(self, task_config: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
         """
-        Валидирует конфигурацию задачи для предотвращения ошибок
+        Валидирует конфигурацию задачи
         
         Args:
             task_config: Конфигурация задачи
             
         Returns:
-            Tuple[bool, Optional[str]]: (валидна ли конфигурация, сообщение об ошибке)
+            Tuple[bool, Optional[str]]: (True, None) если конфигурация валидна,
+                                      (False, str) если есть ошибки
         """
-        # Проверка наличия обязательных полей
-        required_fields = ["user_id", "trigger_type", "action_type"]
+        # Проверка обязательных полей
+        required_fields = ["user_id", "trigger_type", "trigger_config", "action_type", "action_config"]
         for field in required_fields:
             if field not in task_config:
                 return False, f"Отсутствует обязательное поле: {field}"
         
-        # Проверка типа триггера и соответствующей конфигурации
+        # Проверка типа триггера
         trigger_type = task_config.get("trigger_type")
-        if trigger_type not in ["daily", "weekly", "monthly", "once", "interval"]:
-            return False, f"Неподдерживаемый тип триггера: {trigger_type}"
-            
-        # Проверка конфигурации триггера
         trigger_config = task_config.get("trigger_config", {})
-        if not trigger_config:
-            return False, "Отсутствует конфигурация триггера"
-            
-        # Проверка специфичных полей для разных типов триггеров
-        if trigger_type == "daily":
-            if "time" not in trigger_config:
-                return False, "Для daily триггера требуется указать время (time)"
-                
-            # Проверка формата времени
-            time_str = trigger_config.get("time")
-            try:
-                hours, minutes = map(int, time_str.split(":"))
-                if not (0 <= hours < 24 and 0 <= minutes < 60):
-                    return False, f"Неверный формат времени: {time_str}"
-            except Exception:
-                return False, f"Неверный формат времени: {time_str}"
-                
-        elif trigger_type == "weekly":
-            if "day" not in trigger_config:
-                return False, "Для weekly триггера требуется указать день недели (day)"
-                
-            if "time" not in trigger_config:
-                return False, "Для weekly триггера требуется указать время (time)"
-                
-            # Проверка дня недели
-            day = trigger_config.get("day", "").lower()
-            valid_days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-            if day not in valid_days:
-                return False, f"Неверный день недели: {day}"
-                
-            # Проверка формата времени
-            time_str = trigger_config.get("time")
-            try:
-                hours, minutes = map(int, time_str.split(":"))
-                if not (0 <= hours < 24 and 0 <= minutes < 60):
-                    return False, f"Неверный формат времени: {time_str}"
-            except Exception:
-                return False, f"Неверный формат времени: {time_str}"
-                
-        elif trigger_type == "monthly":
-            if "day" not in trigger_config:
-                return False, "Для monthly триггера требуется указать день месяца (day)"
-                
-            if "time" not in trigger_config:
-                return False, "Для monthly триггера требуется указать время (time)"
-                
-            # Проверка дня месяца
-            day = trigger_config.get("day")
-            try:
-                day_int = int(day)
-                if not (1 <= day_int <= 31):
-                    return False, f"Неверный день месяца: {day}"
-            except Exception:
-                return False, f"Неверный день месяца: {day}"
-                
-            # Проверка формата времени
-            time_str = trigger_config.get("time")
-            try:
-                hours, minutes = map(int, time_str.split(":"))
-                if not (0 <= hours < 24 and 0 <= minutes < 60):
-                    return False, f"Неверный формат времени: {time_str}"
-            except Exception:
-                return False, f"Неверный формат времени: {time_str}"
-                
-        elif trigger_type == "once":
+        
+        if trigger_type == "once":
             if "datetime" not in trigger_config:
                 return False, "Для once триггера требуется указать дату и время (datetime)"
-                
+            
             # Проверка формата datetime
             datetime_str = trigger_config.get("datetime")
             if datetime_str != "now":
                 try:
-                    datetime.fromisoformat(datetime_str)
-                except Exception:
-                    try:
-                        datetime.strptime(datetime_str, "%Y-%m-%d %H:%M:%S")
-                    except Exception:
-                        return False, f"Неверный формат даты и времени: {datetime_str}"
-                
+                    # Парсим datetime с учетом timezone
+                    self._parse_datetime(datetime_str)
+                except ValueError as e:
+                    return False, str(e)
+            
         elif trigger_type == "interval":
             if "interval_minutes" not in trigger_config:
                 return False, "Для interval триггера требуется указать интервал в минутах (interval_minutes)"
-                
+            
             # Проверка интервала
             interval_minutes = trigger_config.get("interval_minutes")
             try:
@@ -678,48 +617,26 @@ class SchedulerService:
                     return False, f"Интервал должен быть положительным числом: {interval_minutes}"
             except Exception:
                 return False, f"Неверный формат интервала: {interval_minutes}"
-                
+            
             # Проверка start_time, если указано
             start_time = trigger_config.get("start_time")
             if start_time and start_time != "now":
                 try:
-                    datetime.fromisoformat(start_time)
-                except Exception:
-                    try:
-                        datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
-                    except Exception:
-                        return False, f"Неверный формат времени начала: {start_time}"
+                    # Парсим datetime с учетом timezone
+                    self._parse_datetime(start_time)
+                except ValueError as e:
+                    return False, str(e)
         
         # Проверка типа действия
         action_type = task_config.get("action_type")
         if action_type not in ["run_agent", "send_notification", "api_call"]:
             return False, f"Неподдерживаемый тип действия: {action_type}"
-            
+        
         # Проверка конфигурации действия
         action_config = task_config.get("action_config", {})
         if not action_config:
             return False, "Отсутствует конфигурация действия"
-            
-        # Проверка специфичных полей для разных типов действий
-        if action_type == "run_agent":
-            if "agent_id" not in action_config:
-                return False, "Для действия run_agent требуется указать ID агента (agent_id)"
-                
-            if "user_id" not in action_config:
-                return False, "Для действия run_agent требуется указать ID пользователя (user_id)"
-                
-        elif action_type == "send_notification":
-            if "user_id" not in action_config:
-                return False, "Для действия send_notification требуется указать ID пользователя (user_id)"
-                
-            if "text" not in action_config:
-                return False, "Для действия send_notification требуется указать текст уведомления (text)"
-                
-        elif action_type == "api_call":
-            if "url" not in action_config:
-                return False, "Для действия api_call требуется указать URL (url)"
         
-        # Все проверки пройдены успешно
         return True, None
 
     async def add_task(self, task_config: Dict[str, Any]) -> str:
@@ -747,13 +664,25 @@ class SchedulerService:
         # Генерация ID, если не указан
         task_id = task_config.get("id", str(uuid.uuid4()))
         
-        # Добавляем время создания, если не указано
+        # Добавляем время создания с timezone, если не указано
         if "created_at" not in task_config:
-            task_config["created_at"] = datetime.now().isoformat()
+            task_config["created_at"] = datetime.now(timezone.utc).isoformat()
         
         # Устанавливаем enabled в True, если не указано
         if "enabled" not in task_config:
             task_config["enabled"] = True
+        
+        # Обрабатываем datetime в trigger_config
+        if "trigger_config" in task_config:
+            trigger_config = task_config["trigger_config"]
+            if "datetime" in trigger_config and trigger_config["datetime"] != "now":
+                try:
+                    # Парсим datetime с учетом timezone
+                    dt = self._parse_datetime(trigger_config["datetime"])
+                    # Сохраняем в ISO формате с timezone
+                    trigger_config["datetime"] = dt.isoformat()
+                except ValueError as e:
+                    raise ValueError(f"Неверный формат datetime в trigger_config: {e}")
         
         # Валидация конфигурации задачи
         is_valid, error_message = await self._validate_task_config(task_config)
@@ -861,7 +790,9 @@ class SchedulerService:
         return all_tasks
     
     async def _load_tasks_from_db(self):
-        """Загружает задачи из базы данных"""
+        """
+        Загружает задачи из базы данных
+        """
         try:
             # Используем прямое подключение к MongoDB
             collection = self.db[self.collection_name]
@@ -887,12 +818,32 @@ class SchedulerService:
                     # Преобразуем ObjectId в строку, если необходимо
                     if hasattr(task_id, "__str__"):
                         task_id = str(task_id)
+                    
+                    # Обрабатываем datetime в trigger_config
+                    if "trigger_config" in task:
+                        trigger_config = task["trigger_config"]
+                        if "datetime" in trigger_config and trigger_config["datetime"] != "now":
+                            try:
+                                # Парсим datetime с учетом timezone
+                                dt = self._parse_datetime(trigger_config["datetime"])
+                                # Сохраняем в ISO формате с timezone
+                                trigger_config["datetime"] = dt.isoformat()
+                            except ValueError as e:
+                                logger.error(f"Ошибка при обработке datetime в задаче {task_id}: {e}")
+                                continue
+                    
                     self.scheduled_tasks[task_id] = task
             
             logger.info(f"Загружено {len(self.scheduled_tasks)} задач из базы данных")
         except Exception as e:
             logger.error(f"Ошибка при загрузке задач из базы данных: {e}")
     
+    def _serialize_datetime(self, obj):
+        """Сериализует datetime объекты для MongoDB"""
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return obj
+
     async def _save_task_to_db(self, task_id: str, task_config: Dict[str, Any]):
         """
         Сохраняет задачу в базу данных
@@ -901,8 +852,14 @@ class SchedulerService:
             collection = self.db[self.collection_name]
             task_data = task_config.copy()
             task_data["id"] = task_id
+            
+            # Сериализуем все datetime объекты
+            serialized_data = json.loads(
+                json.dumps(task_data, default=self._serialize_datetime)
+            )
+            
             # Централизовано: всегда ensure_mongo_id
-            result = await collection.insert_one(ensure_mongo_id(task_data))
+            result = await collection.insert_one(ensure_mongo_id(serialized_data))
             if result.inserted_id:
                 logger.info(f"Задача {task_id} сохранена в базе данных")
             else:
@@ -912,46 +869,34 @@ class SchedulerService:
     
     async def _update_task_in_db(self, task_id: str, task_config: Dict[str, Any]):
         """
-        Обновляет задачу в базе данных с улучшенной обработкой ошибок и валидацией данных
-        
-        Args:
-            task_id: ID задачи
-            task_config: Новая конфигурация задачи
+        Обновляет задачу в базе данных
         """
         max_retries = 3
         retry_count = 0
         
-        # Логируем исходные параметры обновления
-        logger.debug(f"Запрос на обновление задачи {task_id}: {json.dumps(task_config, default=str)[:200]}...")
-        
-        # Валидация входных данных
-        if not task_id:
-            logger.error("Невозможно обновить задачу: отсутствует ID задачи")
-            return
-            
-        if not task_config:
-            logger.error(f"Невозможно обновить задачу {task_id}: отсутствуют данные для обновления")
-            return
-        
         while retry_count < max_retries:
             try:
-                # Используем прямое подключение к MongoDB
                 collection = self.db[self.collection_name]
+                
+                # Сериализуем все datetime объекты
+                serialized_data = json.loads(
+                    json.dumps(task_config, default=self._serialize_datetime)
+                )
                 
                 # Ищем задачу по ID
                 existing_task = await collection.find_one({"id": task_id})
                 
                 if existing_task:
                     # Если обновляется только часть полей, мержим их с существующими
-                    if any(key.startswith("trigger_config.") or key.startswith("action_config.") for key in task_config.keys()):
+                    if any(key.startswith("trigger_config.") or key.startswith("action_config.") for key in serialized_data.keys()):
                         # Это частичное обновление внутренних полей
-                        update_ops = {"$set": task_config}
+                        update_ops = {"$set": serialized_data}
                     else:
                         # Для полного обновления секций создаем обновление с учетом существующих данных
                         merged_data = {}
                         
                         # Проходим по всем ключам в обновлении
-                        for key, value in task_config.items():
+                        for key, value in serialized_data.items():
                             if key in ["trigger_config", "action_config"] and isinstance(value, dict) and key in existing_task:
                                 # Для конфигурационных объектов мержим с существующими
                                 merged_value = existing_task[key].copy()
@@ -975,15 +920,13 @@ class SchedulerService:
                     else:
                         logger.info(f"Задача {task_id} не изменилась в базе данных (возможно, новые данные идентичны существующим)")
                     
-                    # Успешно обновили, выходим из цикла
                     return
                 else:
                     # Если задача не найдена, создаем ее
                     logger.warning(f"Задача {task_id} не найдена в базе данных, создаем новую")
                     
                     # Проверяем наличие минимально необходимых полей для создания задачи
-                    if "trigger_type" not in task_config and "action_type" not in task_config:
-                        # Не хватает критически важных полей, не можем создать задачу
+                    if "trigger_type" not in serialized_data and "action_type" not in serialized_data:
                         logger.error(f"Невозможно создать новую задачу {task_id}: недостаточно данных")
                         return
                     
@@ -995,7 +938,7 @@ class SchedulerService:
                     }
                     
                     # Добавляем все поля из переданной конфигурации
-                    new_task.update(task_config)
+                    new_task.update(serialized_data)
                     
                     await self._save_task_to_db(task_id, new_task)
                     return
@@ -1005,22 +948,20 @@ class SchedulerService:
                 logger.error(f"Ошибка при обновлении задачи {task_id} в базе данных (попытка {retry_count}/{max_retries}): {str(e)}")
                 
                 if retry_count < max_retries:
-                    wait_time = 2 ** retry_count  # Экспоненциальная задержка
+                    wait_time = 2 ** retry_count
                     logger.info(f"Повторная попытка обновления задачи {task_id} через {wait_time} секунд...")
                     await asyncio.sleep(wait_time)
                 else:
                     logger.error(f"Не удалось обновить задачу {task_id} после {max_retries} попыток")
                     
-                    # Для критических задач можно добавить запись в специальный лог или отдельную коллекцию
                     error_info = {
                         "timestamp": datetime.now().isoformat(),
                         "task_id": task_id,
                         "operation": "update",
                         "error": str(e),
-                        "data": json.dumps(task_config, default=str)
+                        "data": json.dumps(task_config, default=self._serialize_datetime)
                     }
                     
-                    # Можно сохранить информацию об ошибке для последующего анализа
                     try:
                         await self.db["scheduler_errors"].insert_one(error_info)
                     except Exception as e2:
@@ -1198,7 +1139,7 @@ class SchedulerService:
     async def fix_now_datetime_in_tasks(self):
         """
         Обновляет все задачи в базе данных, заменяя значение 'now' в триггере типа 'once' 
-        на текущее время в формате ISO. Добавлена поддержка повторных попыток и расширенное логирование.
+        на текущее время в формате ISO с timezone
         """
         max_retries = 3
         retry_count = 0
@@ -1222,8 +1163,8 @@ class SchedulerService:
                 
                 logger.info(f"Найдено {len(tasks)} задач с datetime = 'now', начинаем обновление...")
                 
-                # Получаем текущее время в формате ISO с учетом timezone
-                current_time = datetime.now().replace(microsecond=0).isoformat()
+                # Получаем текущее время в формате ISO с timezone
+                current_time = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
                 
                 # Счетчики для статистики
                 updated_count = 0
@@ -1274,12 +1215,11 @@ class SchedulerService:
                 
             except Exception as e:
                 retry_count += 1
-                logger.error(f"Ошибка при обновлении задач с datetime = 'now' (попытка {retry_count}/{max_retries}): {str(e)}")
+                logger.error(f"Ошибка при обновлении задач (попытка {retry_count}/{max_retries}): {str(e)}")
                 
                 if retry_count < max_retries:
-                    wait_time = 2 ** retry_count  # Экспоненциальная задержка (2, 4, 8 секунд)
-                    logger.info(f"Повторная попытка через {wait_time} секунд...")
+                    wait_time = 2 ** retry_count
+                    logger.info(f"Повторная попытка обновления через {wait_time} секунд...")
                     await asyncio.sleep(wait_time)
                 else:
-                    logger.error("Превышено максимальное количество попыток обновления задач с datetime = 'now'")
-                    raise  # Пробрасываем исключение выше 
+                    logger.error(f"Не удалось обновить задачи после {max_retries} попыток") 

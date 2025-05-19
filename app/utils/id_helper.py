@@ -1,6 +1,13 @@
-from bson import ObjectId
+from bson import ObjectId, errors
+from motor.motor_asyncio import AsyncIOMotorCollection
 from typing import Optional, Union, Dict, Any, List
 from fastapi import HTTPException
+from loguru import logger
+import pymongo
+import json
+
+# Добавляем более подробное логирование для отладки
+logger.add("logs/id_helper_debug.log", format="{time} {level} {message}", level="DEBUG", rotation="1 MB", compression="zip", serialize=False)
 
 def to_object_id(id_value: Any) -> Optional[ObjectId]:
     """
@@ -79,33 +86,6 @@ def sanitize_ids(docs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     return [sanitize_id(doc) for doc in docs]
 
-def handle_id_query(id_or_name: str, collection):
-    """
-    Обрабатывает запрос по ID или имени объекта.
-    
-    Args:
-        id_or_name: ID или имя объекта
-        collection: Коллекция MongoDB для поиска
-        
-    Returns:
-        Запрос для MongoDB (filter dict)
-    """
-    obj_id = to_object_id(id_or_name)
-    
-    # Проверяем, является ли id_or_name ObjectId
-    if obj_id and isinstance(obj_id, ObjectId):
-        # Если ObjectId, то ищем по _id
-        return {"_id": obj_id}
-    else:
-        # Ищем сначала по _id как есть (для строковых ID),
-        # затем по имени или slug, а также по scenario_id
-        return {"$or": [
-            {"_id": id_or_name},
-            {"name": id_or_name}, 
-            {"slug": id_or_name},
-            {"scenario_id": id_or_name}
-        ]}
-
 def ensure_mongo_id(doc):
     """
     Гарантирует, что если в документе есть поле id, то _id будет совпадать с ним (строка).
@@ -114,3 +94,97 @@ def ensure_mongo_id(doc):
     if isinstance(doc, dict) and "id" in doc:
         doc["_id"] = doc["id"]
     return doc 
+
+def build_id_query(id_value: str, target_field_name: Optional[str] = None, collection_name_for_guess: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Строит словарь-запрос MongoDB для поиска по ID.
+    Либо по ObjectId (_id), либо по кастомному строковому полю (target_field_name),
+    либо по обоим через $or.
+    Если target_field_name не указан, пытается угадать его на основе collection_name_for_guess.
+    """
+    logger.debug(f"build_id_query: начало. id_value='{id_value}', target_field_name='{target_field_name}', collection_name_for_guess='{collection_name_for_guess}'")
+    
+    query: Dict[str, Any] = {}
+    actual_target_field = target_field_name
+
+    if not actual_target_field and collection_name_for_guess:
+        logger.warning(f"build_id_query: target_field_name не указан, угадываем по collection_name_for_guess='{collection_name_for_guess}'")
+        if collection_name_for_guess == "agents":
+            actual_target_field = "agent_id"
+        elif collection_name_for_guess == "scenarios":
+            actual_target_field = "scenario_id"
+        # Добавьте другие коллекции, если необходимо
+        if actual_target_field:
+            logger.debug(f"build_id_query: Угадано поле '{actual_target_field}' для коллекции '{collection_name_for_guess}'")
+        else:
+            logger.warning(f"build_id_query: Не удалось угадать target_field_name для коллекции '{collection_name_for_guess}'")
+
+    obj_id = to_object_id(id_value)
+
+    if obj_id and actual_target_field:
+        # Ищем по ObjectId ИЛИ по кастомному строковому полю
+        query = {"$or": [{actual_target_field: id_value}, {"_id": obj_id}]}
+        logger.debug(f"build_id_query: (obj_id ЕСТЬ, actual_target_field='{actual_target_field}') Запрос: {query}")
+    elif obj_id:
+        # Ищем только по ObjectId
+        query = {"_id": obj_id}
+        logger.debug(f"build_id_query: (obj_id ЕСТЬ, actual_target_field НЕТ) Запрос: {query}")
+    elif actual_target_field:
+        # id_value не ObjectId, ищем только по кастомному строковому полю
+        query = {actual_target_field: id_value}
+        logger.debug(f"build_id_query: (obj_id НЕТ, actual_target_field='{actual_target_field}') Запрос: {query}")
+    else:
+        # Не можем построить осмысленный запрос, если нет ни ObjectId, ни target_field_name
+        # Однако, некоторые могут захотеть искать по строковому _id напрямую.
+        # Для безопасности и предсказуемости, если нет явного поля и id_value не ObjectId,
+        # вернем запрос, который, скорее всего, ничего не найдет, или можно выбросить ошибку.
+        # Пока что, если id_value - строка, попробуем поискать по _id: id_value.
+        # Это может быть полезно, если _id хранятся как строки (не рекомендуется).
+        logger.warning(f"build_id_query: id_value='{id_value}' не является ObjectId и target_field_name не указан/не угадан. Попытка поиска по _id: '{id_value}'.")
+        query = {"_id": id_value} # Может не сработать, если _id должны быть ObjectId
+
+    logger.debug(f"build_id_query: финальный запрос: {query}")
+    return query
+
+async def find_one_by_id_flexible(
+    id_value: str, 
+    collection: AsyncIOMotorCollection, 
+    target_field_name: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Ищет один документ в коллекции по ID (ObjectId или кастомное строковое поле).
+    Использует build_id_query для построения запроса.
+    """
+    logger.debug(f"find_one_by_id_flexible: начало. id_value='{id_value}', collection_name='{collection.name}', target_field_name='{target_field_name}'")
+    
+    # Определяем имя коллекции для возможного угадывания поля в build_id_query, если target_field_name не задан
+    collection_name_for_guess = collection.name if not target_field_name else None
+    
+    query = build_id_query(id_value, target_field_name, collection_name_for_guess)
+    logger.critical(f"[find_one_by_id_flexible CRITICAL] Сформирован запрос: {json.dumps(query, default=str)}")
+    
+    if not query: # Если build_id_query вернул пустой dict, это ошибка
+        logger.error(f"find_one_by_id_flexible: build_id_query вернул пустой запрос для id_value='{id_value}', target_field_name='{target_field_name}'")
+        return None
+        
+    try:
+        result_doc = await collection.find_one(query)
+        if result_doc:
+            logger.critical(f"[find_one_by_id_flexible CRITICAL] Результат find_one: {json.dumps(result_doc, indent=2, default=str)}")
+        else:
+            logger.critical(f"[find_one_by_id_flexible CRITICAL] Результат find_one: Документ НЕ НАЙДЕН по запросу {json.dumps(query, default=str)}")
+        return result_doc
+    except pymongo.errors.PyMongoError as e:
+        logger.critical(f"[find_one_by_id_flexible CRITICAL] Ошибка MongoDB при выполнении find_one с запросом {json.dumps(query, default=str)}: {e}")
+        return None
+    except Exception as e:
+        logger.critical(f"[find_one_by_id_flexible CRITICAL] Непредвиденная ошибка при выполнении find_one с запросом {json.dumps(query, default=str)}: {e}")
+        return None
+
+# Старая функция handle_id_query больше не нужна в таком виде, так как ее логика разделена
+# между build_id_query и find_one_by_id_flexible.
+# Если где-то остался старый вызов, он должен быть заменен.
+
+# async def handle_id_query(id_value: str, collection: AsyncIOMotorCollection, target_field_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+#    # ... (старый код, который был здесь, теперь не нужен)
+#    pass # Удаляем старую реализацию или комментируем 

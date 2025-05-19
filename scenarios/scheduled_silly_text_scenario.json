@@ -1,0 +1,45 @@
+{
+  "scenario_id": "scheduled_silly_text_scenario",
+  "name": "Scheduled Silly Text Scenario",
+  "description": "Отправляет нелепый текст в Telegram и логирует. Запускается по расписанию.",
+  "version": "1.0",
+  "initial_context": {
+    "default_silly_message": "Космические хомяки строят планы на уикенд!",
+    "default_chat_id_from_scenario": "123456789" 
+  },
+  "steps": [
+    {
+      "id": "log_incoming_context",
+      "type": "log_message",
+      "params": {
+        "message": "Scheduled silly scenario started. Incoming context: {context_to_pass}. User chat ID from context: {user_chat_id}. Silly message template: {silly_message_template}. Default message: {default_silly_message}. Default chat_id: {default_chat_id_from_scenario}"
+      },
+      "next_step_id": "prepare_message"
+    },
+    {
+      "id": "prepare_message",
+      "type": "execute_code",
+      "params": {
+        "code": "context['final_silly_message'] = context.get('silly_message_template', str(context.get('default_silly_message','Рыбы учатся летать!'))).format(text_type=context.get('text_type','случайного'), entity=context.get('entity','Еноты'), target=context.get('target','галактику'))\ncontext['target_chat_id_for_telegram'] = context.get('user_chat_id', str(context.get('default_chat_id_from_scenario','648981358')))"
+      },
+      "next_step_id": "send_silly_text"
+    },
+    {
+      "id": "send_silly_text",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{target_chat_id_for_telegram}",
+        "text": "Scheduled Task: {final_silly_message}"
+      },
+      "next_step_id": "log_completion"
+    },
+    {
+      "id": "log_completion",
+      "type": "log_message",
+      "params": {
+        "message": "Scheduled silly text sent to {target_chat_id_for_telegram}: {final_silly_message}"
+      },
+      "next_step_id": null
+    }
+  ]
+} 

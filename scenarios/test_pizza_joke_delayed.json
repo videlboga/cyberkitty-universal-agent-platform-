@@ -1,0 +1,55 @@
+{
+  "scenario_id": "test_pizza_joke_delayed",
+  "name": "Отложенная шутка про пиццу",
+  "description": "Отправляет пользователю шутку про его тип пиццы через некоторое время.",
+  "version": "1.0",
+  "initial_context": {
+    "telegram_chat_id": null,
+    "user_id": null,
+    "pizza_type": "Какая-то пицца" 
+  },
+  "steps": [
+    {
+      "id": "prepare_joke_text",
+      "type": "action", 
+      "params": {
+        "action_type": "generate_pizza_joke", 
+        "pizza_type_input": "{pizza_type}",
+        "output_var": "joke_text"
+        
+        
+        
+        
+        
+        
+      },
+      
+      
+      "next_step_id": "actually_prepare_joke_text_simple"
+    },
+    {
+      "id": "actually_prepare_joke_text_simple",
+      "type": "action", 
+       "params": {
+        "action_type": "update_context",
+        "updates": {
+          "joke_text": "Так-так, {pizza_type}... Говорят, те, кто придумывает тесты про пиццу, чтобы узнать свою личность, потом случайно заказывают пиццу с ананасами и майонезом! Будь осторожен(а), за такое бывает... окошко в пиццерии закрывается прямо перед носом!"
+        }
+      },
+      "next_step_id": "send_delayed_joke"
+    },
+    {
+      "id": "send_delayed_joke",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{telegram_chat_id}",
+        "text": "{joke_text}"
+      },
+      "next_step_id": "end_joke_scenario"
+    },
+    {
+      "id": "end_joke_scenario",
+      "type": "end"
+    }
+  ]
+} 

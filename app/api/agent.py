@@ -19,9 +19,11 @@ class AgentUpdateRequest(BaseModel):
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/universal_agent")
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+MONGODB_DATABASE_NAME = os.getenv("MONGODB_DATABASE_NAME", "universal_agent_platform")
+
 client = AsyncIOMotorClient(MONGO_URI)
-db = client.get_default_database()
+db = client[MONGODB_DATABASE_NAME]
 agent_repo = AgentRepository(db)
 scenario_repo = ScenarioRepository(db)
 

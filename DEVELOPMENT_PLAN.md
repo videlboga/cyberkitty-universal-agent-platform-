@@ -177,9 +177,10 @@
 ## Чек-лист: ScenarioExecutor
 - [x] Реализован ScenarioExecutor (app/core/scenario_executor.py)
 - [x] Поддержка синхронизации с плагинами (регистрация обработчиков)
-- [x] Поддержка шагов типа message, input, branch, rag_search
+- [x] Поддержка шагов типа message, input, branch, rag_search, execute_code, log_message, и других через плагины
 - [x] Интеграция обработчиков шагов из плагинов
 - [x] Реализовано выполнение всего сценария целиком (/agent-actions/{agent_id}/execute)
+- [x] Корректное слияние `initial_context` сценария с контекстом выполнения
 - [x] Интеграция с API для запуска онбординга (/learning/onboard)
 - [x] Интеграция с AgentManagerPlugin для поддержки типов шагов agent_menu, switch_agent, return_to_menu
 - [ ] Покрытие тестами — не реализовано
@@ -203,8 +204,13 @@
     - [ ] Preview Telegram-экрана (имитация мобильного UI)
     - [ ] Экспорт/импорт flow в JSON/YAML для backend
 - [ ] Поддержка интерактивных меню и кнопок в Telegram (backend)
-    - [ ] ReplyKeyboardMarkup/InlineKeyboardMarkup, обработка callback'ов
-    - [ ] Генерация Telegram-меню и переходов на основе flow-структуры
+    - [x] Расширена поддержка InlineKeyboardMarkup в `TelegramPlugin` (обработка `callback_query`, отправка `inline_keyboard`).
+    - [x] Реализована поддержка ReplyKeyboardMarkup в `TelegramPlugin` для шага `telegram_send_message` (в `handle_step_send_message`). 
+        - Включая параметры: `reply_keyboard` (структура `[[{"text": "..."}]]`), `one_time_keyboard`, `remove_keyboard`, `resize_keyboard`, `input_field_placeholder`, `selective`.
+    - [x] Обновлена документация `docs/scenario_development_guide.md` (раздел 5.1) для описания использования `telegram_send_message` с ReplyKeyboardMarkup и всеми новыми параметрами.
+    - [ ] Протестировать отправку сообщений с `reply_keyboard` (включая `one_time_keyboard`, `remove_keyboard` и другие опции).
+    - [ ] Протестировать получение ответа от `reply_keyboard` (текст кнопки) через шаг `input` и его использование в шаге `branch`.
+    - [ ] Генерация Telegram-меню и переходов на основе flow-структуры (более общая задача)
 - [ ] Менеджер агентов и динамические переходы
     - [x] State machine с поддержкой подагентов и возврата в меню
     - [x] Сценарии для каждого подагента (коуч, лайфхакер, ментор, дайджест, эксперт)
@@ -428,3 +434,86 @@
 
 ## Чек-лист: Централизация логики синхронизации id/_id (ensure_mongo_id)
 - [ ] Централизовать логику синхронизации id/_id (ensure_mongo_id) на всех узлах работы с БД (создание, обновление, миграции, тесты, интеграции)
+
+## Новые задачи (добавлены после ревизии 20.05.2025)
+
+### Плагин для работы с хранилищем (MongoStoragePlugin)
+- [ ] **Проектирование `MongoStoragePlugin`**:
+    - [ ] Определить список необходимых типов шагов (например, `db_find_one`, `db_insert_one`, `db_update_one`, `db_delete_one`, `db_find_many`).
+    - [ ] Определить параметры для каждого типа шага (например, `collection_name`, `query_filter`, `data`, `update_document`, `output_var`, `options`).
+    - [ ] Продумать вопросы безопасности: какие коллекции и операции разрешены из сценариев.
+- [ ] **Реализация `MongoStoragePlugin`**:
+    - [ ] Создать класс плагина `MongoStoragePlugin(PluginBase)`.
+    - [ ] Реализовать методы-обработчики для каждого типа шага.
+    - [ ] Обеспечить корректную работу с асинхронным драйвером MongoDB (`motor`).
+    - [ ] Добавить логирование операций.
+- [ ] **Интеграция `MongoStoragePlugin`**:
+    - [ ] Зарегистрировать плагин в `ScenarioExecutor`.
+- [ ] **Документация и примеры**:
+    - [ ] Обновить `docs/scenario_development_guide.md` описанием новых типов шагов.
+    - [ ] Создать примеры сценариев, использующих `MongoStoragePlugin`.
+- [ ] **Тестирование**:
+    - [ ] Написать unit-тесты для `MongoStoragePlugin`.
+    - [ ] Написать интеграционные тесты, проверяющие выполнение сценариев с шагами доступа к БД.
+
+### Плагин для планирования задач (SchedulingPlugin)
+- [ ] **Проектирование `SchedulingPlugin`**:
+    - [ ] Определить тип шага (например, `schedule_task`).
+    - [ ] Определить параметры для шага `schedule_task` (например, `task_type` ["run_scenario", "send_telegram_message", "call_llm"], `run_at` [абсолютное время или относительное, например, "in_5_minutes"], `task_params` [параметры для самой задачи, например, `scenario_id`, `context`, `message_text`, `chat_id`]).
+    - [ ] Определить, как плагин будет взаимодействовать с `SchedulerService`.
+- [ ] **Реализация `SchedulingPlugin`**:
+    - [ ] Создать класс плагина `SchedulingPlugin(PluginBase)`.
+    - [ ] Реализовать метод-обработчик для шага `schedule_task`.
+    - [ ] Реализовать логику постановки задач в `SchedulerService`.
+    - [ ] Добавить логирование операций.
+- [ ] **Интеграция `SchedulingPlugin`**:
+    - [ ] Зарегистрировать плагин в `ScenarioExecutor`.
+- [ ] **Документация и примеры**:
+    - [ ] Обновить `docs/scenario_development_guide.md` описанием нового типа шага.
+    - [ ] Создать примеры сценариев, использующих `SchedulingPlugin`.
+- [ ] **Тестирование**:
+    - [ ] Написать unit-тесты для `SchedulingPlugin`.
+    - [ ] Написать интеграционные тесты, проверяющие выполнение сценариев с шагами планирования и фактическое выполнение запланированных задач.
+
+## Чек-лист: Реализация новых плагинов и тестового сценария "Пицца"
+
+- [x] **Плагин для хранения данных в MongoDB (`MongoStoragePlugin`)**
+    - [x] Шаг `mongo_insert_one`: вставка одного документа.
+    - [x] Шаг `mongo_find_one`: поиск одного документа.
+    - [x] Шаг `mongo_update_one`: обновление одного документа.
+    - [x] Шаг `mongo_delete_one`: удаление одного документа.
+    - [x] Передача экземпляра `db` в плагин.
+    - [x] Регистрация в `ScenarioExecutor`.
+    - [ ] Документация в `scenario_development_guide.md`. (будет следующим шагом)
+- [x] **Плагин для отложенного запуска сценариев (`SchedulingPlugin`)**
+    - [x] Шаг `schedule_scenario_run`: планирование запуска другого сценария.
+        - [x] Параметры: `run_in_seconds`, `scenario_id_to_run`, `context_to_pass`.
+        - [x] Использование `SchedulerService.add_task` с `action_type: "run_agent"`.
+        - [x] Корректная передача `initial_payload` (`{"context": ...}`) в `SchedulerService`.
+    - [x] Передача экземпляра `SchedulerService` в плагин.
+    - [x] Регистрация в `ScenarioExecutor`.
+    - [x] Проверка и доработка `SchedulerService._run_agent` и эндпоинта `/agent-actions/{id}/execute` для приема `initial_payload.context`.
+    - [ ] Документация в `scenario_development_guide.md`. (будет следующим шагом)
+
+## Недавние достижения и исправления (Май 2025 - текущая сессия)
+- [x] **Отладка ядра исполнения сценариев:**
+    - [x] Успешно исправлена проблема со слиянием `initial_context` сценария и контекста выполнения в `ScenarioExecutor`.
+    - [x] Реализован и протестирован полный цикл обработки шагов в `ScenarioExecutor` с использованием `ScenarioStateMachine`.
+- [x] **Рефакторинг и исправление ошибок:**
+    - [x] Проведен рефакторинг `app/utils/id_helper.py` (замена `handle_id_query` на `build_id_query` и `find_one_by_id_flexible`).
+    - [x] Обновлены репозитории (`AgentRepository`, `ScenarioRepository`, `UserRepository`) и API эндпоинты (`/scenarios/`, `/agents/`, `/collections/`) для совместимости с новым `id_helper`.
+    - [x] Устранен ряд критических ошибок импорта, препятствовавших запуску сервера.
+- [x] **Тестирование:**
+    - [x] Успешно выполнен тестовый сценарий `scenarios/test_mongo_plugin.json`, подтверждающий корректную работу `ScenarioExecutor` и плагина `MongoStoragePlugin`.
+
+## Следующие шаги и текущие задачи
+- [ ] **Тестирование плагина уведомлений и `SchedulerService`:**
+    - [ ] Проверить корректность отправки уведомлений по расписанию.
+    - [ ] Отладить возможные проблемы с форматами дат или логикой планировщика.
+- [ ] **Запуск и отладка сценария "пицца-тест":**
+    - [ ] Выполнить сценарий, моделирующий заказ пиццы.
+    - [ ] Проверить работу интерактивных элементов (кнопки, ввод пользователя) и логику ветвлений.
+    - [ ] Отладить интеграцию с LLM (если используется в сценарии).
+- [ ] **Разработка e2e-тестов** (продолжение)
+- [ ] **Настройка CI/CD и pre-commit** (продолжение)
+- [ ] **Покрытие тестами ScenarioExecutor**

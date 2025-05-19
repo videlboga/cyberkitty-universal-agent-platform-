@@ -1,0 +1,185 @@
+{
+  "scenario_id": "test_pizza_poll",
+  "name": "Тест 'Какая ты пицца?'",
+  "description": "Опросник для определения типа личности в виде пиццы, с последующим вызовом LLM.",
+  "version": "1.0",
+  "initial_context": {
+    "telegram_chat_id": null,
+    "user_id": null,
+    "q1_answer": null,
+    "q2_answer": null,
+    "q3_answer": null,
+    "pizza_poll_answers": {}
+  },
+  "steps": [
+    {
+      "id": "start_poll",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{telegram_chat_id}",
+        "text": "Привет! Давай узнаем, какая ты пицца! Готов(а) ответить на несколько вопросов?",
+        "inline_keyboard": [
+          [{"text": "Да, поехали!", "callback_data": "pizza_poll_q1"}]
+        ]
+      },
+      "next_step_id": "wait_for_start_confirmation"
+    },
+    {
+      "id": "wait_for_start_confirmation",
+      "type": "input",
+      "params": {
+          "prompt": "Невидимый шаг для ожидания callback_data от кнопки 'Да, поехали!'",
+          "input_type": "callback_query",
+          "expected_callback_data": "pizza_poll_q1",
+          "output_var": "start_confirmation_cb"
+      },
+      "next_step_id": "ask_q1"
+    },
+    {
+      "id": "ask_q1",
+      "type": "telegram_send_message",
+      "description": "Первый вопрос опросника",
+      "params": {
+        "chat_id": "{telegram_chat_id}",
+        "text": "Вопрос 1: Какой твой идеальный вечер пятницы?",
+        "inline_keyboard": [
+          [{"text": "Шумная вечеринка с друзьями", "callback_data": "q1_party"}],
+          [{"text": "Уютный вечер дома с книгой/фильмом", "callback_data": "q1_home"}],
+          [{"text": "Активный отдых на природе", "callback_data": "q1_nature"}]
+        ]
+      },
+      "next_step_id": "wait_q1_answer"
+    },
+    {
+      "id": "wait_q1_answer",
+      "type": "input",
+      "params": { "output_var": "q1_callback_data" },
+      "next_step_id": "process_q1_answer"
+    },
+    {
+      "id": "process_q1_answer",
+      "type": "action",
+      "params": {
+        "action_type": "update_context",
+        "updates": {
+          "q1_answer": "{q1_callback_data}",
+          "pizza_poll_answers.q1": "{q1_callback_data}"
+        }
+      },
+      "next_step_id": "ask_q2"
+    },
+    {
+      "id": "ask_q2",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{telegram_chat_id}",
+        "text": "Вопрос 2: Твой любимый топпинг для пиццы (из предложенных)?",
+        "inline_keyboard": [
+          [{"text": "Пепперони", "callback_data": "q2_pepperoni"}],
+          [{"text": "Грибы", "callback_data": "q2_mushrooms"}],
+          [{"text": "Ананасы (да, ананасы!)", "callback_data": "q2_pineapple"}]
+        ]
+      },
+      "next_step_id": "wait_q2_answer"
+    },
+    {
+      "id": "wait_q2_answer",
+      "type": "input",
+      "params": { "output_var": "q2_callback_data" },
+      "next_step_id": "process_q2_answer"
+    },
+    {
+      "id": "process_q2_answer",
+      "type": "action",
+      "params": {
+        "action_type": "update_context",
+        "updates": {
+          "q2_answer": "{q2_callback_data}",
+          "pizza_poll_answers.q2": "{q2_callback_data}"
+        }
+      },
+      "next_step_id": "ask_q3"
+    },
+    {
+      "id": "ask_q3",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{telegram_chat_id}",
+        "text": "Вопрос 3: Если бы ты был(а) специей, то какой?",
+        "inline_keyboard": [
+          [{"text": "Острый чили", "callback_data": "q3_chili"}],
+          [{"text": "Ароматный базилик", "callback_data": "q3_basil"}],
+          [{"text": "Нежный орегано", "callback_data": "q3_oregano"}]
+        ]
+      },
+      "next_step_id": "wait_q3_answer"
+    },
+    {
+      "id": "wait_q3_answer",
+      "type": "input",
+      "params": { "output_var": "q3_callback_data" },
+      "next_step_id": "process_q3_answer"
+    },
+    {
+      "id": "process_q3_answer",
+      "type": "action",
+      "params": {
+        "action_type": "update_context",
+        "updates": {
+          "q3_answer": "{q3_callback_data}",
+          "pizza_poll_answers.q3": "{q3_callback_data}"
+        }
+      },
+      "next_step_id": "prepare_llm_request"
+    },
+    {
+      "id": "prepare_llm_request",
+      "type": "action",
+      "params": {
+        "action_type": "update_context",
+        "updates": {
+          "llm_prompt_input": "Ответ на вопрос 1: {q1_answer}, Ответ на вопрос 2: {q2_answer}, Ответ на вопрос 3: {q3_answer}."
+        }
+      },
+      "next_step_id": "call_llm_for_pizza_type"
+    },
+    {
+      "id": "call_llm_for_pizza_type",
+      "type": "llm_request",
+      "params": {
+        "messages": [
+          {"role": "system", "content": "Ты — веселый эксперт по определению типов личности в виде пиццы. Твоя задача - на основе ответов пользователя сказать, какая он пицца, и дать короткое, забавное описание (1-2 предложения)."},
+          {"role": "user", "content": "Вот ответы на тест: {llm_prompt_input} Какая я пицца?"}
+        ],
+        "output_var": "llm_pizza_response"
+      },
+      "next_step_id": "send_llm_response_to_user"
+    },
+    {
+      "id": "send_llm_response_to_user",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{telegram_chat_id}",
+        "text": "Итак, барабанная дробь... Ты — {llm_pizza_response}!"
+      },
+      "next_step_id": "trigger_agent_hub"
+    },
+     {
+      "id": "trigger_agent_hub",
+      "type": "execute_sub_scenario",
+      "params": {
+        "sub_scenario_id": "test_pizza_agent_hub",
+        "input_mapping": {
+          "user_id": "{user_id}",
+          "telegram_chat_id": "{telegram_chat_id}",
+          "determined_pizza_type": "{llm_pizza_response}"
+        }
+      },
+      "next_step_id": "end_poll_scenario"
+    },
+    {
+      "id": "end_poll_scenario",
+      "type": "end"
+    }
+  ]
+} 

@@ -5,7 +5,7 @@ import os
 from bson import ObjectId
 import json
 from typing import Any, Dict, List
-from app.utils.id_helper import to_object_id, safe_object_id, sanitize_id, sanitize_ids, handle_id_query, ensure_mongo_id
+from app.utils.id_helper import sanitize_id, sanitize_ids, ensure_mongo_id, build_id_query, find_one_by_id_flexible
 
 router = APIRouter(prefix="/db/collections", tags=["collections"])
 
@@ -78,53 +78,72 @@ async def get_item(name: str, item_id: str):
     """Получить документ по id."""
     if name not in await db.list_collection_names():
         logger.error({"event": "get_item", "error": "collection not found", "name": name})
-        raise HTTPException(status_code=404, detail="Collection not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
     
-    # Поддержка поиска как по ObjectId, так и по другим полям (name, slug)
-    query = handle_id_query(item_id, db[name])
-    doc = await db[name].find_one(query)
+    # Используем find_one_by_id_flexible
+    doc = await find_one_by_id_flexible(item_id, db[name], target_field_name=None)
     
     if not doc:
         logger.error({"event": "get_item", "error": "not found", "id": item_id})
-        raise HTTPException(status_code=404, detail="Item not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
     
-    doc = sanitize_id(doc)  # Используем нашу утилиту
+    # sanitize_id здесь не нужен, так как find_one_by_id_flexible уже должен возвращать санитайженный документ, если он содержит _id
+    # Однако, если find_one_by_id_flexible возвращает сырой документ, то sanitize_id нужен.
+    # Предполагаем, что find_one_by_id_flexible возвращает документ, который может потребовать sanitize_id.
+    doc_sanitized = sanitize_id(doc) 
     
     logger.info({"event": "get_item", "collection": name, "id": item_id})
-    return doc
+    return doc_sanitized
 
 @router.patch("/{name}/items/{item_id}", response_model=Dict[str, Any])
 async def update_item(name: str, item_id: str, data: Dict[str, Any] = Body(...)):
     """Обновить документ по id. _id будет совпадать с id, если id присутствует."""
     if name not in await db.list_collection_names():
         logger.error({"event": "update_item", "error": "collection not found", "name": name})
-        raise HTTPException(status_code=404, detail="Collection not found")
-    # Централизовано: всегда ensure_mongo_id
-    query = handle_id_query(item_id, db[name])
-    result = await db[name].update_one(query, {"$set": ensure_mongo_id(data)})
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
+
+    query = build_id_query(item_id, target_field_name=None, collection_name_for_guess=name)
+    if not query:
+        logger.error({"event": "update_item", "error": "invalid item_id format for query", "id": item_id})
+        raise HTTPException(status_code=400, detail="Invalid item_id format for query")
+
+    update_data = ensure_mongo_id(data) # Убедимся, что _id корректный, если он есть в data
+    result = await db[name].update_one(query, {"$set": update_data})
+    
     if result.matched_count == 0:
         logger.error({"event": "update_item", "error": "not found", "id": item_id})
-        raise HTTPException(status_code=404, detail="Item not found")
-    doc = await db[name].find_one(query)
-    doc = sanitize_id(doc)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+    
+    # После успешного обновления, снова найдем документ для возврата
+    updated_doc = await find_one_by_id_flexible(item_id, db[name], target_field_name=None)
+    if not updated_doc:
+         logger.error({"event": "update_item", "error": "not found after update", "id": item_id})
+         raise HTTPException(status_code=404, detail="Item not found after update")
+
+    # sanitize_id здесь не нужен, так как find_one_by_id_flexible уже должен возвращать санитайженный документ
+    # Однако, для консистентности, если find_one_by_id_flexible возвращает сырой документ...
+    doc_sanitized = sanitize_id(updated_doc)
+    
     logger.info({"event": "update_item", "collection": name, "id": item_id})
-    return doc
+    return doc_sanitized
 
 @router.delete("/{name}/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_item(name: str, item_id: str):
     """Удалить документ по id."""
     if name not in await db.list_collection_names():
         logger.error({"event": "delete_item", "error": "collection not found", "name": name})
-        raise HTTPException(status_code=404, detail="Collection not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
     
-    # Поддержка удаления как по ObjectId, так и по другим полям (name, slug)
-    query = handle_id_query(item_id, db[name])
-    
+    query = build_id_query(item_id, target_field_name=None, collection_name_for_guess=name)
+    if not query:
+        logger.error({"event": "delete_item", "error": "invalid item_id format for query", "id": item_id})
+        raise HTTPException(status_code=400, detail="Invalid item_id format for query")
+        
     result = await db[name].delete_one(query)
     
     if result.deleted_count != 1:
-        logger.error({"event": "delete_item", "error": "not found", "id": item_id})
-        raise HTTPException(status_code=404, detail="Item not found")
+        logger.error({"event": "delete_item", "error": "not found or not deleted", "id": item_id})
+        raise HTTPException(status_code=404, detail="Item not found or not deleted")
     
     logger.info({"event": "delete_item", "collection": name, "id": item_id})
-    return None 
+    return Response(status_code=status.HTTP_204_NO_CONTENT) # Возвращаем Response для 204 

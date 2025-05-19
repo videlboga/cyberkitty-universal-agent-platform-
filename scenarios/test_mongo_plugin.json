@@ -1,0 +1,86 @@
+{
+  "scenario_id": "test_mongo_plugin_scenario",
+  "name": "Тестирование MongoStoragePlugin",
+  "description": "Вставляет и читает документ из MongoDB.",
+  "version": "1.0",
+  "initial_context": {
+    "current_datetime": "2023-10-27T10:00:00Z"
+  },
+  "steps": [
+    {
+      "id": "set_current_time",
+      "type": "execute_code",
+      "params": {
+        "code": "import datetime; context['current_datetime_actual'] = datetime.datetime.now(datetime.timezone.utc).isoformat()"
+      },
+      "next_step_id": "log_context_before_insert"
+    },
+    {
+      "id": "log_context_before_insert",
+      "type": "log_message",
+      "params": {
+        "message": "Контекст перед mongo_insert_one: current_datetime='{current_datetime}', current_datetime_actual='{current_datetime_actual}'"
+      },
+      "next_step_id": "insert_document"
+    },
+    {
+      "id": "insert_document",
+      "type": "mongo_insert_one",
+      "params": {
+        "collection_name": "test_plugin_collection",
+        "document": {
+          "name": "Test Item - Mongo Plugin",
+          "value": 789,
+          "timestamp_initial": "{current_datetime}",
+          "timestamp_actual": "{current_datetime_actual}"
+        },
+        "output_var": "inserted_doc_id"
+      },
+      "next_step_id": "log_inserted_id"
+    },
+    {
+      "id": "log_inserted_id",
+      "type": "log_message",
+      "params": {
+        "message": "Документ вставлен, ID: {inserted_doc_id}. Запись в контексте: {retrieved_doc_from_context}"
+      },
+      "next_step_id": "find_document"
+    },
+    {
+      "id": "find_document",
+      "type": "mongo_find_one",
+      "params": {
+        "collection_name": "test_plugin_collection",
+        "filter": {
+          "_id": "{inserted_doc_id}"
+        },
+        "output_var": "retrieved_doc"
+      },
+      "next_step_id": "log_retrieved_document"
+    },
+    {
+      "id": "log_retrieved_document",
+      "type": "log_message",
+      "params": {
+        "message": "Найденный документ: {retrieved_doc}"
+      },
+      "next_step_id": "check_retrieved_fields"
+    },
+    {
+      "id": "check_retrieved_fields",
+      "type": "execute_code",
+      "params": {
+        "code": "assert context['retrieved_doc']['name'] == 'Test Item - Mongo Plugin', 'Field name mismatch'; assert context['retrieved_doc']['value'] == 789, 'Field value mismatch'; assert context['retrieved_doc']['timestamp_actual'] == context['current_datetime_actual'], 'Timestamp actual mismatch'; context['validation_passed'] = True"
+      },
+      "next_step_id": "log_validation_result"
+    },
+    {
+      "id": "log_validation_result",
+      "type": "log_message",
+      "params": {
+        "message": "Проверка полей прошла успешно: {validation_passed}"
+      },
+      "next_step_id": null
+    }
+  ]
+} 

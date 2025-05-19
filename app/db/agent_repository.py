@@ -2,45 +2,55 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.models.agent import Agent
 from typing import Optional, List
 from bson import ObjectId
-from app.utils.id_helper import to_object_id, sanitize_id, handle_id_query, ensure_mongo_id
+from app.utils.id_helper import sanitize_id, ensure_mongo_id, build_id_query, find_one_by_id_flexible
+from fastapi import Depends
+from app.db.database import get_database # Предполагаем, что get_database находится здесь
 
 class AgentRepository:
     def __init__(self, db: AsyncIOMotorDatabase):
         self.collection = db["agents"]
 
     async def create(self, agent: Agent) -> Agent:
-        agent_dict = agent.dict(by_alias=True, exclude_none=True)
+        agent_dict = agent.model_dump(by_alias=True, exclude_none=True)
         agent_dict = ensure_mongo_id(agent_dict)
         result = await self.collection.insert_one(agent_dict)
-        agent.id = str(result.inserted_id)
+        created_agent_doc = await self.collection.find_one({"_id": result.inserted_id})
+        if created_agent_doc:
+            return Agent(**sanitize_id(created_agent_doc))
         return agent
 
     async def get(self, skip: int = 0, limit: int = 100) -> List[Agent]:
-        agents = await self.collection.find().skip(skip).limit(limit).to_list(length=limit)
+        agents_cursor = self.collection.find().skip(skip).limit(limit)
         result = []
-        for a in agents:
-            agent_dict = sanitize_id(a)
-            result.append(Agent(**agent_dict))
+        async for agent_doc in agents_cursor:
+            result.append(Agent(**sanitize_id(agent_doc)))
         return result
 
-    async def get_by_id(self, agent_id: str) -> Optional[Agent]:
-        query = handle_id_query(agent_id, self.collection)
-        agent = await self.collection.find_one(query)
-        if agent:
-            agent_dict = sanitize_id(agent)
-            return Agent(**agent_dict)
+    async def get_by_id(self, agent_id_value: str) -> Optional[Agent]:
+        agent_doc = await find_one_by_id_flexible(agent_id_value, self.collection, target_field_name="agent_id")
+        if agent_doc:
+            return Agent(**sanitize_id(agent_doc))
         return None
 
-    async def update(self, agent_id: str, data: dict) -> Optional[Agent]:
-        query = handle_id_query(agent_id, self.collection)
-        data_to_set = {k: v for k, v in data.items() if k != "_id" and k != "id"}
+    async def update(self, agent_id_value: str, data: dict) -> Optional[Agent]:
+        query = build_id_query(agent_id_value, target_field_name="agent_id", collection_name_for_guess=self.collection.name)
+        if not query:
+            return None
+            
+        data_to_set = {k: v for k, v in data.items() if k not in ["_id", "id", "agent_id"]}
 
         result = await self.collection.update_one(query, {"$set": data_to_set})
         if result.matched_count > 0:
-            return await self.get_by_id(agent_id)
+            return await self.get_by_id(agent_id_value)
         return None
 
-    async def delete(self, agent_id: str) -> bool:
-        query = handle_id_query(agent_id, self.collection)
+    async def delete(self, agent_id_value: str) -> bool:
+        query = build_id_query(agent_id_value, target_field_name="agent_id", collection_name_for_guess=self.collection.name)
+        if not query:
+            return False
+            
         result = await self.collection.delete_one(query)
-        return result.deleted_count == 1 
+        return result.deleted_count > 0
+
+async def get_agent_repository(db: AsyncIOMotorDatabase = Depends(get_database)) -> AgentRepository:
+    return AgentRepository(db) 

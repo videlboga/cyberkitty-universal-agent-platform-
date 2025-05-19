@@ -1,7 +1,7 @@
 import json
 from loguru import logger
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List, Callable
 
 os.makedirs("logs", exist_ok=True)
 logger.add("logs/events.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True)
@@ -17,21 +17,32 @@ class ScenarioStateMachine:
         - next_step: явный индекс следующего шага
     - context: dict, доступен во всех шагах, может изменяться
     """
-    def __init__(self, scenario: Dict[str, Any], state: Optional[Dict[str, Any]] = None, context: Optional[Dict[str, Any]] = None):
-        self.scenario = scenario
-        self.steps = scenario.get("steps", [])
-        self.state = state or {"step_index": 0}
-        self.context = context or {}
-        logger.info({"event": "init_state_machine", "scenario": scenario.get("name"), "state": self.state, "context": self.context})
+    def __init__(self, scenario: Dict[str, Any], context: Dict[str, Any], executor: Any):
+        self.scenario_name = scenario.get("name", "Unknown Scenario")
+        self.steps: List[Dict[str, Any]] = scenario.get("steps", [])
+        self.initial_context = context.copy() # Копируем, чтобы избежать изменения извне
+        self.context = context.copy() # Рабочий контекст, который будет меняться
+        self.executor = executor
+        self.current_step_index = 0
+        self.is_finished = False
+        self.error: Optional[str] = None
+
+        # === НАЧАЛО ИЗМЕНЕНИЯ ДЛЯ ДЕБАГА ===
+        logger.info(f"[STATE_MACHINE DEBUG] __init__ called. Scenario: {self.scenario_name}")
+        logger.info(f"[STATE_MACHINE DEBUG] __init__ received context: {json.dumps(context, indent=2, default=str)}")
+        logger.info(f"[STATE_MACHINE DEBUG] __init__ self.context after copy: {json.dumps(self.context, indent=2, default=str)}")
+        # === КОНЕЦ ИЗМЕНЕНИЯ ДЛЯ ДЕБАГА ===
+
+        logger.info(f"{{\'event\': \'init_state_machine\', \'scenario\': \'{self.scenario_name}\', \'state\': {{\'step_index\': self.current_step_index}}, \'context_via_json_dumps\': {json.dumps(self.context, default=str)}}}")
 
     def current_step(self):
-        idx = self.state.get("step_index", 0)
+        idx = self.current_step_index
         if 0 <= idx < len(self.steps):
             return self.steps[idx]
         return None
 
     def next_step(self, input_data: Optional[Dict[str, Any]] = None):
-        idx = self.state.get("step_index", 0)
+        idx = self.current_step_index
         step = self.current_step()
         # Обновляем context, если input_data есть
         if input_data:
@@ -59,7 +70,7 @@ class ScenarioStateMachine:
                             # Найти индекс шага по ID
                             for i, s in enumerate(self.steps):
                                 if s.get("id") == next_step_id:
-                                    self.state["step_index"] = i
+                                    self.current_step_index = i
                                     logger.debug(f"Переход к шагу {next_step_id} (индекс {i})")
                                     return self.steps[i]
                         else:
@@ -84,7 +95,7 @@ class ScenarioStateMachine:
                                     # Найти индекс шага по ID
                                     for i, s in enumerate(self.steps):
                                         if s.get("id") == next_step_id:
-                                            self.state["step_index"] = i
+                                            self.current_step_index = i
                                             logger.debug(f"Условие истинно, переход к шагу {next_step_id} (индекс {i})")
                                             return self.steps[i]
                             except Exception as e:
@@ -97,7 +108,7 @@ class ScenarioStateMachine:
                             next_step_id = branch.get("next_step")
                             for i, s in enumerate(self.steps):
                                 if s.get("id") == next_step_id:
-                                    self.state["step_index"] = i
+                                    self.current_step_index = i
                                     logger.debug(f"Используем условие по умолчанию, переход к шагу {next_step_id} (индекс {i})")
                                     return self.steps[i]
             
@@ -188,13 +199,13 @@ class ScenarioStateMachine:
                     if result:
                         next_step_index = branches.get("true")
                         if next_step_index is not None:
-                            self.state["step_index"] = next_step_index
+                            self.current_step_index = next_step_index
                             logger.info({"event": "branch_true", "condition": cond, "next_step": next_step_index})
                             return self.steps[next_step_index] if 0 <= next_step_index < len(self.steps) else None
                     else:
                         next_step_index = branches.get("false")
                         if next_step_index is not None:
-                            self.state["step_index"] = next_step_index
+                            self.current_step_index = next_step_index
                             logger.info({"event": "branch_false", "condition": cond, "next_step": next_step_index})
                             return self.steps[next_step_index] if 0 <= next_step_index < len(self.steps) else None
                 except Exception as e:
@@ -209,34 +220,34 @@ class ScenarioStateMachine:
                     # Ищем шаг по ID
                     for i, s in enumerate(self.steps):
                         if s.get("id") == next_step:
-                            self.state["step_index"] = i
+                            self.current_step_index = i
                             logger.debug(f"Найден шаг с ID {next_step} (индекс {i})")
                             return self.steps[i]
                     logger.debug(f"Шаг с ID {next_step} не найден")
                 elif 0 <= next_step < len(self.steps):
-                    self.state["step_index"] = next_step
+                    self.current_step_index = next_step
                     logger.info({"event": "next_step_explicit", "to": next_step, "context": self.context})
                     logger.debug(f"Переход к шагу по индексу {next_step}")
                     return self.steps[next_step]
         
         # По умолчанию — линейный переход
         if idx + 1 < len(self.steps):
-            self.state["step_index"] = idx + 1
-            logger.info({"event": "next_step_linear", "to": self.state["step_index"], "context": self.context})
+            self.current_step_index = idx + 1
+            logger.info({"event": "next_step_linear", "to": self.current_step_index, "context": self.context})
             logger.debug(f"Линейный переход к следующему шагу {idx + 1}")
-            return self.steps[self.state["step_index"]]
+            return self.steps[self.current_step_index]
         
         logger.info({"event": "end_of_scenario", "context": self.context})
         logger.debug("Достигнут конец сценария")
         return None
 
     def serialize(self):
-        return json.dumps({"scenario": self.scenario, "state": self.state, "context": self.context})
+        return json.dumps({"scenario": self.scenario_name, "state": {"step_index": self.current_step_index}, "context": self.context})
 
     @classmethod
     def from_json(cls, data):
         obj = json.loads(data)
-        return cls(obj["scenario"], obj["state"], obj.get("context"))
+        return cls(obj["scenario"], obj["state"]["context"], None)
 
     def trigger_command(self, command, data=None):
         """Обработка триггера on_command (заглушка)"""

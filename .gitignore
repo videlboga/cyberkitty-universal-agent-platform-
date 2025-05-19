@@ -18,6 +18,9 @@ env
 # Log files
 logs/
 *.log
+*.log.*
+# Add bp_serve.log specifically if it's generated in the root
+bp_serve.log
 
 # Data generated at runtime / large assets / backups
 data/
@@ -38,6 +41,7 @@ build/
 node_modules/
 frontend/node_modules/
 coverage*
+.coverage
 .pytest_cache/
 *.bak
 *.tmp

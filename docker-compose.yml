@@ -30,23 +30,6 @@ services:
     restart: unless-stopped
     networks:  # Подключаем сервис к сети
       - app_network
-  telegram_bot:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: python telegram_polling.py
-    env_file:
-      - .env
-    depends_on:
-      - app
-      - mongo
-      - redis
-    volumes:
-      - ./logs:/app/logs
-      - ./:/app  # Для hot-reload, если нужно в разработке
-    restart: unless-stopped
-    networks:  # Подключаем сервис к сети
-      - app_network
 #  frontend:  # Временно комментируем сервис frontend
 #    build:
 #      context: ./frontend

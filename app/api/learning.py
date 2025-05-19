@@ -1,16 +1,16 @@
-from fastapi import APIRouter, HTTPException, status, Body
+from fastapi import APIRouter, HTTPException, status, Body, Depends
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
-from app.core.scenario_executor import ScenarioExecutor
 from app.db.scenario_repository import ScenarioRepository
 from app.db.agent_repository import AgentRepository
+from app.core.scenario_executor import ScenarioExecutor
 from loguru import logger
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import json
 
-# Импортируем telegram_plugin из integration.py
-from app.api.integration import telegram_plugin
+# Добавляем новый импорт для функции-зависимости
+from app.api.integration import get_scenario_executor_dependency
 
 router = APIRouter(prefix="/learning", tags=["learning"])
 
@@ -24,13 +24,6 @@ client = AsyncIOMotorClient(MONGO_URI)
 db = client.get_default_database()
 scenario_repo = ScenarioRepository(db)
 agent_repo = AgentRepository(db)
-
-# Инициализация исполнителя сценариев, передавая telegram_plugin
-scenario_executor = ScenarioExecutor(
-    scenario_repo=scenario_repo, 
-    agent_repo=agent_repo,
-    telegram_plugin=telegram_plugin
-)
 
 # Модели данных
 class UserProfile(BaseModel):
@@ -55,7 +48,10 @@ class OnboardingRequest(BaseModel):
     language: str = "ru"
 
 @router.post("/onboard", status_code=status.HTTP_200_OK)
-async def start_onboarding(request: OnboardingRequest = Body(...)):
+async def start_onboarding(
+    request: OnboardingRequest = Body(...),
+    executor: ScenarioExecutor = Depends(get_scenario_executor_dependency)
+):
     """
     Запускает сценарий онбординга для пользователя 
     и отправляет первое сообщение через Telegram
@@ -104,7 +100,7 @@ async def start_onboarding(request: OnboardingRequest = Body(...)):
             context["username"] = request.username
         
         # Запускаем сценарий через исполнитель
-        result = await scenario_executor.execute_scenario(scenario.model_dump(), context)
+        result = await executor.execute_scenario(scenario.model_dump(), context)
         
         logger.info(f"Сценарий онбординга запущен для пользователя: {request.user_id}")
         return {

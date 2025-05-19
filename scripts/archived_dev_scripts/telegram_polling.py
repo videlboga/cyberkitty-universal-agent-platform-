@@ -1,4 +1,4 @@
-from app.api.integration import telegram_app, telegram_plugin, TELEGRAM_BOT_TOKEN
+from app.core.dependencies import telegram_app_instance as telegram_app, telegram_plugin, TELEGRAM_BOT_TOKEN
 import os
 import sys
 import asyncio

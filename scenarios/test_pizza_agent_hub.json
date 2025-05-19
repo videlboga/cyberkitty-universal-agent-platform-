@@ -1,0 +1,83 @@
+{
+  "scenario_id": "test_pizza_agent_hub",
+  "name": "Хаб Агентов после Пицца-Теста",
+  "description": "Приветствует пользователя по его типу пиццы и предлагает других агентов.",
+  "version": "1.0",
+  "initial_context": {
+    "telegram_chat_id": null,
+    "user_id": null,
+    "determined_pizza_type": "Неопределенная пицца"
+  },
+  "steps": [
+    {
+      "id": "greet_user_and_show_menu",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{telegram_chat_id}",
+        "text": "Снова привет, {determined_pizza_type}! Я — твой гид по миру агентов. С кем бы ты хотел(а) пообщаться?",
+        "inline_keyboard": [
+          [{"text": "Эксперт по RAG-системе", "callback_data": "hub_call_rag_expert"}],
+          [{"text": "Завершить общение", "callback_data": "hub_end_conversation"}]
+        ]
+      },
+      "next_step_id": "wait_for_hub_choice"
+    },
+    {
+      "id": "wait_for_hub_choice",
+      "type": "input",
+      "params": {
+        "prompt": "Ожидание выбора агента",
+        "output_var": "hub_choice_callback_data"
+      },
+      "next_step_id": "branch_on_hub_choice"
+    },
+    {
+      "id": "branch_on_hub_choice",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.hub_choice_callback_data == 'hub_call_rag_expert'",
+            "next_step_id": "call_rag_expert_subscenario"
+          },
+          {
+            "condition": "context.hub_choice_callback_data == 'hub_end_conversation'",
+            "next_step_id": "say_goodbye"
+          }
+        ],
+        "default_next_step_id": "greet_user_and_show_menu"
+      }
+    },
+    {
+      "id": "call_rag_expert_subscenario",
+      "type": "execute_sub_scenario",
+      "params": {
+        "sub_scenario_id": "test_rag_expert_subscenario",
+        "input_mapping": {
+          "user_id": "{user_id}",
+          "telegram_chat_id": "{telegram_chat_id}",
+          "user_pizza_type": "{determined_pizza_type}"
+        },
+        "output_mapping": {}
+      },
+      "next_step_id": "greet_user_and_show_menu"
+    },
+    {
+      "id": "say_goodbye",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{telegram_chat_id}",
+        "text": "Было приятно пообщаться, {determined_pizza_type}! Возвращайся еще!"
+      },
+      "next_step_id": "end_hub_scenario"
+    },
+    {
+      "id": "end_hub_scenario_error",
+      "type": "end"
+    },
+    {
+      "id": "end_hub_scenario",
+      "type": "end"
+    }
+  ]
+} 

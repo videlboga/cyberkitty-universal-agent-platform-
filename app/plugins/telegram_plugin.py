@@ -186,8 +186,13 @@ class TelegramPlugin:
         - inline_keyboard: List[List[Dict[str, str]]] (опционально)
           (e.g. [[{'text': 'Button 1', 'callback_data': 'data1'}]] )
         - reply_keyboard: List[List[Dict[str, str]]] (опционально)
-          (e.g. [[{'text': 'Reply Button 1'}]] )
-        - message_id_to_edit: int (опционально, для редактирования сообщения)
+          (e.g. [[{'text': 'Reply Button 1'}], [{'text': 'Reply Button 2'}]] )
+        - one_time_keyboard: bool (опционально, для reply_keyboard, по умолчанию False)
+        - remove_keyboard: bool (опционально, для удаления reply_keyboard, по умолчанию False)
+        - resize_keyboard: bool (опционально, для reply_keyboard, по умолчанию True)
+        - input_field_placeholder: str (опционально, для reply_keyboard)
+        - selective: bool (опционально, для reply_keyboard, по умолчанию False)
+        - message_id_to_edit: int (опционально, для редактирования сообщения, работает только с inline_keyboard)
         """
         params = step_data.get("params", {}) # Получаем вложенный словарь params
         
@@ -197,6 +202,13 @@ class TelegramPlugin:
         reply_keyboard_data = params.get("reply_keyboard")
         message_id_to_edit = params.get("message_id_to_edit")
         parse_mode = params.get("parse_mode")
+        
+        # Параметры для ReplyKeyboardMarkup
+        one_time_keyboard = params.get("one_time_keyboard", False)
+        remove_keyboard_flag = params.get("remove_keyboard", False)
+        resize_keyboard = params.get("resize_keyboard", True)
+        input_field_placeholder = params.get("input_field_placeholder")
+        selective = params.get("selective", False)
 
         if not chat_id or not text:
             logger.error(f"Шаг telegram_send_message: отсутствует chat_id или text. step_data: {step_data}, context: {context}")
@@ -205,7 +217,25 @@ class TelegramPlugin:
 
         final_reply_markup = None
 
-        if inline_keyboard_data:
+        if remove_keyboard_flag:
+            from telegram import ReplyKeyboardRemove
+            final_reply_markup = ReplyKeyboardRemove(selective=selective)
+        elif reply_keyboard_data: # Этот блок должен идти перед inline_keyboard, если мы хотим дать приоритет reply_keyboard при одновременном указании (хотя это плохая практика)
+            buttons = []
+            for row_data in reply_keyboard_data:
+                button_row = []
+                for button_dict in row_data: # Ожидаем [{'text': 'Кнопка1'}, {'text': 'Кнопка2'}]
+                    button_row.append(button_dict["text"]) # ReplyKeyboardMarkup принимает просто строки для кнопок
+                buttons.append(button_row)
+            
+            final_reply_markup = ReplyKeyboardMarkup(
+                buttons,
+                resize_keyboard=resize_keyboard,
+                one_time_keyboard=one_time_keyboard,
+                input_field_placeholder=input_field_placeholder,
+                selective=selective
+            )
+        elif inline_keyboard_data:
             buttons = []
             for row_data in inline_keyboard_data:
                 button_row = []
@@ -214,52 +244,36 @@ class TelegramPlugin:
                 buttons.append(button_row)
             final_reply_markup = InlineKeyboardMarkup(buttons)
         
-        elif reply_keyboard_data:
-            buttons = []
-            for row_data in reply_keyboard_data:
-                button_row = [button_data["text"] for button_data in row_data]
-                buttons.append(button_row)
-            
-            resize = params.get("resize_keyboard", True)  # Используем params
-            one_time = params.get("one_time_keyboard", False) # Используем params
-            placeholder = params.get("input_field_placeholder") # Используем params
-            selective = params.get("selective", False) # Используем params
-            final_reply_markup = ReplyKeyboardMarkup(
-                buttons,
-                resize_keyboard=resize,
-                one_time_keyboard=one_time,
-                input_field_placeholder=placeholder,
-                selective=selective
-            )
-
         try:
             if message_id_to_edit and final_reply_markup and isinstance(final_reply_markup, InlineKeyboardMarkup):
                 await self.app.bot.edit_message_text(
                     chat_id=chat_id,
                     message_id=message_id_to_edit,
                     text=text,
-                    reply_markup=final_reply_markup,
+                    reply_markup=final_reply_markup, # Можно редактировать только inline-клавиатуру
                     parse_mode=parse_mode
                 )
-                logger.info(f"Сообщение {message_id_to_edit} отредактировано для chat_id {chat_id}")
-            elif message_id_to_edit:
-                await self.app.bot.edit_message_text(
+                logger.info(f"Сообщение {message_id_to_edit} отредактировано для chat_id {chat_id} с inline клавиатурой.")
+            elif message_id_to_edit: # Редактирование без изменения клавиатуры или только текста
+                 await self.app.bot.edit_message_text(
                     chat_id=chat_id,
                     message_id=message_id_to_edit,
                     text=text,
+                    # reply_markup=None, # Явно не указываем, чтобы не сбросить существующую inline клавиатуру, если она была
                     parse_mode=parse_mode
                 )
-                logger.info(f"Текст сообщения {message_id_to_edit} отредактирован для chat_id {chat_id}")
-            else:
+                 logger.info(f"Текст сообщения {message_id_to_edit} отредактирован для chat_id {chat_id}.")
+            else: # Отправка нового сообщения
                 sent_message = await self.app.bot.send_message(
                     chat_id=chat_id,
                     text=text,
                     reply_markup=final_reply_markup,
                     parse_mode=parse_mode
                 )
-                context["sent_message_id"] = sent_message.message_id
-                logger.info(f"Сообщение отправлено в chat_id {chat_id}, message_id: {sent_message.message_id}")
-            context["telegram_send_success"] = True
+                logger.info(f"Сообщение отправлено в chat_id {chat_id}. Message ID: {sent_message.message_id}")
+                context["telegram_last_message_id"] = sent_message.message_id
+                context["telegram_last_message_text"] = text
+
         except Exception as e:
             logger.error(f"Ошибка при отправке/редактировании сообщения Telegram в chat_id {chat_id}: {e}")
             context["telegram_send_error"] = str(e)

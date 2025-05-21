@@ -10,24 +10,6 @@
   },
   "steps": [
     {
-      "id": "prepare_joke_text",
-      "type": "action", 
-      "params": {
-        "action_type": "generate_pizza_joke", 
-        "pizza_type_input": "{pizza_type}",
-        "output_var": "joke_text"
-        
-        
-        
-        
-        
-        
-      },
-      
-      
-      "next_step_id": "actually_prepare_joke_text_simple"
-    },
-    {
       "id": "actually_prepare_joke_text_simple",
       "type": "action", 
        "params": {

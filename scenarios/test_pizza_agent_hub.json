@@ -60,6 +60,21 @@
         },
         "output_mapping": {}
       },
+      "next_step_id": "schedule_joke"
+    },
+    {
+      "id": "schedule_joke",
+      "type": "schedule_scenario_run",
+      "params": {
+        "run_in_seconds": 300,
+        "agent_id_to_run_scenario": "682c5831a151e0d7d339a02d",
+        "context_to_pass": {
+          "telegram_chat_id": "{telegram_chat_id}",
+          "user_id": "{user_id}",
+          "pizza_type": "{determined_pizza_type}"
+        },
+        "task_id_output_var": "joke_task_id"
+      },
       "next_step_id": "greet_user_and_show_menu"
     },
     {

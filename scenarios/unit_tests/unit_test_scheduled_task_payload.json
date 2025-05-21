@@ -1,0 +1,25 @@
+{
+  "scenario_id": "unit_test_scheduled_task_payload",
+  "name": "Unit Test: Scheduled Task Payload",
+  "description": "This scenario is intended to be run by the scheduling_plugin unit test.",
+  "version": "1.0",
+  "created_by_agent_id": "system_dev",
+  "steps": [
+    {
+      "id": "step_1_log_execution",
+      "type": "log_message",
+      "name": "Log Scheduled Execution",
+      "config": {
+        "level": "INFO",
+        "message": "Scheduled task payload scenario has been executed with context: {initial_payload_data}"
+      },
+      "next_step_id": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "name": "End of Scheduled Payload"
+    }
+  ],
+  "initial_context": {}
+} 

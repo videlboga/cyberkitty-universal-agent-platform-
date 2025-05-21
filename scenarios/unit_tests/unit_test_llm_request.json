@@ -1,0 +1,38 @@
+{
+  "scenario_id": "unit_test_llm_request",
+  "name": "Unit Test for LLM Request Step",
+  "description": "Tests the execution of an llm_request step.",
+  "version": "1.0",
+  "created_by_agent_id": "system_dev",
+  "steps": [
+    {
+      "id": "step_1_llm_request",
+      "type": "llm_query",
+      "name": "Simple LLM Request",
+      "params": {
+        "prompt": "Translate 'hello' to French.",
+        "model": "gpt-3.5-turbo",
+        "output_var": "llm_translation_output"
+      },
+      "next_step_id": "step_2_check_output"
+    },
+    {
+      "id": "step_2_check_output",
+      "type": "log_message",
+      "name": "Log LLM Output (or lack thereof)",
+      "config": {
+        "level": "INFO",
+        "message": "LLM output for translation: {llm_translation_output}"
+      },
+      "next_step_id": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "name": "End of LLM Test"
+    }
+  ],
+  "initial_context": {
+    "test_case_name": "llm_request_execution"
+  }
+} 

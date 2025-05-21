@@ -1,777 +1,823 @@
 import os
 import json
 import asyncio
-from typing import Dict, Any, Optional, List, Callable
+import inspect
+import time # ДОБАВЛЕН ИМПОРТ
+from typing import Dict, Any, Optional, List, Callable, Union, TYPE_CHECKING # <--- Добавляем TYPE_CHECKING
 from loguru import logger
 from datetime import datetime
 from app.core.state_machine import ScenarioStateMachine
 from app.plugins.rag_plugin import RAGPlugin
 from app.plugins.telegram_plugin import TelegramPlugin
-from app.plugins.llm_plugin import LLMPlugin
+# Удаляем прямой импорт LLMPlugin, чтобы избежать потенциального цикла, если LLMPlugin когда-то захочет импортировать что-то из executor
+# from app.plugins.llm_plugin import LLMPlugin 
+# Вместо этого, тип LLMPlugin будет использоваться только в аннотациях и через TYPE_CHECKING, если понадобится
 from app.plugins.mongo_storage_plugin import MongoStoragePlugin
 from app.plugins.scheduling_plugin import SchedulingPlugin
 from telegram.ext import Application
 import requests
 from app.db.scenario_repository import ScenarioRepository
 from app.db.agent_repository import AgentRepository
+from app.models.scenario import Scenario
+from app.core.utils import _resolve_value_from_context, resolve_string_template # <-- ДОБАВЛЕН ИМПОРТ
+
+# Для разрешения циклических зависимостей при аннотации типов
+if TYPE_CHECKING:
+    from app.plugins.llm_plugin import LLMPlugin # <--- Импорт LLMPlugin для аннотаций
 
 # Настройка логирования
 os.makedirs("logs", exist_ok=True)
-logger.add("logs/scenario_executor.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True)
+logger.add("logs/scenario_executor.log", format="{time} {level} {message}", level="DEBUG", rotation="10 MB", compression="zip", serialize=True) # Уровень INFO изменен на DEBUG
 
 # Получаем токен из переменных окружения
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
-# Утилита для подстановки значений, если еще не импортирована или не определена выше
-# Если она уже есть в mongo_storage_plugin, лучше импортировать оттуда или вынести в общие utils
-# Для простоты пока определим здесь, если ее нет глобально в этом файле.
-# Предполагаем, что _resolve_value_from_context доступна или будет импортирована.
-# Если она в mongo_storage_plugin, то from app.plugins.mongo_storage_plugin import _resolve_value_from_context
-# По коду mongo_storage_plugin она там есть, но не факт, что видна здесь без явного импорта из модуля.
-# Для безопасности, предположим, что она нужна и определим ее или обеспечим импорт.
-# Проверил код MongoStoragePlugin - она там внутренняя. Скопируем ее сюда для использования.
-
-def _resolve_value_from_context(value: Any, context: Dict[str, Any], depth=0, max_depth=10) -> Any:
-    if depth > max_depth:
-        logger.warning(f"Max recursion depth reached in _resolve_value_from_context for value: {value}")
-        return value
-
-    if isinstance(value, str):
-        # Пытаемся разрешить как полный плейсхолдер {key} или {obj.key}
-        if value.startswith("{") and value.endswith("}"):
-            key_path = value[1:-1]
-            parts = key_path.split('.')
-            current_value = context
-            resolved_successfully = True
-            for part in parts:
-                if isinstance(current_value, dict) and part in current_value:
-                    current_value = current_value[part]
-                elif isinstance(current_value, list): # Попытка доступа по индексу для списков
-                    try:
-                        idx = int(part)
-                        if 0 <= idx < len(current_value):
-                            current_value = current_value[idx]
-                        else:
-                            resolved_successfully = False
-                            break
-                    except ValueError:
-                        resolved_successfully = False
-                        break
-                else:
-                    resolved_successfully = False
-                    break
-            
-            if resolved_successfully:
-                # Если результат - строка, которая сама является плейсхолдером, разрешаем ее дальше
-                if isinstance(current_value, str) and current_value.startswith("{") and current_value.endswith("}") and current_value != value:
-                    return _resolve_value_from_context(current_value, context, depth + 1, max_depth)
-                return current_value
-            else: # Если не смогли разрешить как полный ключ, проверяем частичную подстановку
-                # Это для строк типа "Hello {name}, your age is {age}"
-                # Используем простой f-string like replacement, но безопасный
-                # Обновлено: более простой вариант, не используем format, так как он может вызвать ошибки с лишними {}
-                # Вместо этого, ищем {key} и заменяем.
-                # Эта логика перенесена в resolve_string_template
-                return resolve_string_template(value, context)
-        else:
-            # Если строка не является полным плейсхолдером, все равно пытаемся подставить в нее значения
-            return resolve_string_template(value, context)
-
-    elif isinstance(value, dict):
-        return {k: _resolve_value_from_context(v, context, depth + 1, max_depth) for k, v in value.items()}
-    elif isinstance(value, list):
-        return [_resolve_value_from_context(item, context, depth + 1, max_depth) for item in value]
-    return value
-
-def resolve_string_template(template_str: str, ctx: Dict[str, Any]) -> str:
-    """
-    Разрешает плейсхолдеры вида {key} или {obj.key.subkey} в строке.
-    Не использует eval или format во избежание ошибок безопасности и форматирования.
-    """
-    import re
-    # Находим все плейсхолдеры вида {key} или {obj.key...}
-    # Этот паттерн более гибкий, чем просто \\{([^\\}]+)\\}
-    placeholders = re.findall(r"\\{([^{}]+)\\}", template_str)
-
-    resolved_str = template_str
-    for placeholder in placeholders:
-        key_path = placeholder
-        parts = key_path.split('.')
-        current_value = ctx
-        resolved_successfully = True
-        for part in parts:
-            if isinstance(current_value, dict) and part in current_value:
-                current_value = current_value[part]
-            elif isinstance(current_value, list):
-                try:
-                    idx = int(part)
-                    if 0 <= idx < len(current_value):
-                        current_value = current_value[idx]
-                    else:
-                        resolved_successfully = False
-                        break
-                except ValueError:
-                    resolved_successfully = False
-                    break
-            else:
-                resolved_successfully = False
-                break
-        
-        if resolved_successfully:
-            # Преобразуем значение в строку для подстановки
-            # Если значение - словарь или список, его строковое представление будет подставлено
-            replacement_value = str(current_value)
-            resolved_str = resolved_str.replace(f"{{{placeholder}}}", replacement_value)
-        # Если плейсхолдер не найден в контексте, он остается без изменений в строке
-        # else:
-        #     logger.debug(f"Placeholder '{{{placeholder}}}' not found in context or path invalid.")
-
-    return resolved_str
-
 class ScenarioExecutor:
-    """
-    Исполнитель сценариев с поддержкой плагинов и произвольных типов шагов.
-    
-    Функциональность:
-    - Регистрация обработчиков для различных типов шагов
-    - Выполнение шагов сценария через плагины и обработчики
-    - Обработка контекста и состояния сценария
-    - Поддержка асинхронного выполнения
-    """
-    
     def __init__(self,
                  scenario_repo: ScenarioRepository,
                  agent_repo: AgentRepository,
                  api_base_url: str = "http://localhost:8000",
                  telegram_plugin: Optional[TelegramPlugin] = None,
                  mongo_storage_plugin: Optional[MongoStoragePlugin] = None,
-                 scheduling_plugin: Optional[SchedulingPlugin] = None):
-        """
-        Инициализация исполнителя сценариев
-        
-        Args:
-            scenario_repo: Репозиторий для доступа к сценариям.
-            agent_repo: Репозиторий для доступа к агентам.
-            api_base_url: Базовый URL API для доступа к коллекциям и интеграциям.
-            telegram_plugin: Опциональный экземпляр TelegramPlugin.
-            mongo_storage_plugin: Опциональный экземпляр MongoStoragePlugin.
-            scheduling_plugin: Опциональный экземпляр SchedulingPlugin.
-        """
+                 scheduling_plugin: Optional[SchedulingPlugin] = None,
+                 rag_plugin: Optional[RAGPlugin] = None,
+                 llm_plugin: Optional['LLMPlugin'] = None): # <--- LLMPlugin теперь в кавычках как Forward Reference
         self.scenario_repo = scenario_repo
         self.agent_repo = agent_repo
         self.api_base_url = api_base_url
-        self.telegram_plugin = telegram_plugin
-        self.mongo_storage_plugin = mongo_storage_plugin
-        self.scheduling_plugin = scheduling_plugin
         self.step_handlers = {}
-        self.plugins = []
+        self._plugins: tuple = tuple() 
+        self._plugins_initialized_flag = False
+        self.waiting_for_input_events = {} 
+        self.paused_scenarios = {} 
         
-        # Инициализация обработчиков стандартных типов шагов
-        self._register_default_handlers()
+        temp_plugins_list = []
+        if telegram_plugin: temp_plugins_list.append(telegram_plugin)
+        if mongo_storage_plugin: temp_plugins_list.append(mongo_storage_plugin)
+        if scheduling_plugin: temp_plugins_list.append(scheduling_plugin)
+        if rag_plugin: temp_plugins_list.append(rag_plugin)
+        if llm_plugin: temp_plugins_list.append(llm_plugin)
         
-        # Инициализация и регистрация плагинов
-        self._init_plugins()
+        self._plugins = tuple(temp_plugins_list) 
+        self._plugins_initialized_flag = True
 
-        # Регистрация обработчика для под-сценариев
+        logger.info(f"[SCENARIO_EXECUTOR __init__] Initial self._plugins (tuple): {self._plugins}")
+        self._register_default_handlers()
+        self._init_plugins()
         self.step_handlers["execute_sub_scenario"] = self._handle_execute_sub_scenario
-        
         logger.info("ScenarioExecutor инициализирован")
-    
+        logger.info(f"[SCENARIO_EXECUTOR __init__ END] id(self): {id(self)}, id(self._plugins): {id(self._plugins)}, self._plugins: {self._plugins}")
+
+    @property
+    def plugins(self) -> tuple:
+        logger.debug(f"[SCENARIO_EXECUTOR .plugins GETTER] id(self): {id(self)}, Reading self._plugins: {self._plugins}")
+        return self._plugins
+
+    @plugins.setter
+    def plugins(self, value: tuple):
+        logger.warning(f"[SCENARIO_EXECUTOR .plugins SETTER ATTEMPT] id(self): {id(self)}, Attempting to set self.plugins to: {value}.")
+        if not self._plugins_initialized_flag:
+            self._plugins = value
+            logger.info(f"[SCENARIO_EXECUTOR .plugins SETTER] self._plugins set to: {self._plugins} during initial setup.")
+        else:
+            logger.error(f"[SCENARIO_EXECUTOR .plugins SETTER] CRITICAL: Attempt to modify self.plugins after initialization!")
+
     def _register_default_handlers(self):
-        """Регистрация обработчиков для стандартных типов шагов"""
         self.step_handlers["message"] = self.handle_message
         self.step_handlers["input"] = self.handle_input
         self.step_handlers["branch"] = self.handle_branch
-        self.step_handlers["rag_search"] = self.handle_rag_search
+        self.step_handlers["rag_search"] = self.handle_rag_search # Предполагая, что RAGPlugin будет передан и инициализирован
         self.step_handlers["action"] = self.handle_action
         self.step_handlers["start"] = self.handle_start
         self.step_handlers["end"] = self.handle_end
         self.step_handlers["execute_code"] = self.handle_execute_code
         self.step_handlers["log_message"] = self.handle_log_message
-        
-        logger.info("Зарегистрированы обработчики для стандартных типов шагов, включая execute_code и log_message")
+        self.step_handlers["telegram_send_message"] = self.telegram_send_message
+        self.step_handlers["telegram_edit_message"] = self.telegram_edit_message
+        logger.info("Зарегистрированы обработчики для стандартных типов шагов.")
     
     def _init_plugins(self):
-        """Инициализация плагинов и регистрация их обработчиков"""
-        self.rag_plugin = RAGPlugin()
-        
-        self.llm_plugin = LLMPlugin()
-        
-        # Регистрация обработчиков из плагинов
-        self.llm_plugin.register_step_handlers(self.step_handlers)
-        
-        if self.telegram_plugin:
-            self.telegram_plugin.register_step_handlers(self.step_handlers)
-            logger.info("Обработчики TelegramPlugin зарегистрированы.")
-        else:
-            logger.warning("TelegramPlugin не был предоставлен ScenarioExecutor, интеграция с Telegram через ScenarioExecutor не будет работать для обработчиков шагов.")
-            
-        if self.mongo_storage_plugin:
-            self.mongo_storage_plugin.register_step_handlers(self.step_handlers)
-            logger.info("Обработчики MongoStoragePlugin зарегистрированы.")
-        else:
-            logger.warning("MongoStoragePlugin не был предоставлен ScenarioExecutor.")
-            
-        if self.scheduling_plugin:
-            self.scheduling_plugin.register_step_handlers(self.step_handlers)
-            logger.info("Обработчики SchedulingPlugin зарегистрированы.")
-            # # Добавим лог для проверки, что именно зарегистрировано (ВРЕМЕННО ОТКЛЮЧЕНО ИЗ-ЗА ОШИБКИ)
-            # for step_type, handler_func in self.scheduling_plugin.get_step_handlers().items():
-            #     logger.info(f"SchedulingPlugin: зарегистрирован '{step_type}' -> {handler_func.__name__} из {handler_func.__self__.__class__.__name__}")
-        else:
-            logger.warning("SchedulingPlugin не был предоставлен ScenarioExecutor.")
-            
-        logger.info("Инициализированы плагины и их обработчики (кроме Telegram и MongoStorage, если не были предоставлены).")
-    
+        logger.info(f"[SCENARIO_EXECUTOR _init_plugins START] self.plugins: {[p.__class__.__name__ for p in self.plugins]}")
+        for plugin in self.plugins:
+            plugin_name = plugin.__class__.__name__
+            if hasattr(plugin, 'register_step_handlers') and callable(plugin.register_step_handlers):
+                try:
+                    plugin.register_step_handlers(self.step_handlers)
+                    logger.info(f"Обработчики {plugin_name} зарегистрированы. Keys: {list(self.step_handlers.keys())}")
+                except Exception as e:
+                    logger.error(f"Ошибка при регистрации обработчиков для {plugin_name}: {e}")
+            else:
+                logger.warning(f"Плагин {plugin_name} не имеет метода register_step_handlers.")
+        logger.info(f"[SCENARIO_EXECUTOR _init_plugins END] Final step_handlers keys: {list(self.step_handlers.keys())}")
+
     async def handle_message(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Обработчик шага типа message - простое сообщение пользователю
-        (Это может быть переименовано/объединено с log_message, если функционал дублируется)
-        """
-        # Логика отображения сообщения реализуется во фронтенде или через другие плагины (напр. Telegram)
-        # Здесь просто логируем факт вызова этого шага, если он используется
         message_text = step_data.get("params", {}).get("text", "(пустое сообщение)")
         resolved_message = _resolve_value_from_context(message_text, context)
         logger.info(f"Обработчик handle_message: {resolved_message}")
         return context
     
-    async def handle_input(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Обработчик шага типа input - ожидание ввода от пользователя
-        
-        Args:
-            step_data: Данные шага (тип, текст, ...)
-            context: Контекст сценария
+    async def handle_input(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        step_params = step_data.get("params", {})
+        input_type = step_params.get("input_type")
+        step_id = step_data.get("step_id_for_log", "unknown_input_step")
+
+        if input_type == "callback_query":
+            output_var = step_params.get("output_var")
+            if output_var and output_var in context and context[output_var] is not None:
+                logger.info(f"Шаг input ({step_id}) типа 'callback_query': Ввод уже предоставлен. Продолжаем.")
+                return context 
+
+            logger.info(f"Шаг input ({step_id}) типа 'callback_query'. Ввод еще не предоставлен. Регистрация ожидания.")
+            chat_id = context.get("telegram_chat_id") or context.get("chat_id")
+            user_id = context.get("user_id")
+            scenario_id = context.get("__current_scenario_id__") # Это должно быть установлено в execute_scenario
             
-        Returns:
-            Dict: Обновленный контекст
-        """
-        # Здесь только возвращаем контекст без изменений
-        # Логика отображения поля ввода и получения данных реализуется во фронтенде
+            if not chat_id or not user_id or not scenario_id:
+                err_msg = f"Input step ({step_id}): Missing data for scenario_instance_id (chat_id, user_id, scenario_id)"
+                logger.error(err_msg)
+                context["__step_error__"] = err_msg
+                return context
+
+            scenario_instance_id = context.get("__scenario_instance_id__")
+            if not scenario_instance_id: # Должен быть создан в execute_scenario
+                scenario_instance_id = f"{scenario_id}_{user_id}_{chat_id}_{datetime.now().timestamp()}"
+                context["__scenario_instance_id__"] = scenario_instance_id 
+                logger.warning(f"Шаг input ({step_id}): __scenario_instance_id__ не был в контексте, сгенерирован новый: {scenario_instance_id}")
+
+            message_id_with_buttons = context.get("message_id_with_buttons") # Это поле должно устанавливаться telegram_send_message
+            if not message_id_with_buttons:
+                logger.warning(f"Шаг input ({step_id}) 'callback_query' не нашел 'message_id_with_buttons' в контексте.")
+
+            self.waiting_for_input_events[scenario_instance_id] = {
+                "message_id": message_id_with_buttons, "output_var": output_var,
+                "expected_callback_data_pattern": step_params.get("expected_callback_data"),
+                "scenario_id": scenario_id, "step_id": step_id, "chat_id": chat_id, "user_id": user_id,
+                "status": "waiting", "timestamp": datetime.now().isoformat()
+            }
+            logger.info(f"Шаг input ({step_id}): Зарегистрировано ожидание для instance_id='{scenario_instance_id}'.")
+            return "PAUSED_WAITING_FOR_CALLBACK"
+            
+        logger.warning(f"Шаг input ({step_id}) с неизвестным input_type='{input_type}' или не указан. Возвращаем контекст.")
         return context
     
     async def handle_branch(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Обработчик шага типа branch - ветвление на основе условия
-        
-        Args:
-            step_data: Данные шага (тип, condition, branches)
-            context: Контекст сценария
-            
-        Returns:
-            Dict: Обновленный контекст
-        """
-        # Обработка условия и ветвления реализована в ScenarioStateMachine
-        # Здесь только возвращаем контекст без изменений
-        return context
+        return context # Логика в ScenarioStateMachine
     
     async def handle_rag_search(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Обработчик шага типа rag_search - поиск по базе знаний через RAG
+        rag_plugin = self.get_plugin_by_type("RAGPlugin")
+        if not rag_plugin:
+            logger.error("RAGPlugin не найден в ScenarioExecutor для шага rag_search.")
+            context["__step_error__"] = "RAGPlugin not found"
+            return context
         
-        Args:
-            step_data: Данные шага (тип, query, collection_name, output_var)
-            context: Контекст сценария
-            
-        Returns:
-            Dict: Обновленный контекст с результатами RAG
-        """
-        query = step_data.get("query", "")
-        
-        # Подстановка переменных из контекста в запрос
-        if isinstance(query, str) and "{" in query and "}" in query:
-            for key, value in context.items():
-                placeholder = "{" + key + "}"
-                if placeholder in query:
-                    query = query.replace(placeholder, str(value))
-        
-        collection_name = step_data.get("collection_name", "default")
-        output_var = step_data.get("output_var", "rag_results")
+        params = step_data.get("params", {})
+        query_template = params.get("query", "")
+        query = _resolve_value_from_context(query_template, context)
+        collection_name = _resolve_value_from_context(params.get("collection_name", "default"), context)
+        output_var = params.get("output_var", "rag_results")
         
         try:
-            results = await self.rag_plugin.search(query, collection_name)
+            results = await rag_plugin.search(query, collection_name)
             context[output_var] = results
-            logger.info(f"RAG поиск выполнен: коллекция={collection_name}, запрос={query}, найдено={len(results) if results else 0}")
+            logger.info(f"RAG поиск: колл='{collection_name}', запрос='{query}', найдено={len(results) if results else 0}")
         except Exception as e:
-            logger.error(f"Ошибка при RAG поиске: {e}")
+            logger.error(f"Ошибка RAG поиска: {e}")
             context[output_var] = {"error": str(e)}
-        
         return context
     
-    async def handle_action(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Обрабатывает шаг типа action: выполнение действия через плагины
-        
-        Args:
-            step_data: Данные шага
-            context: Контекст выполнения
+    async def _update_context_from_updates(self, updates: Dict[str, Any], context: Dict[str, Any], scenario_id: str, step_id: str) -> Dict[str, Any]:
+        logger.debug(f"[_update_context_from_updates SCENARIO_ID:{scenario_id} STEP_ID:{step_id}] Original context ID: {id(context)}, Context BEFORE updates: {json.dumps(context, indent=2, default=str, ensure_ascii=False)}")
+        processed_updates_log = {}
+        for key, value_template in updates.items():
+            resolved_value = _resolve_value_from_context(value_template, context)
+            keys = key.split('.')
+            temp_context_target = context 
             
-        Returns:
-            Dict[str, Any]: Обновленный контекст
-        """
-        try:
-            action_type = step_data.get("action_type")
-            params = step_data.get("params", {}) # Это параметры для действия
-            # step_data может содержать и другие поля, специфичные для шага "action", 
-            # но не являющиеся параметрами самого действия (например, output_var)
-            
-            if not action_type:
-                logger.warning("Шаг action не содержит тип действия (action_type)")
-                context["__step_error__"] = "Шаг action не содержит action_type"
-                return context
-            
-            # Если action_type совпадает с telegram_send_message, используем соответствующий обработчик из TelegramPlugin
-            if action_type == "telegram_send_message":
-                # Параметры для telegram_send_message должны быть внутри params
-                # step_data для handle_step_send_message это и есть params в данном случае
-                logger.info(f"Шаг action вызывает telegram_send_message с параметрами: {{params}}")
-                # Убедимся, что chat_id передается, если он есть в общем контексте и не указан в params
-                if "chat_id" not in params and "chat_id" in context:
-                    params["chat_id"] = context["chat_id"]
+            logger.debug(f"[_update_context_from_updates] Processing update: key='{key}', value_template='{value_template}', resolved_value='{resolved_value}'")
+            logger.debug(f"[_update_context_from_updates]   Initial temp_context_target ID: {id(temp_context_target)}")
 
-                if self.telegram_plugin: # Проверяем наличие плагина перед вызовом
-                    return await self.telegram_plugin.handle_step_send_message(params, context)
-                else:
-                    logger.error("Попытка выполнить telegram_send_message, но TelegramPlugin не инициализирован в ScenarioExecutor.")
-                    context["__step_error__"] = "TelegramPlugin не инициализирован."
-                    return context
+            for i, k_part in enumerate(keys[:-1]):
+                logger.debug(f"[_update_context_from_updates]     Navigating/creating part: '{k_part}' (part {i+1} of {len(keys)-1}) in temp_context_target (ID: {id(temp_context_target)})")
+                if k_part not in temp_context_target or not isinstance(temp_context_target[k_part], dict):
+                    logger.debug(f"[_update_context_from_updates]       Part '{k_part}' not found or not a dict. Creating new dict.")
+                    temp_context_target[k_part] = {}
+                temp_context_target = temp_context_target[k_part] 
+                logger.debug(f"[_update_context_from_updates]     temp_context_target is now (ID: {id(temp_context_target)}): {json.dumps(temp_context_target, indent=2, default=str, ensure_ascii=False)}")
+
+            final_key_part = keys[-1]
+            logger.debug(f"[_update_context_from_updates]   Setting final_key_part='{final_key_part}' in temp_context_target (ID: {id(temp_context_target)}) to resolved_value='{resolved_value}'")
+            temp_context_target[final_key_part] = resolved_value
             
-            # Для других типов действий можно также проверять наличие зарегистрированных обработчиков
-            # или использовать общую логику, если предполагается, что action_type - это имя метода в каком-либо плагине.
-            # Пока что, для неизвестных action_type, логируем и возвращаем контекст.
-            # Эта логика может быть расширена для поддержки большего количества generic actions.
-            
-            logger.info(f"Выполнение общего действия типа '{action_type}' не реализовано напрямую в handle_action. Проверьте тип шага.")
-            # Если предполагается, что action_type - это какой-то другой зарегистрированный тип шага,
-            # то сценарий должен использовать 'type: action_type' вместо 'type: action, action_type: action_type'
-            
-            # Если есть другие плагины, которые регистрируют действия под своими именами,
-            # они должны регистрировать их в self.step_handlers, и тогда шаг должен быть type: plugin_action_name
-            
-            # По умолчанию, если action_type не telegram_send_message и не другой специальный, считаем ошибкой конфигурации шага
-            context["__step_error__"] = f"Неизвестный action_type '{action_type}' в шаге 'action'. Зарегистрируйте его или используйте соответствующий 'type'."
-            logger.warning(context["__step_error__"])
+            logger.debug(f"[_update_context_from_updates]   Context (original ref ID: {id(context)}) AFTER update for key '{key}': {json.dumps(context, indent=2, default=str, ensure_ascii=False)}")
+            processed_updates_log[key] = resolved_value
+
+        logger.info(f"[_update_context_from_updates SCENARIO_ID:{scenario_id} STEP_ID:{step_id}] Successfully updated context (processed_updates_log): {processed_updates_log}")
+        logger.debug(f"[_update_context_from_updates] Final context ID: {id(context)}, Context AFTER all updates: {json.dumps(context, indent=2, default=str, ensure_ascii=False)}")
+        return context
+
+    async def handle_action(self, step_data: Dict[str, Any], state_machine_obj: ScenarioStateMachine) -> Dict[str, Any]: # Принимает state_machine
+        context = state_machine_obj.context # Работаем с контекстом из state_machine
+        step_params = step_data.get("params", {})
+        action_type = step_params.get("action_type")
+        scenario_id_for_log = state_machine_obj.scenario_id
+        step_id_for_log = step_data.get('id', 'unknown_action_step')
+
+        logger.debug(f"[handle_action SCENARIO_ID:{scenario_id_for_log} STEP_ID:{step_id_for_log}] Received action_type: {action_type}, params: {step_params}")
+
+        if not action_type:
+            logger.warning(f"[handle_action] Шаг action (ID: {step_id_for_log}) не содержит action_type.")
+            context["__step_error__"] = "Шаг action не содержит action_type"
             return context
-                
-        except Exception as e:
-            logger.error(f"Ошибка при обработке шага action (action_type: {step_data.get('action_type')}): {e}", exc_info=True)
-            context["__step_error__"] = str(e)
-            return context
-    
-    async def handle_start(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Обрабатывает шаг типа start: начало сценария
+            
+        if action_type == "update_context":
+            updates = step_params.get("updates", {})
+            # _update_context_from_updates теперь изменяет 'context' (который state_machine_obj.context) по ссылке
+            await self._update_context_from_updates(
+                updates, 
+                context, # Это state_machine_obj.context
+                scenario_id=scenario_id_for_log, 
+                step_id=step_id_for_log
+            )
+            # state_machine_obj.context уже обновлен.
+            logger.info(f"[handle_action ID: {step_id_for_log}] action 'update_context' executed. SM context should be updated.")
         
-        Args:
-            step_data: Данные шага
-            context: Контекст выполнения
-            
-        Returns:
-            Dict[str, Any]: Обновленный контекст
-        """
-        logger.info("Начало выполнения сценария")
-        # Можно добавить инициализацию начальных значений контекста
+        elif action_type == "execute_code":
+            code_to_execute = step_params.get("code")
+            if not code_to_execute:
+                logger.warning(f"[handle_action ID: {step_id_for_log}] Шаг execute_code не содержит кода для выполнения.")
+                context["__step_error__"] = "Шаг execute_code: отсутствует параметр 'code'."
+            else:
+                try:
+                    execution_globals = {"context": context, "logger": logger, "datetime": datetime, "os": os, "json": json, "time": time}
+                    logger.debug(f"[handle_action ID: {step_id_for_log}] Перед выполнением execute_code. Контекст: {context}")
+                    exec(code_to_execute, execution_globals) # context изменяется по ссылке
+                    logger.info(f"[handle_action ID: {step_id_for_log}] Шаг execute_code успешно выполнил код: {code_to_execute[:100]}...")
+                except Exception as e:
+                    error_msg = f"Ошибка при выполнении кода в шаге execute_code (ID: {step_id_for_log}): {e}"
+                    logger.error(error_msg, exc_info=True)
+                    context["__step_error__"] = error_msg
+        else:
+            err_msg = f"Неизвестный action_type '{action_type}' в шаге 'action' (ID: {step_id_for_log})."
+            logger.warning(err_msg)
+            context["__step_error__"] = err_msg
+        
+        return context # Возвращаем измененный context (который state_machine_obj.context)
+
+    async def handle_start(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        logger.info(f"Обработчик handle_start: Начало сценария '{context.get('__current_scenario_id__', 'N/A')}'")
         return context
     
     async def handle_end(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Обрабатывает шаг типа end: завершение сценария
-        
-        Args:
-            step_data: Данные шага
-            context: Контекст выполнения
-            
-        Returns:
-            Dict[str, Any]: Обновленный контекст
-        """
-        logger.info("Завершение выполнения сценария")
-        # Можно добавить специальную обработку при завершении сценария
+        logger.info(f"Обработчик handle_end: Завершение сценария '{context.get('__current_scenario_id__', 'N/A')}'")
         return context
     
     async def handle_execute_code(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Обработчик для шага execute_code."""
+        # Этот обработчик вызывается, если тип шага "execute_code", а не "action" с "action_type: execute_code"
         params = step_data.get("params", {})
         code_to_execute = params.get("code")
+        step_id = step_data.get("step_id_for_log", "unknown_execute_code_step")
+        logger.debug(f"[handle_execute_code STEP_ID:{step_id}] Direct execution.")
 
         if not code_to_execute:
-            logger.warning("Шаг execute_code не содержит кода для выполнения.")
-            context["__step_error__"] = "Шаг execute_code: отсутствует параметр 'code'."
+            logger.warning(f"Шаг execute_code (ID:{step_id}) не содержит кода для выполнения.")
+            context["__step_error__"] = f"Шаг execute_code (ID:{step_id}): отсутствует параметр 'code'."
             return context
-
         try:
-            # Подготовка локального словаря для exec, чтобы код имел доступ к 'context'
-            # и мог изменять его. Также можно передать 'logger' или другие утилиты.
-            execution_globals = {"context": context, "logger": logger, "datetime": datetime, "os": os, "json": json}
-            # logger.debug(f"Перед выполнением execute_code. Контекст: {context}")
+            execution_globals = {"context": context, "logger": logger, "datetime": datetime, "os": os, "json": json, "time": time}
             exec(code_to_execute, execution_globals)
-            # logger.debug(f"После выполнения execute_code. Контекст: {context}")
-            # Контекст изменяется напрямую, так как он передается по ссылке в execution_globals
-            logger.info(f"Шаг execute_code успешно выполнил код: {code_to_execute[:100]}...")
-
+            logger.info(f"Шаг execute_code (ID:{step_id}) успешно выполнил код: {code_to_execute[:100]}...")
         except Exception as e:
-            error_msg = f"Ошибка при выполнении кода в шаге execute_code: {e}"
+            error_msg = f"Ошибка при выполнении кода в шаге execute_code (ID:{step_id}): {e}"
             logger.error(error_msg, exc_info=True)
             context["__step_error__"] = error_msg
-        
         return context
     
     async def handle_log_message(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Обработчик шага типа log_message.
-        Логирует сообщение с возможностью подстановки переменных из контекста.
-        """
-        step_config = step_data.get("config", {})
-
-        message_template = step_config.get("message", "")
-
-        level = step_config.get("level", "INFO").upper()
+        params = step_data.get("params", {}) # Изменено с config на params для единообразия
+        message_template = params.get("message", "")
+        level = params.get("level", "INFO").upper()
+        resolved_message = _resolve_value_from_context(message_template, context)
         
-        if isinstance(message_template, str) and "{" in message_template and "}" in message_template:
-            # Пытаемся разрешить плейсхолдеры
-            try:
-                resolved_message = _resolve_value_from_context(message_template, context)
-
-            except KeyError as e:
-                logger.warning(f"Ошибка подстановки в log_message (KeyError: {{e}}). Исходное сообщение: '{{message_template}}'")
-                resolved_message = f"[Ошибка форматирования: {{e}}] {{message_template}}"
-            except Exception as e:
-                logger.error(f"Непредвиденная ошибка при форматировании log_message: {{e}}. Исходное сообщение: '{{message_template}}'")
-                resolved_message = f"[Непредвиденная ошибка форматирования: {{e}}] {{message_template}}"
-        else:
-            resolved_message = message_template # Если нет плейсхолдеров, используем как есть
-            
-        # Логируем сообщение с использованием стандартного логгера (loguru)
-        # logger.log(level, resolved_message) # Старый вариант с logger.log
-        
-        # Используем методы info, warning, error и т.д. в зависимости от уровня
-        if level == "DEBUG":
-            logger.debug(resolved_message)
-        elif level == "INFO":
-            logger.info(resolved_message)
-        elif level == "WARNING":
-            logger.warning(resolved_message)
-        elif level == "ERROR":
-            logger.error(resolved_message)
-        elif level == "CRITICAL":
-            logger.critical(resolved_message)
-        else: # По умолчанию INFO, если уровень неизвестен
-            logger.info(f"({level}) {resolved_message}")
-
+        if level == "DEBUG": logger.debug(resolved_message)
+        elif level == "INFO": logger.info(resolved_message)
+        elif level == "WARNING": logger.warning(resolved_message)
+        elif level == "ERROR": logger.error(resolved_message)
+        elif level == "CRITICAL": logger.critical(resolved_message)
+        else: logger.info(f"({level}) {resolved_message}")
         return context
 
-    async def execute_step(self, step_id: str, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_step(self, step_data: Dict[str, Any], state_machine: ScenarioStateMachine, scenario_id_for_log: str) -> Optional[str]:
         step_type = step_data.get("type")
-        logger.info(f"Выполнение шага: ID='{step_id}', Тип='{step_type}'")
-        step_data["step_id_for_log"] = step_id # Для логгера в handle_log_message
+        step_id = step_data.get('id', 'UNKNOWN_STEP')
+        step_data["step_id_for_log"] = step_id # Добавляем для использования в обработчиках, если нужно
 
-        resolved_params = {}
-        if "params" in step_data and isinstance(step_data["params"], dict):
-            resolved_params = _resolve_value_from_context(step_data["params"], context)
+        logger.debug(f"[execute_step SCENARIO_ID:{scenario_id_for_log} STEP_ID:{step_id}] Type:'{step_type}'. Initial SM context ID: {id(state_machine.context)}")
         
-        handler_method = self.step_handlers.get(step_type)
-        
-        if handler_method:
-            try:
-                # === НАЧАЛО ИЗМЕНЕНИЯ ДЛЯ ДЕБАГА ===
-                copied_context_for_handler = context.copy()
+        # Разрешаем плейсхолдеры во всем step_data перед передачей в обработчик
+        # Это гарантирует, что обработчик получает уже разрезолвенные параметры
+        current_step_data_for_handler = _resolve_value_from_context(step_data.copy(), state_machine.context)
+        logger.debug(f"[execute_step SCENARIO_ID:{scenario_id_for_log} STEP_ID:{step_id}] Resolved step_data_for_handler: {json.dumps(current_step_data_for_handler, indent=2, default=str, ensure_ascii=False)}")
 
-                # === КОНЕЦ ИЗМЕНЕНИЯ ДЛЯ ДЕБАГА ===
-
-                import inspect
-                sig = inspect.signature(handler_method)
-                num_expected_params = len(sig.parameters)
-                
-                updated_context_from_handler = None # Инициализируем
-                if num_expected_params == 3: 
-                    updated_context_from_handler = await handler_method(step_data, copied_context_for_handler, self) # Используем step_data и copied_context_for_handler
-                elif num_expected_params == 2: 
-                    updated_context_from_handler = await handler_method(step_data, copied_context_for_handler) # Используем step_data и copied_context_for_handler
-                elif num_expected_params == 1: 
-                     handler_result = await handler_method(resolved_params) # Оставляем resolved_params для одноаргументных, т.к. они могут ожидать именно "params"
-                     # Если хендлер вернул словарь, считаем это обновлением контекста
-                     if isinstance(handler_result, dict):
-                         updated_context_from_handler = handler_result
-                     # Иначе, контекст не меняется этим шагом (или меняется побочным эффектом, что не рекомендуется)
-                else:
-                    logger.error(f"Обработчик для {step_type} имеет неизвестную сигнатуру: {sig}")
-                    context["__step_error__"] = f"Неверная сигнатура обработчика для {step_type}"
-                    # Не возвращаем context здесь, чтобы дать блоку finally обновить его __step_error__
-                
-                # Хендлер должен вернуть словарь, которым будет обновлен текущий контекст.
-                # Если хендлер ничего не вернул (None), то контекст не меняется.
-                if isinstance(updated_context_from_handler, dict):
-                    context.update(updated_context_from_handler)
-                elif updated_context_from_handler is not None: # Вернул что-то, но не словарь
-                    logger.warning(f"Обработчик {step_type} для шага '{step_id}' вернул не словарь ({type(updated_context_from_handler)}). Контекст не будет обновлен этим результатом напрямую.")
-                    # Можно положить результат в специальный ключ, если это нужно
-                    # context[f"__raw_output_{step_id}"] = updated_context_from_handler
-
-
-            except Exception as e:
-                logger.error(f"Ошибка при выполнении шага '{step_id}' (тип: {step_type}): {e}")
-                logger.exception(e) # Логируем полный трейсбек
-                context["__step_error__"] = f"Ошибка на шаге {step_id}: {str(e)}"
-        else:
-            logger.warning(f"Не найден обработчик для типа шага: {step_type} (ID: {step_id})")
-            context["__step_error__"] = f"Неизвестный тип шага: {step_type}"
-            
-        return context
-
-    async def execute_scenario(self, scenario_doc: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Выполняет сценарий, используя ScenarioStateMachine для управления состоянием и переходами.
-
-        Args:
-            scenario_doc: Документ сценария из БД (словарь).
-            context: Начальный контекст выполнения (опционально).
-
-        Returns:
-            Словарь с результатом выполнения, включая финальный контекст.
-        """
-        agent_id = context.get("agent_id") if context else None
-        if not agent_id:
-            logger.warning("agent_id не предоставлен в начальном контексте для execute_scenario.")
-            # agent_id = scenario_doc.get("meta", {}).get("created_by_agent_id") 
-
-        # Инициализация начального контекста
-        initial_context_from_doc = scenario_doc.get("initial_context")
-        if isinstance(initial_context_from_doc, dict):
-            current_context = initial_context_from_doc.copy()
-        else:
-            current_context = {}
-        
-        logger.info(f"[SCENARIO_EXECUTOR DEBUG] initial_context_from_doc type: {type(initial_context_from_doc)}")
-        logger.info(f"[SCENARIO_EXECUTOR DEBUG] initial_context_from_doc content: {json.dumps(initial_context_from_doc, indent=2, default=str)}")
-        logger.info(f"[SCENARIO_EXECUTOR DEBUG] current_context (после .copy() или {{}}): {json.dumps(current_context, indent=2, default=str)}")
-
-        if context: # Это context, переданный в execute_scenario
-            current_context.update(context)
-            # logger.info(f"[SCENARIO_EXECUTOR DEBUG] После current_context.update(context): {json.dumps(current_context, indent=2, default=str)}") # Старый лог
-
-        # Добавляем системные переменные в контекст
-        if "__current_scenario_id__" not in current_context:
-            current_context["__current_scenario_id__"] = str(scenario_doc.get("_id", scenario_doc.get("id")))
-        if "__current_agent_id__" not in current_context and agent_id:
-            current_context["__current_agent_id__"] = agent_id
-        
-        # Гарантируем наличие current_datetime, если он не был передан или не был в initial_context
-        if "current_datetime" not in current_context:
-            current_context["current_datetime"] = datetime.now().isoformat()
-        elif not current_context.get("current_datetime"): # Если ключ есть, но значение пустое/None
-            current_context["current_datetime"] = datetime.now().isoformat()
-
-        # === НАЧАЛО ИЗМЕНЕНИЯ ДЛЯ ДЕБАГА ===
-        logger.info(f"[SCENARIO_EXECUTOR DEBUG] current_context ПЕРЕД logger.info(Начало выполнения...): {json.dumps(current_context, indent=2, default=str)}")
-        # === КОНЕЦ ИЗМЕНЕНИЯ ДЛЯ ДЕБАГА ===
-
-        logger.info(f"Начало выполнения сценария: {scenario_doc.get('name', scenario_doc.get('_id'))} с контекстом: {current_context}")
-
+        handler_result = None
         try:
-            # Передаем копию контекста в state_machine, чтобы она могла его использовать для условий
-            # и не изменять оригинальный current_context напрямую во время своей работы.
-            state_machine = ScenarioStateMachine(
-                scenario=scenario_doc, 
-                context=current_context.copy(),
-                executor=self
-            )
+            if step_type not in self.step_handlers:
+                raise ValueError(f"Обработчик для типа шага '{step_type}' не зарегистрирован.")
+
+            handler_fn = self.step_handlers[step_type]
+            sig = inspect.signature(handler_fn)
+            
+            # Изменение: все обработчики теперь принимают (step_data, state_machine_object) или (step_data, context_dict)
+            # Для handle_action передаем state_machine_object, для остальных - context dict
+            if step_type == "action": # Особый случай для handle_action
+                 if asyncio.iscoroutinefunction(handler_fn):
+                    handler_result = await handler_fn(current_step_data_for_handler, state_machine)
+                 else:
+                    handler_result = handler_fn(current_step_data_for_handler, state_machine)
+            else: # Для остальных обработчиков
+                if asyncio.iscoroutinefunction(handler_fn):
+                    handler_result = await handler_fn(current_step_data_for_handler, state_machine.context)
+                else:
+                    handler_result = handler_fn(current_step_data_for_handler, state_machine.context)
+
+            # После вызова обработчика, state_machine.context мог быть изменен НАПРЯМУЮ обработчиком (особенно handle_action)
+            # Если обработчик вернул словарь, это И ЕСТЬ обновленный контекст, который нужно присвоить state_machine.context.
+            # Если обработчик (кроме handle_action) изменяет контекст по ссылке и возвращает его же, это тоже ок.
+
+            if isinstance(handler_result, str) and handler_result.startswith("PAUSED_WAITING_FOR_"):
+                logger.info(f"[execute_step SCENARIO_ID:{scenario_id_for_log} STEP_ID:{step_id}] Шаг вернул маркер паузы: {handler_result}")
+                return handler_result 
+            
+            # ИСПРАВЛЕНИЕ: Как обрабатывать результат от плагина
+            if handler_result is not None: # Если плагин что-то вернул (не None)
+                output_var_name = current_step_data_for_handler.get("params", {}).get("output_var")
+                if output_var_name:
+                    # Кладём результат плагина в контекст под именем из output_var
+                    state_machine.context[output_var_name] = handler_result 
+                    logger.debug(f"[execute_step SCENARIO_ID:{scenario_id_for_log} STEP_ID:{step_id}] Plugin returned a result. Stored in context['{output_var_name}']. Context updated.")
+                else:
+                    # Если output_var не указан, но плагин вернул что-то (кроме None),
+                    # это может быть неожиданным. Просто логируем.
+                    # Если это был dict, и мы хотели бы его смержить, нужна доп. логика.
+                    logger.warning(f"[execute_step SCENARIO_ID:{scenario_id_for_log} STEP_ID:{step_id}] Plugin returned a result, but no 'output_var' specified in step params. Result: {handler_result}. Context NOT automatically updated with this result unless done by plugin itself.")
+            
+            # Если __step_error__ уже в контексте (установлен обработчиком), то он там и останется.
+            if state_machine.context.get("__step_error__"):
+                 logger.warning(f"[execute_step SCENARIO_ID:{scenario_id_for_log} STEP_ID:{step_id}] Ошибка в контексте после выполнения обработчика: {state_machine.context['__step_error__']}")
+            else:
+                logger.info(f"[execute_step SCENARIO_ID:{scenario_id_for_log} STEP_ID:{step_id}] Шаг '{step_type}' успешно выполнен (или обработчик не вернул ошибку явно).")
+            
+            return None # Успешное выполнение (или ошибка записана в контекст)
+
         except Exception as e:
-            logger.error(f"Ошибка инициализации ScenarioStateMachine: {e}", exc_info=True)
-            return {
-                "agent_id": agent_id,
-                "scenario_id": str(scenario_doc.get("_id", scenario_doc.get("id"))),
-                "success": False,
-                "error": f"Ошибка инициализации ScenarioStateMachine: {str(e)}",
-                "context": current_context,
-            }
+            logger.error(f"[execute_step SCENARIO_ID:{scenario_id_for_log} STEP_ID:{step_id}] Ошибка при вызове/выполнении обработчика: {e}", exc_info=True)
+            state_machine.context["__step_error__"] = f"Критическая ошибка на шаге {step_id}: {str(e)}"
+            return None 
+        
+    async def execute_scenario(self, scenario_doc: Union[Dict[str, Any], Scenario], initial_context_from_runner: Optional[Dict[str, Any]] = None, agent_id_from_runner: Optional[str] = None) -> Dict[str, Any]:
+        if isinstance(scenario_doc, Scenario): # Если это Pydantic модель
+            scenario_data = scenario_doc.model_dump(exclude_none=True)
+        elif isinstance(scenario_doc, dict):
+            scenario_data = scenario_doc
+        else:
+            logger.error(f"execute_scenario: scenario_doc должен быть dict или Scenario, получено {type(scenario_doc)}")
+            return {"status": "error", "message": "Invalid scenario_doc type."}
+
+        scenario_id = scenario_data.get("scenario_id", "unknown_scenario")
+        scenario_name = scenario_data.get("name", scenario_id)
+        logger.info(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] Starting execution. Agent ID from runner: {agent_id_from_runner}")
+        logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] Initial context from runner: {json.dumps(initial_context_from_runner, indent=2, default=str, ensure_ascii=False)}")
+
+        # 1. Формирование начального контекста для StateMachine
+        effective_sm_context = {}
+        logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] 1.0 effective_sm_context after init: {json.dumps(effective_sm_context, indent=2, default=str, ensure_ascii=False)}")
+
+        # 1.1 Контекст из самого документа сценария (самый низкий приоритет)
+        if scenario_data.get("initial_context"):
+            effective_sm_context.update(scenario_data["initial_context"])
+        logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] 1.1 effective_sm_context after scenario_data['initial_context']: {json.dumps(effective_sm_context, indent=2, default=str, ensure_ascii=False)}")
+        
+        # 1.2 Контекст из настроек агента (если agent_id известен)
+        current_agent_id = agent_id_from_runner or (initial_context_from_runner.get("agent_id") if initial_context_from_runner else None)
+        if current_agent_id:
+            agent_doc = await self.agent_repo.get_by_id(current_agent_id)
+            if agent_doc: # Агент найден
+                if agent_doc.initial_context:
+                    effective_sm_context.update(agent_doc.initial_context)
+                    logger.info(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] Loaded initial_context from agent '{current_agent_id}'.")
+                logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] 1.2a effective_sm_context after agent_doc.initial_context: {json.dumps(effective_sm_context, indent=2, default=str, ensure_ascii=False)}")
+                
+                logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] Agent settings dump: {agent_doc.settings}")
+                agent_default_chat_id = agent_doc.settings.get("default_telegram_chat_id") if agent_doc.settings else None
+                logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] Extracted agent_default_chat_id: {agent_default_chat_id}")
+                logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] current effective_sm_context.get('telegram_chat_id'): {effective_sm_context.get('telegram_chat_id')}")
+
+                if agent_default_chat_id and not effective_sm_context.get("telegram_chat_id"):
+                    effective_sm_context["telegram_chat_id"] = agent_default_chat_id
+                    logger.info(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] Set 'telegram_chat_id' from agent settings: {agent_default_chat_id}")
+                    if not effective_sm_context.get("user_id"):
+                        effective_sm_context["user_id"] = str(agent_default_chat_id) 
+                        logger.info(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] Set 'user_id' from agent's default_telegram_chat_id: {agent_default_chat_id}")
+                else:
+                    logger.info(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] 'telegram_chat_id' NOT set from agent settings. Reason: agent_default_chat_id is '{agent_default_chat_id}' OR effective_sm_context already has telegram_chat_id '{effective_sm_context.get('telegram_chat_id')}'")
+                logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] 1.2b effective_sm_context after agent_settings (chat_id/user_id): {json.dumps(effective_sm_context, indent=2, default=str, ensure_ascii=False)}")
+
+        # 1.3 Контекст, переданный при вызове /run или /execute (самый высокий приоритет)
+        if initial_context_from_runner:
+            effective_sm_context.update(initial_context_from_runner)
+        logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] 1.3 effective_sm_context after initial_context_from_runner: {json.dumps(effective_sm_context, indent=2, default=str, ensure_ascii=False)}")
+        
+        # 1.4 Системные переменные (перезаписывают все предыдущие, если есть коллизии)
+        effective_sm_context["__current_scenario_id__"] = scenario_id
+        if current_agent_id: # Убедимся, что agent_id есть
+            effective_sm_context["agent_id"] = current_agent_id # Это основной ключ для использования в сценариях
+            effective_sm_context["__current_agent_id__"] = current_agent_id # Системный, для внутренних нужд
+        logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] 1.4 effective_sm_context after system vars: {json.dumps(effective_sm_context, indent=2, default=str, ensure_ascii=False)}")
+
+        if "__scenario_instance_id__" not in effective_sm_context: # Генерируем, если не пришел (не возобновление)
+            user_id_for_instance = effective_sm_context.get("user_id", "system")
+            chat_id_val = effective_sm_context.get("chat_id", effective_sm_context.get("telegram_chat_id", "no_chat"))
+            timestamp_for_id = time.time()
+            effective_sm_context["__scenario_instance_id__"] = f"{scenario_id}_{user_id_for_instance}_{chat_id_val}_{timestamp_for_id}"
+            logger.info(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] Generated new __scenario_instance_id__: {effective_sm_context['__scenario_instance_id__']}")
+        
+        logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] Effective initial context for SM: {json.dumps(effective_sm_context, indent=2, default=str, ensure_ascii=False)}")
+
+        sm = ScenarioStateMachine(
+            scenario=scenario_data, 
+            context=effective_sm_context.copy(), # Передаем копию, чтобы SM имел свой собственный экземпляр
+            executor=self
+        )
+        logger.info(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] StateMachine initialized. Initial current_step_index: {sm.current_step_index}, initial context ID: {id(sm.context)}")
 
         execution_successful = True
         error_message = None
         
-        # Получаем первый шаг
-        current_step_details = state_machine.current_step() 
-
+        current_step_details = sm.current_step() 
         while current_step_details:
-            step_id_for_log = current_step_details.get('id', state_machine.current_step_index if hasattr(state_machine, 'current_step_index') else "N/A")
+            step_id_for_log = current_step_details.get('id', sm.current_step_index)
             step_type_for_log = current_step_details.get('type', "N/A")
-            logger.info(f"Выполнение шага: ID='{step_id_for_log}', Type='{step_type_for_log}'")
-            logger.debug(f"Данные шага: {current_step_details}")
-            logger.debug(f"Контекст перед шагом '{step_id_for_log}': {current_context}")
+            logger.info(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id} STEP_ID:{step_id_for_log}] Executing Type:'{step_type_for_log}'. SM context ID: {id(sm.context)}")
             
             try:
-                # Выполняем шаг с помощью метода execute_step самого ScenarioExecutor
-                # execute_step уже содержит логику разрешения плейсхолдеров в step_data и вызова обработчика
-                updated_context_after_step = await self.execute_step(step_id_for_log, current_step_details, current_context)
-                current_context.update(updated_context_after_step) # Обновляем основной контекст
+                result_after_step_execution = await self.execute_step(current_step_details, sm, scenario_id)
 
-                # Проверка на ошибки выполнения шага, установленные в self.execute_step или обработчиках
-                if "__step_error__" in current_context:
-                    error_message = current_context["__step_error__"]
-                    logger.error(f"Ошибка выполнения шага {step_id_for_log}: {error_message}")
-                    # Удаляем ошибку из контекста, чтобы она не переносилась дальше как переменная
-                    del current_context["__step_error__"]
+                if sm.context.get("__step_error__"):
+                    error_message = sm.context["__step_error__"]
+                    logger.error(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id} STEP_ID:{step_id_for_log}] Error in context after step: {error_message}")
                     execution_successful = False
                     break 
+
+                if result_after_step_execution == "PAUSED_WAITING_FOR_CALLBACK":
+                    scenario_instance_id = sm.context.get("__scenario_instance_id__")
+                    if scenario_instance_id:
+                        self.paused_scenarios[scenario_instance_id] = {
+                            "scenario_doc": scenario_data, "state_machine": sm, 
+                            "last_step_id_before_pause": step_id_for_log,
+                            "status": "paused", "timestamp": datetime.now().isoformat()
+                        }
+                        logger.info(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id} INSTANCE_ID:{scenario_instance_id}] Paused at step '{step_id_for_log}'.")
+                        final_context = sm.context.copy()
+                        final_context.update({
+                            "status": "paused", 
+                            "message": f"Scenario paused at step {step_id_for_log}, waiting for callback.",
+                            "scenario_instance_id": scenario_instance_id
+                        })
+                        return final_context
+                    else: # Это не должно произойти, т.к. instance_id генерируется выше
+                        error_message = "Internal error: __scenario_instance_id__ missing on pause."
+                        logger.error(error_message)
+                        sm.context["__step_error__"] = error_message
+                        execution_successful = False
+                        break
                 
-                # Проверка на критические ошибки сценария
-                if "__scenario_error__" in current_context:
-                    error_message = current_context["__scenario_error__"]
-                    logger.error(f"Критическая ошибка сценария на шаге {step_id_for_log}: {error_message}")
-                    del current_context["__scenario_error__"]
+                elif result_after_step_execution is not None: # execute_step должен вернуть None или маркер паузы
+                    error_message = f"Internal logic error: execute_step returned unexpected value: '{result_after_step_execution}'."
+                    logger.error(error_message)
+                    sm.context["__step_error__"] = error_message
                     execution_successful = False
                     break
-
-                # Передаем обновленный основной контекст в state_machine (копию).
-                # Это нужно, чтобы state_machine мог использовать актуальные значения для вычисления условий перехода.
-                state_machine.context = current_context.copy() 
-                
-                # Переход к следующему шагу. state_machine.next_step() обновит свое внутреннее состояние 
-                # (например, self.state["step_index"]) и вернет данные следующего шага.
-                current_step_details = state_machine.next_step() 
-                
-                if not current_step_details:
-                    logger.info(f"Сценарий '{scenario_doc.get('name', scenario_doc.get('_id'))}' успешно завершен после шага {step_id_for_log}.")
-                    break
-
-            except Exception as e:
-                logger.error(f"Непредвиденная ошибка при выполнении цикла для шага {step_id_for_log}: {e}", exc_info=True)
-                error_message = f"Непредвиденная ошибка в цикле выполнения: {str(e)}"
+            
+            except Exception as e_outer:
+                logger.error(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id} STEP_ID:{step_id_for_log}] Outer loop exception: {e_outer}", exc_info=True)
+                error_message = f"Outer-loop execution error at step {step_id_for_log}: {str(e_outer)}"
+                sm.context["__step_error__"] = error_message # Записываем ошибку в контекст SM
                 execution_successful = False
                 break
-        
-        final_status_message = f"Scenario '{scenario_doc.get('name', scenario_doc.get('_id'))}' execution "
-        if execution_successful and not error_message:
-            final_status_message += "completed successfully."
-        else:
-            final_status_message += f"failed. Error: {error_message if error_message else 'Unknown error'}"
-        
-        logger.info(final_status_message)
+            
+            # Переход к следующему шагу. Контекст SM мог быть изменен в execute_step.
+            current_step_details = sm.next_step() # sm.next_step() использует sm.context
+            
+            if not current_step_details and not sm.is_finished():
+                if not sm.context.get("__step_error__"): 
+                    error_message = f"Failed to determine next step after '{step_id_for_log}' during resume. Scenario '{scenario_name}' ended unexpectedly."
+                    logger.error(error_message)
+                    sm.context["__step_error__"] = error_message
+                execution_successful = False # Явно указываем на неудачу
+                break
 
-        return {
-            "agent_id": agent_id,
-            "scenario_id": str(scenario_doc.get("_id", scenario_doc.get("id"))),
-            "success": execution_successful and not error_message,
-            "error": error_message, # Будет None если ошибок не было
-            "message": final_status_message,
-            "context": current_context,
-        }
+        # Формирование финального ответа
+        final_context_to_return = sm.context.copy() # Берем актуальный контекст из SM
+        final_context_to_return["scenario_id"] = scenario_id # Убедимся, что ID сценария есть
+        if current_agent_id:
+            final_context_to_return["agent_id"] = current_agent_id
 
-    async def _handle_execute_sub_scenario(self, step_data: Dict[str, Any], parent_context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Обработчик для шага типа 'execute_sub_scenario'.
-        Запускает указанный под-сценарий, передает ему часть родительского контекста (input_mapping)
-        и возвращает результаты из контекста под-сценария в родительский (output_mapping).
-        """
-        sub_scenario_id = step_data.get("sub_scenario_id")
+        if execution_successful and sm.is_finished():
+            final_context_to_return["success"] = True
+            final_context_to_return["message"] = f"Scenario '{scenario_name}' executed successfully."
+            logger.info(final_context_to_return["message"])
+        else: # Если была ошибка или сценарий не завершился корректно
+            final_context_to_return["success"] = False
+            # error_message уже содержит ошибку с шага, или __step_error__ из контекста, или общее сообщение
+            error_key_to_check = "__step_error__" if "__step_error__" in sm.context else "_step_error"
+            raw_error = error_message or sm.context.get(error_key_to_check) or "Unknown execution error or scenario did not finish."
+            
+            # Упрощаем ошибку, если она является словарем (возможно, копией контекста)
+            if isinstance(raw_error, dict):
+                simplified_error = raw_error.get(error_key_to_check, str(raw_error)) # Пытаемся извлечь текстовое сообщение
+                if isinstance(simplified_error, dict): # Если все еще словарь, просто преобразуем в строку
+                    simplified_error = f"Complex error object: {list(simplified_error.keys())}"
+            else:
+                simplified_error = str(raw_error)
+
+            final_context_to_return["error"] = simplified_error
+            final_context_to_return["message"] = f"Scenario '{scenario_name}' execution failed or did not finish. Error: {simplified_error}"
+            logger.error(final_context_to_return["message"])
+        
+        # Очищаем потенциально проблемные ключи из основного уровня возвращаемого контекста
+        # Ключи, которые содержали копии контекста или сложные объекты и могли вызывать RecursionError
+        keys_to_remove_if_exist = ["start_confirmation_cb", "q1_callback_data", "q2_callback_data", "q3_callback_data", "llm_pizza_response"]
+        for key_to_remove in keys_to_remove_if_exist:
+            if key_to_remove in final_context_to_return:
+                # Вместо полного удаления, можно оставить маркер или упрощенное значение, если нужно
+                # final_context_to_return[key_to_remove] = f"<data_omitted_for_key_{key_to_remove}>"
+                del final_context_to_return[key_to_remove]
+
+        # Также удаляем внутренние ошибки _step_error и __step_error__ из верхнего уровня, т.к. они уже учтены в final_context_to_return["error"]
+        if "_step_error" in final_context_to_return:
+            del final_context_to_return["_step_error"]
+        if "__step_error__" in final_context_to_return:
+            del final_context_to_return["__step_error__"]
+            
+        return final_context_to_return
+
+    async def _handle_execute_sub_scenario(self, step_data: Dict[str, Any], parent_sm_context: Dict[str, Any]) -> Dict[str, Any]:
+        params = step_data.get("params", {})
+        sub_scenario_id = params.get("sub_scenario_id")
+        input_mapping = params.get("input_mapping", {})
+        output_mapping = params.get("output_mapping", {})
+        # sub_scenario_agent_id = params.get("sub_scenario_agent_id") # Пока не используется, но может понадобиться
+
+        parent_step_id = step_data.get('id', 'unknown_parent_step')
+        logger.info(f"[_handle_execute_sub_scenario PARENT_STEP_ID:{parent_step_id}] sub_scenario_id: {sub_scenario_id}")
+
         if not sub_scenario_id:
-            error_msg = "Шаг 'execute_sub_scenario' не содержит обязательного поля 'sub_scenario_id'"
-            logger.error(error_msg)
-            parent_context["__step_error__"] = error_msg
-            return parent_context
-
-        logger.info(f"Запуск под-сценария: ID='{sub_scenario_id}' из родительского шага '{step_data.get('id', 'N/A')}'.")
+            err_msg = "Шаг 'execute_sub_scenario' не содержит 'sub_scenario_id'."
+            logger.error(err_msg)
+            parent_sm_context["__step_error__"] = err_msg
+            return parent_sm_context
 
         try:
             sub_scenario_model = await self.scenario_repo.get_by_id(sub_scenario_id)
             if not sub_scenario_model:
-                error_msg = f"Под-сценарий с ID '{sub_scenario_id}' не найден."
-                logger.error(error_msg)
-                parent_context["__step_error__"] = error_msg
-                return parent_context
+                err_msg = f"Под-сценарий с ID '{sub_scenario_id}' не найден."
+                logger.error(err_msg)
+                parent_sm_context["__step_error__"] = err_msg
+                return parent_sm_context
             
-            sub_scenario_dict = sub_scenario_model.model_dump(exclude_none=True)
-
-            # 1. Инициализация начального контекста для под-сценария
             sub_context_initial = {}
-            input_mapping = step_data.get("input_mapping", {})
-            logger.debug(f"Input mapping для под-сценария '{sub_scenario_id}': {input_mapping}")
-            for sub_key, parent_key_or_value in input_mapping.items():
-                if isinstance(parent_key_or_value, str) and parent_key_or_value in parent_context:
-                    sub_context_initial[sub_key] = parent_context[parent_key_or_value]
-                    logger.debug(f"  Mapping: sub_context['{sub_key}'] = parent_context['{parent_key_or_value}'] (value: {parent_context[parent_key_or_value]})")
-                else: # Если это не ключ из родительского контекста или не строка, считаем это литеральным значением
-                    sub_context_initial[sub_key] = parent_key_or_value
-                    logger.debug(f"  Mapping: sub_context['{sub_key}'] = literal_value (value: {parent_key_or_value})")
-            
-            logger.info(f"Начальный контекст для под-сценария '{sub_scenario_id}': {sub_context_initial}")
+            for sub_key, parent_key_or_value_template in input_mapping.items():
+                # Разрешаем значение из родительского контекста, если это плейсхолдер
+                resolved_parent_value = _resolve_value_from_context(parent_key_or_value_template, parent_sm_context)
+                sub_context_initial[sub_key] = resolved_parent_value
+            logger.debug(f"Начальный контекст для под-сценария '{sub_scenario_id}': {sub_context_initial}")
 
-            # 2. Выполнение под-сценария
-            # Важно: передаем копию, чтобы изменения в sub_context_initial не повлияли на input_mapping в будущем
-            final_sub_context = await self.execute_scenario(sub_scenario_dict, sub_context_initial.copy())
+            # Определяем agent_id для под-сценария. По умолчанию берем из родительского контекста.
+            agent_id_for_sub_scenario = parent_sm_context.get("agent_id")
+
+            final_sub_context_result = await self.execute_scenario(
+                scenario_doc=sub_scenario_model, # Передаем модель Pydantic
+                initial_context_from_runner=sub_context_initial.copy(),
+                agent_id_from_runner=agent_id_for_sub_scenario 
+            )
             
-            logger.info(f"Под-сценарий '{sub_scenario_id}' завершен. Финальный контекст под-сценария: {final_sub_context}")
+            logger.info(f"Под-сценарий '{sub_scenario_id}' завершен. Результат: {final_sub_context_result.get('message')}")
             
-            if "__scenario_error__" in final_sub_context:
-                error_detail = final_sub_context['__scenario_error__']
+            if not final_sub_context_result.get("success", False):
+                error_detail = final_sub_context_result.get('error', 'Unknown error in sub-scenario')
                 logger.warning(f"Под-сценарий '{sub_scenario_id}' завершился с ошибкой: {error_detail}")
-                parent_context["__step_error__"] = f"Ошибка в под-сценарии '{sub_scenario_id}': {error_detail}"
-                # В случае ошибки в под-сценарии, не применяем output_mapping и возвращаем родительский контекст с ошибкой
-                return parent_context
+                parent_sm_context["__step_error__"] = f"Ошибка в под-сценарии '{sub_scenario_id}': {error_detail}"
+                return parent_sm_context
+
+            # Маппинг результатов. final_sub_context_result это полный результат от execute_scenario,
+            # из него нужен сам финальный контекст, который обычно лежит в том же словаре.
+            actual_final_sub_context = final_sub_context_result # Так как execute_scenario возвращает сам финальный контекст
+
+            for parent_key, sub_key_or_value_template in output_mapping.items():
+                # Разрешаем значение из контекста под-сценария
+                resolved_sub_value = _resolve_value_from_context(sub_key_or_value_template, actual_final_sub_context)
+                parent_sm_context[parent_key] = resolved_sub_value
+            logger.debug(f"Output mapping для под-сценария '{sub_scenario_id}' применен.")
 
         except Exception as e:
-            error_msg = f"Критическая ошибка во время выполнения под-сценария '{sub_scenario_id}': {str(e)}"
-            logger.exception(error_msg) # Используем logger.exception для полного трейсбека
-            parent_context["__step_error__"] = error_msg
-            return parent_context
-
-        # 3. Маппинг результатов из контекста под-сценария в родительский контекст
-        output_mapping = step_data.get("output_mapping", {})
-        logger.debug(f"Output mapping для под-сценария '{sub_scenario_id}': {output_mapping}")
-        for parent_key, sub_key_or_value in output_mapping.items():
-            if isinstance(sub_key_or_value, str) and sub_key_or_value in final_sub_context:
-                parent_context[parent_key] = final_sub_context[sub_key_or_value]
-                logger.debug(f"  Mapping: parent_context['{parent_key}'] = final_sub_context['{sub_key_or_value}'] (value: {final_sub_context[sub_key_or_value]})")
-            elif not isinstance(sub_key_or_value, str): # Если это не строка, то это литеральное значение
-                 parent_context[parent_key] = sub_key_or_value
-                 logger.debug(f"  Mapping: parent_context['{parent_key}'] = literal_value (value: {sub_key_or_value})")
-            else: # Ключ не найден в контексте под-сценария
-                logger.warning(f"Ключ '{sub_key_or_value}' не найден в финальном контексте под-сценария '{sub_scenario_id}' для output mapping. Поле '{parent_key}' не будет установлено или будет None.")
-                parent_context[parent_key] = None # Или можно не устанавливать, или установить специальное значение
-
-        logger.info(f"Завершено выполнение шага execute_sub_scenario для '{sub_scenario_id}'. Обновленный родительский контекст: {parent_context}")
-        return parent_context 
-
-    async def run_scenario_by_id(self, scenario_id: str, context: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
-        """
-        Загружает сценарий по ID из репозитория и выполняет его.
+            err_msg = f"Критическая ошибка при выполнении под-сценария '{sub_scenario_id}': {str(e)}"
+            logger.error(err_msg, exc_info=True)
+            parent_sm_context["__step_error__"] = err_msg
         
-        Args:
-            scenario_id: ID сценария для загрузки и выполнения.
-            context: Исходный контекст (опционально).
-            
-        Returns:
-            Финальный контекст после выполнения всех шагов, или None в случае ошибки загрузки сценария.
-        """
-        logger.info(f"Запрос на выполнение сценария по ID: '{scenario_id}'")
-        if context is None:
-            context = {} # Инициализируем пустой контекст, если не предоставлен
+        return parent_sm_context
 
-        # Добавляем scenario_id в контекст, если его там нет, или если он отличается
-        # Это может быть полезно для логирования или внутренней логики
-        if context.get("scenario_id") != scenario_id:
-            context["scenario_id"] = scenario_id # Может перезаписать, если уже был другой
-
+    async def run_scenario_by_id(self, scenario_id: str, initial_context: Optional[Dict[str, Any]] = None, agent_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        logger.info(f"Запрос на выполнение сценария по ID: '{scenario_id}'. Agent ID: {agent_id}")
+        initial_context = initial_context or {}
+        
         try:
             scenario_model = await self.scenario_repo.get_by_id(scenario_id)
             if not scenario_model:
-                logger.error(f"Сценарий с ID '{scenario_id}' не найден в репозитории.")
-                # В этом случае, возможно, стоит вернуть ошибку в контексте или возбудить исключение,
-                # чтобы вызывающий код мог это обработать.
-                # Пока просто возвращаем None, указывая на неудачу запуска.
-                # Вызывающий код в TelegramPlugin должен будет это проверить.
-                return None 
+                logger.error(f"Сценарий с ID '{scenario_id}' не найден.")
+                return {"status": "error", "message": f"Scenario with ID '{scenario_id}' not found.", "success": False}
             
-            scenario_dict = scenario_model.model_dump(exclude_none=True)
-            
-            # Перед выполнением, убедимся, что критически важные данные для Telegram есть в контексте, если они нужны
-            # Например, user_id и chat_id. Они должны были быть добавлены вызывающим кодом (TelegramPlugin).
-            if "user_id" not in context or "chat_id" not in context:
-                logger.warning(f"При запуске сценария '{scenario_id}' в контексте отсутствуют 'user_id' или 'chat_id'. Контекст: {context}")
-                # Это не обязательно фатальная ошибка для самого executor, но может быть проблемой для шагов сценария
-            
-            logger.info(f"Сценарий '{scenario_id}' (Имя: {scenario_dict.get('name', 'N/A')}) загружен. Начальный контекст: {context}")
-            
-            return await self.execute_scenario(scenario_dict, context)
+            return await self.execute_scenario(
+                scenario_doc=scenario_model, 
+                initial_context_from_runner=initial_context,
+                agent_id_from_runner=agent_id
+            )
         except Exception as e:
-            logger.error(f"Критическая ошибка во время загрузки или выполнения сценария по ID '{scenario_id}': {e}", exc_info=True)
-            # Также возвращаем None или обрабатываем ошибку иначе
-            return None 
+            logger.error(f"Критическая ошибка при run_scenario_by_id '{scenario_id}': {e}", exc_info=True)
+            return {"status": "error", "message": f"Critical error running scenario by ID '{scenario_id}': {str(e)}", "success": False}
+
+    async def resume_scenario(self, scenario_instance_id: str, received_input_data: Any) -> Optional[Dict[str, Any]]:
+        logger.info(f"Попытка возобновления сценария. Instance ID: '{scenario_instance_id}', Входные данные: '{received_input_data}'")
+        paused_info = self.paused_scenarios.get(scenario_instance_id)
+        if not paused_info:
+            logger.error(f"Не найден приостановленный сценарий для instance_id: {scenario_instance_id}")
+            return {"status": "error", "message": "Paused scenario not found", "success": False}
+
+        waiting_event_info = self.waiting_for_input_events.get(scenario_instance_id)
+        if not waiting_event_info: # Может быть уже обработан или удален
+            logger.warning(f"Нет информации об ожидаемом событии для instance_id: {scenario_instance_id} при возобновлении. Возможно, дублирующийся callback.")
+            # Если сценарий еще числится как paused, но нет waiting_event, это странно. Удалим из paused.
+            if scenario_instance_id in self.paused_scenarios: del self.paused_scenarios[scenario_instance_id]
+            return {"status": "error", "message": "Waiting event info not found for scenario. Possible duplicate callback.", "success": False}
+
+        sm = paused_info.get("state_machine")
+        output_var = waiting_event_info.get("output_var")
+        
+        if not sm or not output_var:
+            logger.error(f"Неполные данные для возобновления {scenario_instance_id}. Очистка.")
+            if scenario_instance_id in self.waiting_for_input_events: del self.waiting_for_input_events[scenario_instance_id]
+            if scenario_instance_id in self.paused_scenarios: del self.paused_scenarios[scenario_instance_id]
+            return {"status": "error", "message": "Incomplete data for resuming", "success": False}
+
+        logger.info(f"Возобновление '{sm.scenario_name}' (instance: {scenario_instance_id}).")
+        sm.context[output_var] = received_input_data # Обновляем контекст в SM
+        sm.context["__last_input_received__"] = received_input_data # Дополнительно для отладки
+        
+        del self.waiting_for_input_events[scenario_instance_id]
+        del self.paused_scenarios[scenario_instance_id]
+        
+        # Продолжаем выполнение из цикла execute_scenario, но с существующей SM
+        # Это похоже на execute_scenario, но начинается не с начала, а с текущего шага SM.
+        # Вместо полного копирования логики execute_scenario, мы вызовем его внутренний цикл.
+        # Для этого нужно реструктурировать execute_scenario или создать новую функцию _continue_scenario_execution(sm)
+        # Пока что для простоты скопируем и адаптируем цикл:
+
+        current_step_details = sm.current_step() # Это должен быть тот самый 'input' шаг
+        execution_successful = True
+        error_message = None
+        scenario_id = sm.scenario_id # Получаем из SM
+        scenario_name = sm.scenario_name
+
+        logger.info(f"[RESUME_LOOP SCENARIO_ID:{scenario_id} INSTANCE_ID:{scenario_instance_id}] Starting loop from step: {current_step_details.get('id') if current_step_details else 'N/A'}")
+
+        while current_step_details:
+            step_id_for_log = current_step_details.get('id', sm.current_step_index)
+            step_type_for_log = current_step_details.get('type', "N/A")
+            logger.info(f"[RESUME_LOOP SCENARIO_ID:{scenario_id} STEP_ID:{step_id_for_log}] Executing Type:'{step_type_for_log}'.")
+            
+            try:
+                result_after_step_execution = await self.execute_step(current_step_details, sm, scenario_id)
+
+                if sm.context.get("__step_error__"):
+                    error_message = sm.context["__step_error__"]
+                    logger.error(f"[RESUME_LOOP SCENARIO_ID:{scenario_id} STEP_ID:{step_id_for_log}] Error in context: {error_message}")
+                    execution_successful = False
+                    break 
+
+                if result_after_step_execution == "PAUSED_WAITING_FOR_CALLBACK":
+                    logger.error(f"[RESUME_LOOP SCENARIO_ID:{scenario_id} STEP_ID:{step_id_for_log}] Scenario requested PAUSE again immediately after resume! Logic error.")
+                    error_message = "Logic error: Scenario requested pause immediately after resume."
+                    sm.context["__step_error__"] = error_message
+                    # Снова регистрируем паузу, чтобы не потерять состояние, но это индикатор проблемы
+                    self.paused_scenarios[scenario_instance_id] = {"scenario_doc": sm.scenario_data, "state_machine": sm, "last_step_id_before_pause": step_id_for_log, "status": "error_re_paused"}
+                    self.waiting_for_input_events[scenario_instance_id] = waiting_event_info # Восстанавливаем
+                    execution_successful = False
+                    break
+                
+                elif result_after_step_execution is not None:
+                    error_message = f"Internal logic error: execute_step returned unexpected value during resume: '{result_after_step_execution}'."
+                    logger.error(error_message)
+                    sm.context["__step_error__"] = error_message
+                    execution_successful = False
+                    break
+            
+            except Exception as e_outer:
+                logger.error(f"[RESUME_LOOP SCENARIO_ID:{scenario_id} STEP_ID:{step_id_for_log}] Outer loop exception: {e_outer}", exc_info=True)
+                error_message = f"Outer-loop resume error at step {step_id_for_log}: {str(e_outer)}"
+                sm.context["__step_error__"] = error_message
+                execution_successful = False
+                break
+            
+            current_step_details = sm.next_step()
+            
+            if not current_step_details and not sm.is_finished():
+                if not sm.context.get("__step_error__"): 
+                    error_message = f"Failed to determine next step after '{step_id_for_log}' during resume. Scenario '{scenario_name}' ended unexpectedly."
+                    logger.error(error_message)
+                    sm.context["__step_error__"] = error_message
+                execution_successful = False
+                break
+        
+        final_context_to_return = sm.context.copy()
+        final_context_to_return["scenario_id"] = scenario_id
+        final_context_to_return["agent_id"] = sm.context.get("agent_id") # agent_id должен быть в контексте SM
+        final_context_to_return["scenario_instance_id"] = scenario_instance_id
+
+
+        if execution_successful and sm.is_finished():
+            final_context_to_return["success"] = True
+            final_context_to_return["message"] = f"Scenario '{scenario_name}' (instance: {scenario_instance_id}) resumed and completed successfully."
+            logger.info(final_context_to_return["message"])
+        else:
+            final_context_to_return["success"] = False
+            final_context_to_return["error"] = error_message or sm.context.get("__step_error__") or "Unknown resume error or scenario did not finish."
+            final_context_to_return["message"] = f"Scenario '{scenario_name}' (instance: {scenario_instance_id}) resumption failed or did not finish. Error: {final_context_to_return['error']}"
+            logger.error(final_context_to_return["message"])
+            
+        return final_context_to_return
+
+    async def telegram_send_message(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        step_id = step_data.get("step_id_for_log", "unknown_telegram_send_step")
+        params = step_data.get("params", {})
+        # Сначала пытаемся взять chat_id из параметров шага, затем из контекста (telegram_chat_id или chat_id)
+        chat_id_template = params.get("chat_id", context.get("telegram_chat_id", context.get("chat_id")))
+        text_template = params.get("text")
+        # inline_keyboard из параметров шага (должен быть уже в правильном формате списка списков)
+        inline_keyboard_template = params.get("inline_keyboard") 
+
+        if not chat_id_template or not text_template:
+            err_msg = f"Шаг {step_id} (telegram_send_message): Не указан chat_id или text."
+            logger.error(err_msg)
+            context["__step_error__"] = err_msg
+            return context
+
+        chat_id = str(_resolve_value_from_context(chat_id_template, context))
+        resolved_text = str(_resolve_value_from_context(text_template, context))
+        resolved_inline_keyboard = _resolve_value_from_context(inline_keyboard_template, context) if inline_keyboard_template else None
+        
+        telegram_plugin = self.get_plugin_by_type("TelegramPlugin")
+        if not telegram_plugin:
+            err_msg = f"Шаг {step_id}: TelegramPlugin не найден в ScenarioExecutor."
+            logger.error(err_msg)
+            context["__step_error__"] = err_msg
+            return context
+        
+        logger.debug(f"[telegram_send_message STEP_ID:{step_id}] Chat ID: {chat_id}, Text: '{resolved_text}', Keyboard: {resolved_inline_keyboard}")
+        
+        try:
+            # TelegramPlugin.send_message ожидает inline_keyboard как список списков словарей
+            message_receipt = await telegram_plugin.send_message(
+                chat_id=chat_id,
+                text=resolved_text,
+                buttons_data=resolved_inline_keyboard # buttons_data это inline_keyboard для плагина
+            )
+            
+            if message_receipt and hasattr(message_receipt, 'message_id'):
+                 # Сохраняем ID сообщения, которое содержит кнопки, для возможного использования в input шаге
+                 # или для редактирования сообщения в будущем
+                 context["message_id_with_buttons"] = message_receipt.message_id 
+                 context[f"__last_message_id_{step_id}"] = message_receipt.message_id # Для специфичного отслеживания
+                 context["__last_message_id"] = message_receipt.message_id # Общий последний ID
+                 logger.info(f"[telegram_send_message STEP_ID:{step_id}] Message ID {message_receipt.message_id} сохранен в контекст (message_id_with_buttons).")
+            elif message_receipt:
+                logger.warning(f"[telegram_send_message STEP_ID:{step_id}] telegram_plugin.send_message вернул ответ, но без message_id: {message_receipt}")
+            else: # Если send_message вернул None (например, из-за ошибки внутри плагина, которая не вызвала исключение)
+                logger.warning(f"[telegram_send_message STEP_ID:{step_id}] telegram_plugin.send_message не вернул результат (None).")
+                if "__plugin_error__" not in context: # Если плагин сам не установил ошибку
+                     context["__step_error__"] = "telegram_plugin.send_message did not return a message receipt."
+
+        except Exception as e:
+            logger.error(f"[telegram_send_message STEP_ID:{step_id}] ОШИБКА: {e}", exc_info=True)
+            context["__step_error__"] = f"Error in telegram_plugin.send_message: {str(e)}"
+        return context
+
+    async def telegram_edit_message(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        # TODO: Реализовать логику редактирования сообщения
+        logger.warning("Обработчик telegram_edit_message еще не реализован.")
+        return context
+
+    def get_plugin_by_type(self, plugin_type_name: str) -> Optional[Any]:
+        logger.debug(f"[GET_PLUGIN_BY_TYPE] Searching for '{plugin_type_name}'. Available: {[p.__class__.__name__ for p in self.plugins]}")
+        for plugin in self.plugins:
+            if plugin.__class__.__name__ == plugin_type_name:
+                return plugin
+        logger.warning(f"Плагин '{plugin_type_name}' не найден.")
+        return None

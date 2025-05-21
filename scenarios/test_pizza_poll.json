@@ -145,7 +145,7 @@
     },
     {
       "id": "call_llm_for_pizza_type",
-      "type": "llm_request",
+      "type": "llm_query",
       "params": {
         "messages": [
           {"role": "system", "content": "Ты — веселый эксперт по определению типов личности в виде пиццы. Твоя задача - на основе ответов пользователя сказать, какая он пицца, и дать короткое, забавное описание (1-2 предложения)."},
@@ -160,7 +160,7 @@
       "type": "telegram_send_message",
       "params": {
         "chat_id": "{telegram_chat_id}",
-        "text": "Итак, барабанная дробь... Ты — {llm_pizza_response}!"
+        "text": "Итак, барабанная дробь... Ты — {llm_pizza_response.response}!"
       },
       "next_step_id": "trigger_agent_hub"
     },
@@ -172,7 +172,7 @@
         "input_mapping": {
           "user_id": "{user_id}",
           "telegram_chat_id": "{telegram_chat_id}",
-          "determined_pizza_type": "{llm_pizza_response}"
+          "determined_pizza_type": "{llm_pizza_response.response}"
         }
       },
       "next_step_id": "end_poll_scenario"

@@ -1,0 +1,50 @@
+{
+  "scenario_id": "unit_test_core_sub_scenario_parent",
+  "name": "Unit Test: Core Sub-scenario (Parent)",
+  "description": "Tests executing a sub-scenario and handling context mapping.",
+  "version": "1.0",
+  "initial_context": {
+    "parent_value": "ПереданоРодителем",
+    "parent_only_value": "ЭтоТолькоВРодителе"
+  },
+  "steps": [
+    {
+      "id": "start_log_parent",
+      "type": "log_message",
+      "params": {
+        "message": "UNIT TEST SUB-PARENT: Starting parent. parent_value: {parent_value}",
+        "level": "INFO"
+      },
+      "next_step_id": "call_sub_scenario"
+    },
+    {
+      "id": "call_sub_scenario",
+      "type": "execute_sub_scenario",
+      "params": {
+        "sub_scenario_id": "unit_test_core_sub_scenario_child",
+        "input_mapping": {
+          "child_input": "{parent_value}", 
+          "another_child_input": "СтатическоеЗначениеДляРебенка"
+        },
+        "output_mapping": {
+          "parent_value_from_child": "child_output",
+          "parent_value_new_from_child": "child_new_value"
+        }
+      },
+      "next_step_id": "log_after_sub_scenario"
+    },
+    {
+      "id": "log_after_sub_scenario",
+      "type": "log_message",
+      "params": {
+        "message": "UNIT TEST SUB-PARENT: Returned from child. parent_value_from_child: {parent_value_from_child}, parent_value_new_from_child: {parent_value_new_from_child}, parent_only_value: {parent_only_value}",
+        "level": "INFO"
+      },
+      "next_step_id": "end_parent_scenario"
+    },
+    {
+      "id": "end_parent_scenario",
+      "type": "end"
+    }
+  ]
+} 

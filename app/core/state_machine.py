@@ -18,6 +18,8 @@ class ScenarioStateMachine:
     - context: dict, доступен во всех шагах, может изменяться
     """
     def __init__(self, scenario: Dict[str, Any], context: Dict[str, Any], executor: Any):
+        # Попытаться получить 'scenario_id', если нет, то 'id'
+        self.scenario_id = scenario.get("scenario_id") or scenario.get("id")
         self.scenario_name = scenario.get("name", "Unknown Scenario")
         self.steps: List[Dict[str, Any]] = scenario.get("steps", [])
         self.initial_context = context.copy() # Копируем, чтобы избежать изменения извне
@@ -52,6 +54,36 @@ class ScenarioStateMachine:
         # Проверяем условие (condition) и ветвления (branches)
         if step:
             logger.debug(f"Текущий шаг: {step.get('id', idx)}, тип: {step.get('type')}")
+            
+            # Обработка next_step_map (для input шагов с callback_query)
+            next_step_map = step.get("next_step_map")
+            output_var_name = step.get("params", {}).get("output_var")
+
+            if next_step_map and output_var_name:
+                logger.debug(f"Обрабатываем next_step_map для шага '{step.get('id', idx)}' с output_var='{output_var_name}'.")
+                value_from_context = self.context.get(output_var_name)
+                logger.debug(f"Значение из контекста ({output_var_name}): {value_from_context}")
+
+                if value_from_context in next_step_map:
+                    next_step_id = next_step_map[value_from_context]
+                    logger.debug(f"next_step_map: Ключ '{value_from_context}' найден, следующий шаг ID: {next_step_id}")
+                    for i, s in enumerate(self.steps):
+                        if s.get("id") == next_step_id:
+                            self.current_step_index = i
+                            logger.debug(f"Переход к шагу {next_step_id} (индекс {i}) через next_step_map.")
+                            return self.steps[i]
+                    logger.warning(f"next_step_map: Шаг с ID '{next_step_id}' (из ключа '{value_from_context}') не найден в сценарии.")
+                else:
+                    logger.warning(f"next_step_map: Ключ '{value_from_context}' (из output_var '{output_var_name}') не найден в next_step_map: {next_step_map}.")
+                    # Можно добавить переход к default шагу из next_step_map, если он есть
+                    if "default" in next_step_map:
+                        next_step_id = next_step_map["default"]
+                        logger.info(f"next_step_map: Используем default переход к шагу ID: {next_step_id}")
+                        for i, s in enumerate(self.steps):
+                            if s.get("id") == next_step_id:
+                                self.current_step_index = i
+                                return self.steps[i]
+                        logger.warning(f"next_step_map: Default шаг с ID '{next_step_id}' не найден.")
             
             # Обработка ветвлений нового формата (type: branch)
             if step.get("type") == "branch":
@@ -241,13 +273,26 @@ class ScenarioStateMachine:
         logger.debug("Достигнут конец сценария")
         return None
 
-    def serialize(self):
-        return json.dumps({"scenario": self.scenario_name, "state": {"step_index": self.current_step_index}, "context": self.context})
+    def serialize(self) -> Dict[str, Any]:
+        return {
+            "current_step_index": self.current_step_index,
+            "is_finished": self.is_finished,
+            "error": self.error
+        }
 
     @classmethod
-    def from_json(cls, data):
-        obj = json.loads(data)
-        return cls(obj["scenario"], obj["state"]["context"], None)
+    def from_state(cls, scenario_data: Dict[str, Any], persisted_state: Optional[Dict[str, Any]], persisted_context: Dict[str, Any], executor: Any):
+        """ Восстанавливает состояние StateMachine из scenario_data, сохраненного состояния и контекста. """
+        instance = cls(scenario_data, persisted_context, executor) # Основная инициализация
+        if persisted_state:
+            instance.current_step_index = persisted_state.get("current_step_index", 0)
+            instance.is_finished = persisted_state.get("is_finished", False)
+            instance.error = persisted_state.get("error", None)
+        else:
+            # Если persisted_state не предоставлен (например, первый запуск из /run, где state еще нет)
+            # current_step_index, is_finished, error уже установлены в __init__
+            pass 
+        return instance
 
     def trigger_command(self, command, data=None):
         """Обработка триггера on_command (заглушка)"""

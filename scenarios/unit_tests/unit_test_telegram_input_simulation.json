@@ -1,0 +1,74 @@
+{
+  "scenario_id": "unit_test_telegram_input_simulation",
+  "name": "Unit Test: TelegramPlugin Input Simulation",
+  "description": "Simulates waiting for input (e.g., callback_data from a button) and logs it.",
+  "version": "1.0",
+  "initial_context": {
+    "user_id": "tg_tester_input",
+    "simulated_callback_data": null
+  },
+  "steps": [
+    {
+      "id": "start_log_input_sim",
+      "type": "log_message",
+      "params": {
+        "message": "UNIT TEST TELEGRAM INPUT SIM: Starting input simulation. Target chat_id from .env.",
+        "level": "INFO"
+      },
+      "next_step_id": "send_message_for_input"
+    },
+    {
+      "id": "send_message_for_input",
+      "type": "telegram_send_message",
+      "params": {
+        "text": "Нажмите кнопку, чтобы протестировать ввод:",
+        "inline_keyboard": [
+          [{"text": "Тестовая Кнопка", "callback_data": "sim_button_pressed"}]
+        ]
+      },
+      "next_step_id": "wait_for_simulated_input"
+    },
+    {
+      "id": "wait_for_simulated_input",
+      "type": "input",
+      "params": {
+        "prompt": "Ожидание нажатия кнопки (simulated)",
+        "output_var": "user_input_data"
+      },
+      "next_step_id": "log_received_input"
+    },
+    {
+      "id": "log_received_input",
+      "type": "log_message",
+      "params": {
+        "message": "UNIT TEST TELEGRAM INPUT SIM: 'Received' input: {user_input_data}. Если null или пустая строка, значит TelegramPlugin не обновил контекст или этот сценарий запущен вне Telegram-контура, или шаг input не получил данные.",
+        "level": "INFO"
+      },
+      "next_step_id": "update_context_if_needed"
+    },
+    {
+      "id": "update_context_if_needed",
+      "type": "action",
+      "params": {
+        "action_type": "update_context",
+        "updates": {
+          "simulated_callback_data": "{user_input_data}"
+        }
+      },
+      "next_step_id":"final_check_log"
+    },
+    {
+      "id": "final_check_log",
+      "type": "log_message",
+      "params": {
+        "message": "UNIT TEST TELEGRAM INPUT SIM: simulated_callback_data в контексте: {simulated_callback_data}.",
+        "level": "INFO"
+      },
+      "next_step_id": "end_input_sim_test"
+    },
+    {
+      "id": "end_input_sim_test",
+      "type": "end"
+    }
+  ]
+} 

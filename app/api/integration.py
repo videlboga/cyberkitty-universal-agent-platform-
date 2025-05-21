@@ -28,6 +28,8 @@ from app.core.dependencies import (
     scheduling_plugin,
     telegram_plugin,
     telegram_app_instance, # Если нужен сам инстанс Application
+    rag_plugin_instance, # <--- ДОБАВЛЕНО
+    llm_plugin_instance, # <--- ДОБАВЛЕНО
     # API_BASE_URL, # Если используется здесь, лучше тоже из dependencies
     # MONGO_URI, MONGODB_DATABASE_NAME # Аналогично
 )
@@ -115,7 +117,9 @@ async def get_scenario_executor_dependency(
         # Явное указание плагинов, которые ожидает конструктор ScenarioExecutor
         telegram_plugin=telegram_plugin, # Глобальный экземпляр
         mongo_storage_plugin=mongo_storage_plugin, # Глобальный экземпляр
-        scheduling_plugin=scheduling_plugin # Глобальный экземпляр
+        scheduling_plugin=scheduling_plugin, # Глобальный экземпляр
+        rag_plugin=rag_plugin_instance, # <--- ДОБАВЛЕНО
+        llm_plugin=llm_plugin_instance  # <--- ДОБАВЛЕНО
     )
 
 @router.get("/llm/models")

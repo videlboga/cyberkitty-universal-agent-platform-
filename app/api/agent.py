@@ -59,6 +59,38 @@ async def check_agent_scenario_compatibility(agent_data: Agent | AgentUpdateRequ
 
 @router.post("/", response_model=Agent, status_code=status.HTTP_201_CREATED)
 async def create_agent(agent_payload: Agent):
+    # Добавляем логику для default_telegram_chat_id
+    # Pydantic v2 с extra='allow' должен сделать 'settings' доступным как атрибут,
+    # если он был в JSON-запросе.
+    
+    chat_id_found_in_payload = False
+    # Сначала проверяем, существует ли атрибут 'settings' и является ли он словарем
+    if hasattr(agent_payload, 'settings') and agent_payload.settings is not None and isinstance(agent_payload.settings, dict):
+        if agent_payload.settings.get("default_telegram_chat_id"):
+            chat_id_found_in_payload = True
+            logger.info(f"default_telegram_chat_id '{agent_payload.settings.get('default_telegram_chat_id')}' найден в payload агента.")
+    else:
+        # Если атрибута 'settings' нет или он None, логируем это.
+        logger.info("Атрибут 'settings' отсутствует или None в agent_payload перед проверкой ENV.")
+
+    if not chat_id_found_in_payload:
+        logger.info("default_telegram_chat_id не найден в payload или отсутствует, пытаемся загрузить из ENV TEST_TELEGRAM_CHAT_ID.")
+        env_chat_id = os.getenv("TEST_TELEGRAM_CHAT_ID")
+        if env_chat_id:
+            logger.info(f"TEST_TELEGRAM_CHAT_ID из ENV: '{env_chat_id}'. Добавляем/обновляем в agent_payload.settings.")
+            # Если settings не существует как атрибут, или не словарь, создаем его
+            # Важно: Pydantic v2 при extra='allow' создаст атрибут, если ему присвоить значение.
+            # Но если он уже есть и не dict, это проблема. Лучше явно создать, если его нет.
+            if not hasattr(agent_payload, 'settings') or not isinstance(getattr(agent_payload, 'settings', None), dict):
+                logger.info("Создаем атрибут 'settings' в agent_payload как пустой dict.")
+                agent_payload.settings = {} 
+            
+            # Теперь agent_payload.settings точно существует и является словарем
+            agent_payload.settings["default_telegram_chat_id"] = env_chat_id
+            logger.info(f"agent_payload.settings после обновления из ENV: {agent_payload.settings}")
+        else:
+            logger.warning("TEST_TELEGRAM_CHAT_ID не найден в ENV. default_telegram_chat_id не будет установлен автоматически.")
+
     if agent_payload.scenario_id:
         scenario = await scenario_repo.get_by_id(agent_payload.scenario_id)
         if not scenario:
@@ -77,7 +109,11 @@ async def create_agent(agent_payload: Agent):
             )
 
     created_agent = await agent_repo.create(agent_payload)
-    logger.info(f"Агент создан: {created_agent.name} с ID {created_agent.id}")
+    # Добавим лог, чтобы увидеть, что сохранилось в settings
+    saved_settings = None
+    if hasattr(created_agent, 'settings') and created_agent.settings is not None:
+        saved_settings = created_agent.settings
+    logger.info(f"Агент создан: {created_agent.name} с ID {created_agent.id}. Сохраненные settings: {saved_settings}")
     return created_agent
 
 @router.get("/", response_model=List[Agent])

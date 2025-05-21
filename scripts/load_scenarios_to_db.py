@@ -13,7 +13,8 @@ if not MONGODB_DATABASE_NAME:
     raise ValueError("Переменная окружения MONGODB_DATABASE_NAME не установлена.")
 
 SCENARIOS_COLLECTION_NAME = "scenarios"
-SCENARIOS_DIR = "scenarios"
+# SCENARIOS_DIR = "scenarios" # Старая версия
+SCENARIOS_DIRS = ["scenarios", "scenarios/unit_tests"] # Новый список директорий
 
 def get_mongo_client():
     """Создает и возвращает клиент MongoDB."""
@@ -36,13 +37,26 @@ def load_scenarios():
     db = client[MONGODB_DATABASE_NAME]
     collection = db[SCENARIOS_COLLECTION_NAME]
     
-    if not os.path.exists(SCENARIOS_DIR) or not os.path.isdir(SCENARIOS_DIR):
-        print(f"Директория сценариев '{SCENARIOS_DIR}' не найдена.")
-        return
+    # if not os.path.exists(SCENARIOS_DIR) or not os.path.isdir(SCENARIOS_DIR): # Старая проверка
+    #     print(f"Директория сценариев '{SCENARIOS_DIR}' не найдена.")
+    #     return
 
-    json_files = [f for f in os.listdir(SCENARIOS_DIR) if f.endswith('.json')]
-    if not json_files:
-        print(f"В директории '{SCENARIOS_DIR}' не найдено JSON файлов сценариев.")
+    all_json_files_with_paths = []
+    for s_dir in SCENARIOS_DIRS:
+        if not os.path.exists(s_dir) or not os.path.isdir(s_dir):
+            print(f"Предупреждение: Директория сценариев '{s_dir}' не найдена или не является директорией. Пропуск.")
+            continue
+        
+        json_files_in_dir = [os.path.join(s_dir, f) for f in os.listdir(s_dir) if f.endswith('.json')]
+        if not json_files_in_dir:
+            print(f"В директории '{s_dir}' не найдено JSON файлов сценариев.")
+        else:
+            all_json_files_with_paths.extend(json_files_in_dir)
+            print(f"Найдено {len(json_files_in_dir)} JSON файлов в '{s_dir}'.")
+
+    # json_files = [f for f in os.listdir(SCENARIOS_DIR) if f.endswith('.json')] # Старая версия
+    if not all_json_files_with_paths: # Новая проверка
+        print(f"Не найдено JSON файлов сценариев ни в одной из указанных директорий: {SCENARIOS_DIRS}.")
         return
 
     operations = []
@@ -50,8 +64,10 @@ def load_scenarios():
     updated_count = 0
     error_count = 0
 
-    for file_name in json_files:
-        file_path = os.path.join(SCENARIOS_DIR, file_name)
+    # for file_name in json_files: # Старая версия
+    #     file_path = os.path.join(SCENARIOS_DIR, file_name)
+    for file_path in all_json_files_with_paths: # Новая версия, используем полный путь
+        file_name = os.path.basename(file_path) # Получаем только имя файла для логов
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 scenario_data = json.load(f)

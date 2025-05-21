@@ -1,0 +1,56 @@
+{
+  "scenario_id": "unit_test_executor_execute_code",
+  "name": "Unit Test for ScenarioExecutor execute_code Step",
+  "description": "Tests the execution of arbitrary Python code within a scenario.",
+  "version": "1.0",
+  "created_by_agent_id": "system_dev",
+  "steps": [
+    {
+      "id": "step_1_init_context_vars",
+      "type": "action",
+      "params": {
+        "action_type": "update_context",
+        "updates": {
+          "original_value": 10,
+          "script_was_here": false
+        }
+      },
+      "next_step_id": "step_2_log_before_script"
+    },
+    {
+      "id": "step_2_log_before_script",
+      "type": "log_message",
+      "config": {
+        "level": "INFO",
+        "message": "Before execute_code: original_value={original_value}, script_was_here={script_was_here}"
+      },
+      "next_step_id": "step_3_execute_python_code"
+    },
+    {
+      "id": "step_3_execute_python_code",
+      "type": "execute_code",
+      "name": "Execute Python to Modify Context",
+      "params": {
+        "code": "context[\"original_value\"] = context[\"original_value\"] * 2\ncontext[\"new_value_from_script\"] = \"Hello from execute_code!\"\ncontext[\"script_was_here\"] = True"
+      },
+      "next_step_id": "step_4_log_after_script"
+    },
+    {
+      "id": "step_4_log_after_script",
+      "type": "log_message",
+      "config": {
+        "level": "INFO",
+        "message": "After execute_code: original_value={original_value}, new_value_from_script='{new_value_from_script}', script_was_here={script_was_here}"
+      },
+      "next_step_id": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "name": "End of execute_code Test"
+    }
+  ],
+  "initial_context": {
+    "test_case_name": "execute_code_functionality"
+  }
+} 

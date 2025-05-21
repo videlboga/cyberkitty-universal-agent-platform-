@@ -17,6 +17,8 @@ else:
 HEADERS = {
     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
     "Content-Type": "application/json",
+    "HTTP-Referer": os.getenv("OPENROUTER_REFERER", "http://localhost:8000"),
+    "X-Title": os.getenv("OPENROUTER_X_TITLE", "Universal Agent System")
 }
 
 async def openrouter_chat(prompt: str, model: str = "openai/gpt-3.5-turbo", **kwargs) -> Dict[str, Any]:
@@ -33,10 +35,20 @@ async def openrouter_chat(prompt: str, model: str = "openai/gpt-3.5-turbo", **kw
         logger.debug(f"Отправка запроса к OpenRouter: модель={model}, длина запроса={len(prompt)}")
         # --- Новый блок: логируем curl-команду ---
         import json as _json
+        # Формируем заголовки для curl как строку
+        headers_for_curl = ""
+        # Добавляем стандартные заголовки, которые всегда есть в HEADERS
+        headers_for_curl += f"-H 'Authorization: Bearer {OPENROUTER_API_KEY}' "
+        headers_for_curl += f"-H 'Content-Type: application/json' "
+        # Добавляем опциональные заголовки из константы HEADERS, если они там есть
+        if "HTTP-Referer" in HEADERS:
+            headers_for_curl += f"-H 'HTTP-Referer: {HEADERS['HTTP-Referer']}' "
+        if "X-Title" in HEADERS:
+            headers_for_curl += f"-H 'X-Title: {HEADERS['X-Title']}' "
+        
         curl_cmd = (
             f"curl -X POST {OPENROUTER_URL} "
-            f"-H 'Authorization: Bearer {OPENROUTER_API_KEY}' "
-            f"-H 'Content-Type: application/json' "
+            f"{headers_for_curl.strip()} " # Убираем лишний пробел в конце, если есть
             f"-d '{_json.dumps(payload, ensure_ascii=False)}'"
         )
         with open("logs/llm_curl.log", "a", encoding="utf-8") as f:

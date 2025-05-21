@@ -1,0 +1,97 @@
+{
+  "scenario_id": "unit_test_core_flow_and_context",
+  "name": "Unit Test: Core Flow, Context, and Branching",
+  "description": "Tests basic step execution, context updates, placeholder resolution, and conditional branching.",
+  "version": "1.0",
+  "initial_context": {
+    "user_name": "Тестер",
+    "initial_value": 10
+  },
+  "steps": [
+    {
+      "id": "start_log",
+      "type": "log_message",
+      "params": {
+        "message": "UNIT TEST CORE: Starting test for {user_name} with initial_value: {initial_value}.",
+        "level": "INFO"
+      },
+      "next_step_id": "update_context_action"
+    },
+    {
+      "id": "update_context_action",
+      "type": "action",
+      "params": {
+        "action_type": "update_context",
+        "updates": {
+          "calculated_value": "Это значение было установлено на шаге update_context_action",
+          "counter": "{initial_value}"
+        }
+      },
+      "next_step_id": "resolve_and_log"
+    },
+    {
+      "id": "resolve_and_log",
+      "type": "log_message",
+      "params": {
+        "message": "UNIT TEST CORE: After update_context. calculated_value: '{calculated_value}', counter: {counter}",
+        "level": "INFO"
+      },
+      "next_step_id": "increment_counter"
+    },
+    {
+      "id": "increment_counter",
+      "type": "action",
+      "params": {
+        "action_type": "update_context",
+        "updates": {
+          "counter": 15
+        }
+      },
+      "next_step_id": "branch_on_counter"
+    },
+    {
+      "id": "branch_on_counter",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.counter > 10",
+            "next_step_id": "log_branch_taken"
+          }
+        ],
+        "default_next_step_id": "log_branch_default"
+      }
+    },
+    {
+      "id": "log_branch_taken",
+      "type": "log_message",
+      "params": {
+        "message": "UNIT TEST CORE: Branch taken because counter ({counter}) is > 10.",
+        "level": "INFO"
+      },
+      "next_step_id": "final_log"
+    },
+    {
+      "id": "log_branch_default",
+      "type": "log_message",
+      "params": {
+        "message": "UNIT TEST CORE: Default branch taken because counter ({counter}) is not > 10.",
+        "level": "INFO"
+      },
+      "next_step_id": "final_log"
+    },
+    {
+      "id": "final_log",
+      "type": "log_message",
+      "params": {
+        "message": "UNIT TEST CORE: Test finished. Final counter: {counter}.",
+        "level": "INFO"
+      },
+      "next_step_id": "end_scenario"
+    },
+    {
+      "id": "end_scenario",
+      "type": "end"
+    }
+  ]
+} 

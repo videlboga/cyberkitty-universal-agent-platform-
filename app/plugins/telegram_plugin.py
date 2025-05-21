@@ -1,430 +1,608 @@
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import CommandHandler, MessageHandler, CallbackQueryHandler, filters, CallbackContext
+from telegram.ext import CommandHandler, MessageHandler, CallbackQueryHandler, filters, CallbackContext, TypeHandler, Application
 import asyncio
 from loguru import logger
 import os
 import inspect
-from typing import Dict, Any, List, Callable
+from typing import Dict, Any, List, Callable, Optional
+import json
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from telegram import Bot
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from httpx import ConnectTimeout, ReadTimeout, RemoteProtocolError
+
+from app.plugins.plugin import PluginBase
+from app.core.utils import resolve_string_template, _resolve_value_from_context # resolve_placeholders_in_structure_recursive
+# from app.core.config import settings as app_settings # <-- УДАЛЯЕМ ЭТОТ ИМПОРТ
+# from app.core.scenario_executor import ScenarioExecutor # Убираем прямой импорт из-за цикличности
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.core.scenario_executor import ScenarioExecutor
 
 # Настройка логирования
 os.makedirs("logs", exist_ok=True)
 logger.add("logs/telegram_plugin.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True)
+# logger.add("logs/all_telegram_updates.log", format="{time} {level} {message}", level="DEBUG", rotation="10 MB", compression="zip", serialize=True) # Временно отключаем
 
-class TelegramPlugin:
-    def __init__(self, app):
-        self.app = app
-        self.add_handlers()
-        logger.info("Telegram Plugin инициализирован")
+# async def log_all_updates(update: Update, context: CallbackContext): # Временно отключаем
+#     logger.debug(f"[ALL_UPDATES] Received update: {update.to_json()}")
+
+# Импортируем _resolve_value_from_context из scenario_executor
+# Это создаст циклическую зависимость, если scenario_executor импортирует TelegramPlugin.
+# Лучше вынести _resolve_value_from_context в отдельный utils файл.
+# ПОКА ЗАКОММЕНТИРУЕМ, и будем ожидать, что executor передаст функцию или сам обработает параметры
+# from app.core.scenario_executor import _resolve_value_from_context, resolve_string_template
+# Временное решение: скопируем функции сюда, чтобы избежать цикл. зависимостей на данном этапе.
+
+def _resolve_value_from_context(value: Any, context: Dict[str, Any], depth=0, max_depth=10) -> Any:
+    if depth > max_depth:
+        logger.warning(f"Max recursion depth reached in _resolve_value_from_context for value: {value}")
+        return value
+
+    if isinstance(value, str):
+        if value.startswith("{") and value.endswith("}"):
+            key_path = value[1:-1]
+            parts = key_path.split('.')
+            current_value = context
+            resolved_successfully = True
+            for part in parts:
+                if isinstance(current_value, dict) and part in current_value:
+                    current_value = current_value[part]
+                elif isinstance(current_value, list):
+                    try:
+                        idx = int(part)
+                        if 0 <= idx < len(current_value):
+                            current_value = current_value[idx]
+                        else:
+                            resolved_successfully = False
+                            break
+                    except ValueError:
+                        resolved_successfully = False
+                        break
+                else:
+                    resolved_successfully = False
+                    break
+            
+            if resolved_successfully:
+                if isinstance(current_value, str) and current_value.startswith("{") and current_value.endswith("}") and current_value != value:
+                    return _resolve_value_from_context(current_value, context, depth + 1, max_depth)
+                return current_value
+            else:
+                return resolve_string_template(value, context)
+        else:
+            return resolve_string_template(value, context)
+
+    elif isinstance(value, dict):
+        return {k: _resolve_value_from_context(v, context, depth + 1, max_depth) for k, v in value.items()}
+    elif isinstance(value, list):
+        return [_resolve_value_from_context(item, context, depth + 1, max_depth) for item in value]
+    return value
+
+def resolve_string_template(template_str: str, ctx: Dict[str, Any]) -> str:
+    import re
+    placeholders = re.findall(r"\{([^{}]+)\}", template_str)
+    resolved_str = template_str
+    for placeholder in placeholders:
+        key_path = placeholder
+        parts = key_path.split('.')
+        current_value = ctx
+        resolved_successfully = True
+        for part in parts:
+            if isinstance(current_value, dict) and part in current_value:
+                current_value = current_value[part]
+            elif isinstance(current_value, list):
+                try:
+                    idx = int(part)
+                    if 0 <= idx < len(current_value):
+                        current_value = current_value[idx]
+                    else:
+                        resolved_successfully = False
+                        break
+                except ValueError:
+                    resolved_successfully = False
+                    break
+            else:
+                resolved_successfully = False
+                break
+        
+        if resolved_successfully:
+            replacement_value = str(current_value)
+            resolved_str = resolved_str.replace(f"{{{placeholder}}}", replacement_value)
+    return resolved_str
+
+class TelegramPlugin(PluginBase):
+    def __init__(self, app: Application):
+        super().__init__()
+        self.app: Application = app
+        self.updater: Optional[Updater] = app.updater # Updater теперь берется из переданного app
+        self.bot_info: Optional[Bot] = None
+        self.scenario_executor: Optional['ScenarioExecutor'] = None # Будет установлено позже
+        self.is_polling = False
+        self.polling_task: Optional[asyncio.Task] = None
+        self.user_states: Dict[int, Dict[str, Any]] = {}  # Состояние пользователя для многошаговых диалогов
+        self.message_id_map: Dict[str, int] = {} # Для хранения message_id context_id -> message_id
+        self.handlers_added: bool = False # <--- НОВЫЙ ФЛАГ
+        logger.info(f"TelegramPlugin __init__ (id:{id(self)}) completed. self.app (id:{id(self.app)}) set from argument.")
+
+    async def async_initialize(self):
+        logger.info(f"TelegramPlugin async_initialize (id:{id(self)}): Начало асинхронной инициализации...")
+        
+        if not self.app:
+            logger.error(f"TelegramPlugin async_initialize (id:{id(self)}): self.app отсутствует. Инициализация невозможна.")
+            return
+
+        # Убираем проверку self.app.initialized, т.к. атрибут отсутствует в объекте Application
+        # if not self.app.initialized: 
+        try:
+            logger.info(f"TelegramPlugin async_initialize (id:{id(self)}): Вызов self.app.initialize() (id_app: {id(self.app)})...")
+            await self.app.initialize()
+            logger.info(f"TelegramPlugin async_initialize (id:{id(self)}): self.app.initialize() успешно завершен.")
+        except Exception as e_app_init:
+            logger.error(f"TelegramPlugin async_initialize (id:{id(self)}): Ошибка при self.app.initialize(): {e_app_init}", exc_info=True)
+            return # Не можем продолжать без инициализированного app
+        # else:
+        #    logger.info(f"TelegramPlugin async_initialize (id:{id(self)}): self.app (id:{id(self.app)}) уже был инициализирован.")
+
+        # Обновляем updater на случай, если он изменился или не был установлен в __init__
+        self.updater = self.app.updater
+        if not self.updater:
+            logger.error(f"TelegramPlugin async_initialize (id:{id(self)}): self.app.updater is None ПОСЛЕ инициализации self.app! polling и добавление хендлеров могут быть невозможны.")
+            # Не прерываем, т.к. add_handlers может быть уже вызван, а polling управляется из main.py
+
+        try:
+            self.bot_info = await self.app.bot.get_me()
+            logger.info(f"TelegramPlugin async_initialize (id:{id(self)}): Bot info: {self.bot_info.username} (ID: {self.bot_info.id})")
+        except Exception as e_get_me:
+            logger.error(f"TelegramPlugin async_initialize (id:{id(self)}): Ошибка при получении bot_info: {e_get_me}", exc_info=True)
+            # Не критично для добавления хендлеров, но важно для работы
+
+        # Добавляем executor в bot_data этого инстанса app, если он еще не там
+        from app.core.dependencies import scenario_executor_instance # Поздний импорт
+        if scenario_executor_instance:
+            if "scenario_executor" not in self.app.bot_data or self.app.bot_data["scenario_executor"] != scenario_executor_instance:
+                self.app.bot_data["scenario_executor"] = scenario_executor_instance
+                logger.info(f"TelegramPlugin async_initialize (id:{id(self)}): scenario_executor (id: {id(scenario_executor_instance)}) добавлен/обновлен в self.app.bot_data (id_app: {id(self.app)}).")
+            else:
+                logger.info(f"TelegramPlugin async_initialize (id:{id(self)}): scenario_executor уже присутствует и совпадает в self.app.bot_data.")
+        else:
+            logger.warning(f"TelegramPlugin async_initialize (id:{id(self)}): scenario_executor_instance отсутствует, не могу добавить/проверить в self.app.bot_data.")
+
+        # Хендлеры теперь добавляются в dependencies.py сразу после создания плагина.
+        # Здесь мы просто проверяем флаг.
+        if not self.handlers_added:
+            logger.warning(f"TelegramPlugin async_initialize (id:{id(self)}): self.handlers_added = False. Это НЕОЖИДАННО, т.к. add_handlers() должен был быть вызван из dependencies.py. Попытка вызвать add_handlers() сейчас...")
+            self.add_handlers() # На всякий случай, если что-то пошло не так
+        else:
+            logger.info(f"TelegramPlugin async_initialize (id:{id(self)}): self.handlers_added = True. Хендлеры УЖЕ были добавлены ранее.")
+            
+        logger.info(f"TelegramPlugin async_initialize (id:{id(self)}): Завершение асинхронной инициализации.")
 
     def add_handlers(self):
-        # Обработчики команд
-        self.app.add_handler(CommandHandler("start", self.on_start))
-        self.app.add_handler(CommandHandler("help", self.on_help))
-        
-        # Обработчики различных типов сообщений
-        self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.on_text))
-        self.app.add_handler(MessageHandler(filters._Voice(), self.on_voice))
-        self.app.add_handler(MessageHandler(filters.PHOTO, self.on_photo))
-        self.app.add_handler(MessageHandler(filters.Document.ALL, self.on_document))
-        self.app.add_handler(MessageHandler(filters._Video(), self.on_video))
-        self.app.add_handler(MessageHandler(filters._Audio(), self.on_audio))
-        self.app.add_handler(MessageHandler(filters.Sticker.ALL, self.on_sticker))
-        self.app.add_handler(MessageHandler(filters._Contact(), self.on_contact))
-        self.app.add_handler(MessageHandler(filters._Location(), self.on_location))
-        self.app.add_handler(CallbackQueryHandler(self.on_callback_query))
-        
-        logger.info(f"Зарегистрировано {len(self.app.handlers)} обработчиков")
-
-    def register_step_handlers(self, step_handlers: Dict[str, Callable]):
-        """Регистрирует обработчики шагов, предоставляемые этим плагином."""
-        step_handlers["telegram_send_message"] = self.handle_step_send_message
-        # Если в будущем появятся другие обработчики шагов от TelegramPlugin, их можно добавить сюда
-        registered_handlers_list = ["telegram_send_message"]
-        logger.info(f"TelegramPlugin зарегистрировал обработчики шагов: {registered_handlers_list}")
-
-    async def on_start(self, update: Update, context_ext: CallbackContext):
-        """Обработка команды /start: инициирует запуск сценария главного меню."""
-        user = update.effective_user
-        chat_id = update.effective_chat.id
-        logger.info(f"Команда /start от пользователя {user.id} (@{user.username}), chat_id: {chat_id}")
-        
-        main_menu_scenario_id = os.getenv("MAIN_MENU_SCENARIO_ID", "scenario_main_menu") 
-
-        initial_scenario_context = {
-            "user_id": user.id,
-            "chat_id": chat_id,
-            "username": user.username,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "trigger": "start_command",
-            "message_text": update.message.text
-        }
-        
-        logger.info(f"Запрос на запуск сценария '{main_menu_scenario_id}' для user {user.id} из команды /start.")
-        
-        scenario_executor = context_ext.bot_data.get("scenario_executor")
-        
-        if scenario_executor:
-            try:
-                # Запускаем сценарий. Ответ (финальный контекст) нам здесь обычно не нужен,
-                # так как сценарий сам отправит сообщения через telegram_send_message.
-                result_context = await scenario_executor.run_scenario_by_id(main_menu_scenario_id, initial_scenario_context)
-                if result_context is None:
-                    # Это означает, что сценарий не найден или произошла ошибка при его запуске/выполнении
-                    logger.error(f"Сценарий '{main_menu_scenario_id}' не был выполнен (возможно, не найден или ошибка внутри). User: {user.id}")
-                    await update.message.reply_text(
-                        "Не удалось загрузить главное меню. Пожалуйста, попробуйте позже или обратитесь к администратору."
-                    )
-                # Если сценарий выполнен, он должен был сам отправить ответ. 
-                # Ничего дополнительно здесь делать не нужно, если только не логировать финальный контекст.
-                # logger.info(f"Сценарий '{main_menu_scenario_id}' завершен для user {user.id}. Финальный контекст: {result_context}")
-
-            except Exception as e:
-                logger.error(f"Исключение при попытке запуска сценария '{main_menu_scenario_id}' из on_start: {e}", exc_info=True)
-                await update.message.reply_text("Произошла ошибка при запуске главного меню. Попробуйте позже.")
-        else:
-            logger.error("ScenarioExecutor не найден в context_ext.bot_data. Невозможно запустить сценарий.")
-            await update.message.reply_text(
-                "Ошибка конфигурации сервера: не удается обработать команду. Пожалуйста, сообщите администратору."
-            )
-    
-    async def on_help(self, update: Update, context_ext: CallbackContext):
-        """Обработка команды /help: отправка справки"""
-        text = """
-*Доступные команды:*
-/start - Выбрать агента
-/help - Эта справка
-
-*Доступные агенты:*
-• Коуч - подскажет, как достичь ваших целей
-• Лайфхакер - поделится полезными советами
-• Ментор - поможет в обучении
-• Дайджест - соберет новости по вашим интересам
-• Эксперт - ответит на сложные вопросы
-        """
-        await update.message.reply_text(text, parse_mode="Markdown")
-
-    async def on_text(self, update: Update, context_ext: CallbackContext):
-        """Обработка текстовых сообщений"""
-        user = update.effective_user
-        text = update.message.text
-        logger.info(f"Сообщение от {user.id} (@{user.username}): {text[:50]}")
-
-        # --- Новый блок: обработка через ScenarioExecutor ---
-        try:
-            # ЗАГЛУШКА: Получение scenario_id и контекста. В будущем это должно приходить из репозитория сессий.
-            scenario_id = None # TODO: Заменить на получение из репозитория сессий по user.id
-            scenario_context = {"user_id": user.id, "chat_id": update.effective_chat.id} # TODO: Заменить
-            
-            # Пример: если бы у нас был user_session_repository
-            # user_session = await self.user_session_repository.get_session(user.id)
-            # if user_session and user_session.active_scenario_id:
-            #    scenario_id = user_session.active_scenario_id
-            #    scenario_context = user_session.context
-
-            if scenario_id: # Если есть активный сценарий
-                logger.info(f"Пользователь {user.id} в сценарии {scenario_id}, передаю в ScenarioExecutor. Текст: {text[:50]}")
-                
-                # Заглушка для ответа
-                await update.message.reply_text(f"Сценарий '{scenario_id}' получил ваш текст: {text[:30]}... (Обработка в разработке)")
-
-            else: # Если нет активного сценария, возможно, запустить сценарий по умолчанию или ответить стандартно
-                logger.info(f"Для пользователя {user.id} нет активного сценария. Текст: {text[:50]}")
-                await update.message.reply_text(f"Я получил ваше сообщение: {text}. Активного сценария нет.")
-            return # Возвращаемся после обработки (или попытки обработки) через сценарий
-
-        except Exception as e:
-            logger.error(f"Ошибка при обработке текстового сообщения сценарием: {e}", exc_info=True)
-            await update.message.reply_text("[Ошибка] Не удалось обработать ваше сообщение. Попробуйте позже или /start.")
+        if not self.app:
+            logger.error(f"TelegramPlugin add_handlers (id:{id(self)}): Application (self.app) не инициализирован. Невозможно добавить обработчики.")
             return
-        # --- Конец нового блока ---
-
-        # Этот блок теперь не должен достигаться, если логика выше корректна
-        # await update.message.reply_text(f"Я получил ваше сообщение: {text}")
-
-    async def on_voice(self, update: Update, context_ext: CallbackContext):
-        """Обработка голосовых сообщений"""
-        await update.message.reply_text("Я получил голосовое сообщение, но пока не умею его обрабатывать")
-
-    async def on_photo(self, update: Update, context_ext: CallbackContext):
-        """Обработка фотографий"""
-        await update.message.reply_text("Я получил фотографию, но пока не умею её обрабатывать")
-
-    async def on_document(self, update: Update, context_ext: CallbackContext):
-        """Обработка документов"""
-        await update.message.reply_text(f"Я получил документ '{update.message.document.file_name}', но пока не умею его обрабатывать")
-
-    async def on_video(self, update: Update, context_ext: CallbackContext):
-        """Обработка видео"""
-        await update.message.reply_text("Я получил видео, но пока не умею его обрабатывать")
-
-    async def on_audio(self, update: Update, context_ext: CallbackContext):
-        """Обработка аудио"""
-        await update.message.reply_text("Я получил аудио, но пока не умею его обрабатывать")
-
-    async def on_sticker(self, update: Update, context_ext: CallbackContext):
-        """Обработка стикеров"""
-        await update.message.reply_text("👍")
-
-    async def on_contact(self, update: Update, context_ext: CallbackContext):
-        """Обработка контактов"""
-        contact = update.message.contact
-        await update.message.reply_text(f"Контакт получен: {contact.first_name} {contact.phone_number}")
-
-    async def on_location(self, update: Update, context_ext: CallbackContext):
-        """Обработка локаций"""
-        location = update.message.location
-        await update.message.reply_text(f"Локация получена: {location.latitude}, {location.longitude}")
-
-    async def handle_step_send_message(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Обработчик шага сценария для отправки сообщения через Telegram.
-        step_data должен содержать:
-        - chat_id (или будет взят из context.chat_id)
-        - text: текст сообщения
-        - parse_mode: str (опционально, e.g., "MarkdownV2", "HTML")
-        - inline_keyboard: List[List[Dict[str, str]]] (опционально)
-          (e.g. [[{'text': 'Button 1', 'callback_data': 'data1'}]] )
-        - reply_keyboard: List[List[Dict[str, str]]] (опционально)
-          (e.g. [[{'text': 'Reply Button 1'}], [{'text': 'Reply Button 2'}]] )
-        - one_time_keyboard: bool (опционально, для reply_keyboard, по умолчанию False)
-        - remove_keyboard: bool (опционально, для удаления reply_keyboard, по умолчанию False)
-        - resize_keyboard: bool (опционально, для reply_keyboard, по умолчанию True)
-        - input_field_placeholder: str (опционально, для reply_keyboard)
-        - selective: bool (опционально, для reply_keyboard, по умолчанию False)
-        - message_id_to_edit: int (опционально, для редактирования сообщения, работает только с inline_keyboard)
-        """
-        params = step_data.get("params", {}) # Получаем вложенный словарь params
         
-        chat_id = params.get("chat_id") or context.get("chat_id")
-        text = params.get("text")
-        inline_keyboard_data = params.get("inline_keyboard")
-        reply_keyboard_data = params.get("reply_keyboard")
-        message_id_to_edit = params.get("message_id_to_edit")
-        parse_mode = params.get("parse_mode")
-        
-        # Параметры для ReplyKeyboardMarkup
-        one_time_keyboard = params.get("one_time_keyboard", False)
-        remove_keyboard_flag = params.get("remove_keyboard", False)
-        resize_keyboard = params.get("resize_keyboard", True)
-        input_field_placeholder = params.get("input_field_placeholder")
-        selective = params.get("selective", False)
+        if self.handlers_added:
+            logger.warning(f"TelegramPlugin add_handlers (id:{id(self)}): Попытка повторного добавления обработчиков, когда self.handlers_added=True. Пропускаю.")
+            return
 
-        if not chat_id or not text:
-            logger.error(f"Шаг telegram_send_message: отсутствует chat_id или text. step_data: {step_data}, context: {context}")
-            context["telegram_send_error"] = "Missing chat_id or text"
-            return context
+        logger.info(f"TelegramPlugin add_handlers (id:{id(self)}): Попытка добавления обработчиков к self.app (id: {id(self.app)}).")
 
-        final_reply_markup = None
+        self.app.add_handler(CommandHandler("start", self.handle_start_command, block=False))
+        self.app.add_handler(CommandHandler("superdupertestcommand123", self.handle_super_test_command, block=False)) # <--- РЕГИСТРАЦИЯ НОВОГО ОБРАБОТЧИКА
+        # self.app.add_handler(CommandHandler("test_message_id", self.test_message_id_command)) # ВРЕМЕННО ОТКЛЮЧИМ
+        # self.app.add_handler(CommandHandler("status", self.handle_status_command)) # ВРЕМЕННО ОТКЛЮЧИМ
+        self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text_message))
 
-        if remove_keyboard_flag:
-            from telegram import ReplyKeyboardRemove
-            final_reply_markup = ReplyKeyboardRemove(selective=selective)
-        elif reply_keyboard_data: # Этот блок должен идти перед inline_keyboard, если мы хотим дать приоритет reply_keyboard при одновременном указании (хотя это плохая практика)
-            buttons = []
-            for row_data in reply_keyboard_data:
-                button_row = []
-                for button_dict in row_data: # Ожидаем [{'text': 'Кнопка1'}, {'text': 'Кнопка2'}]
-                    button_row.append(button_dict["text"]) # ReplyKeyboardMarkup принимает просто строки для кнопок
-                buttons.append(button_row)
-            
-            final_reply_markup = ReplyKeyboardMarkup(
-                buttons,
-                resize_keyboard=resize_keyboard,
-                one_time_keyboard=one_time_keyboard,
-                input_field_placeholder=input_field_placeholder,
-                selective=selective
-            )
-        elif inline_keyboard_data:
-            buttons = []
-            for row_data in inline_keyboard_data:
-                button_row = []
-                for button_data in row_data:
-                    button_row.append(InlineKeyboardButton(text=button_data["text"], callback_data=button_data["callback_data"]))
-                buttons.append(button_row)
-            final_reply_markup = InlineKeyboardMarkup(buttons)
-        
-        try:
-            if message_id_to_edit and final_reply_markup and isinstance(final_reply_markup, InlineKeyboardMarkup):
-                await self.app.bot.edit_message_text(
-                    chat_id=chat_id,
-                    message_id=message_id_to_edit,
-                    text=text,
-                    reply_markup=final_reply_markup, # Можно редактировать только inline-клавиатуру
-                    parse_mode=parse_mode
+        # Используем группу -1 для повышения приоритета этого обработчика
+        # self.app.add_handler(CallbackQueryHandler(lambda u, c: self._dispatch_callback_query(u, c)), group=-1) # Старая версия
+        self.app.add_handler(CallbackQueryHandler(self.on_callback_query), group=-1) # Явно указываем self.on_callback_query
+        logger.info(f"TelegramPlugin add_handlers (id:{id(self)}): CallbackQueryHandler добавлен с self.on_callback_query (группа -1). self.app id: {id(self.app)}")
+
+        # ОТЛАДКА: Проверяем наличие self.logger перед определением all_updates_handler_debug
+        if hasattr(self, 'logger') and self.logger is not None:
+            logger.info(f"TelegramPlugin add_handlers (id:{id(self)}): self.logger СУЩЕСТВУЕТ перед all_updates_handler_debug. Тип: {{type(self.logger)}}")
+        else:
+            logger.error(f"TelegramPlugin add_handlers (id:{id(self)}): self.logger НЕ СУЩЕСТВУЕТ или None перед all_updates_handler_debug!")
+
+        # Добавляем "сырой" обработчик всех обновлений с высоким приоритетом
+        # async def all_updates_handler_debug(update: Update, context: CallbackContext):
+        #     self.logger.critical(f"!!!!!!!!!!!!!! [RAW_UPDATE_HANDLER] ПОЛУЧЕНО ОБНОВЛЕНИЕ: {update.to_json()} !!!!!!!!!!!!!!")
+        #     # print(f"!!!!!!!!!!!!!! [RAW_UPDATE_HANDLER VIA PRINT] ПОЛУЧЕНО ОБНОВЛЕНИЕ: {update.to_json()} !!!!!!!!!!!!!!") # Возвращаем на self.logger
+        #     # Важно: этот обработчик ничего не должен делать, кроме логирования,
+        #     # чтобы не мешать другим обработчикам, если они все же сработают.
+        #     # Не используйте context.application.stop() или другие подобные вызовы здесь.
+        #     # Также важно не бросать исключения из этого обработчика, чтобы не нарушить работу PTB.
+        #     # Просто логируем и позволяем обновлению идти дальше по цепочке.
+        #     pass # Явный pass, чтобы показать, что больше ничего не делаем
+
+        # self.app.add_handler(TypeHandler(Update, all_updates_handler_debug), group=-2) # Группа -2 для еще более высокого приоритета
+        # self.logger.critical(f"TelegramPlugin add_handlers (id:{id(self)}): TypeHandler для ВСЕХ обновлений добавлен в группу -2.") # Закомментировано, так как сам обработчик закомментирован
+
+        self.handlers_added = True # <--- УСТАНАВЛИВАЕМ ФЛАГ
+        logger.info(f"TelegramPlugin add_handlers (id:{id(self)}): Флаг self.handlers_added установлен в True.")
+
+        # Логируем все зарегистрированные обработчики для этого инстанса self.app
+        # ... existing code ...
+
+    async def handle_super_test_command(self, update: Update, context: CallbackContext): # <--- НОВЫЙ МЕТОД
+        logger.info("SUPER_DUPER_TEST_COMMAND HANDLER CALLED") # Изменено с critical и убраны "!!!"
+        if update.effective_chat:
+            try:
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text="SUPER DUPER TEST COMMAND RECEIVED!"
                 )
-                logger.info(f"Сообщение {message_id_to_edit} отредактировано для chat_id {chat_id} с inline клавиатурой.")
-            elif message_id_to_edit: # Редактирование без изменения клавиатуры или только текста
-                 await self.app.bot.edit_message_text(
-                    chat_id=chat_id,
-                    message_id=message_id_to_edit,
-                    text=text,
-                    # reply_markup=None, # Явно не указываем, чтобы не сбросить существующую inline клавиатуру, если она была
-                    parse_mode=parse_mode
-                )
-                 logger.info(f"Текст сообщения {message_id_to_edit} отредактирован для chat_id {chat_id}.")
-            else: # Отправка нового сообщения
-                sent_message = await self.app.bot.send_message(
-                    chat_id=chat_id,
-                    text=text,
-                    reply_markup=final_reply_markup,
-                    parse_mode=parse_mode
-                )
-                logger.info(f"Сообщение отправлено в chat_id {chat_id}. Message ID: {sent_message.message_id}")
-                context["telegram_last_message_id"] = sent_message.message_id
-                context["telegram_last_message_text"] = text
+                logger.info(f"Ответ на /superdupertestcommand123 успешно отправлен в chat_id: {update.effective_chat.id}")
+            except Exception as e:
+                logger.error(f"Ошибка при отправке сообщения в handle_super_test_command для chat_id {update.effective_chat.id}: {e}", exc_info=True)
+        else:
+            logger.warning("Не удалось определить effective_chat для ответа на /superdupertestcommand123")
 
-        except Exception as e:
-            logger.error(f"Ошибка при отправке/редактировании сообщения Telegram в chat_id {chat_id}: {e}")
-            context["telegram_send_error"] = str(e)
+    async def handle_start_command(self, update: Update, context: CallbackContext):
+        """Обрабатывает команду /start."""
+        self.logger.info(f"!!!!!!!!!!!!!! TELEGRAM_PLUGIN: handle_start_command ВЫЗВАН! update.message.text: {update.message.text}") # МОЙ НОВЫЙ ЛОГ - ОСТАВЛЕН ПО ПРОСЬБЕ
+        self.logger.info("HANDLE_START_COMMAND CALLED") # Изменено с critical и убраны "!!!"
+        logger.info(f"Команда /start получена от user_id: {update.effective_user.id}, chat_id: {update.effective_chat.id}")
         
-        return context
+        if update.effective_chat:
+            try:
+                keyboard = [[InlineKeyboardButton("Тестовая кнопка", callback_data="test_button_callback")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id, 
+                    text="Привет! Нажми тестовую кнопку:",
+                    reply_markup=reply_markup
+                )
+                logger.info(f"Сообщение с тестовой кнопкой на /start успешно отправлено в chat_id: {update.effective_chat.id}")
+            except Exception as e:
+                logger.error(f"Ошибка при отправке сообщения с кнопкой в handle_start_command для chat_id {update.effective_chat.id}: {e}", exc_info=True)
+            self.logger.info("Message with button should have been sent (or error logged)") # Изменено с critical и убраны "!!!"
+        else:
+            logger.warning(f"Не удалось определить effective_chat для ответа на /start. Update: {{update.to_json()}}") # Исправлено экранирование
+            self.logger.warning("EFFECTIVE_CHAT WAS NONE") # Изменено с critical и убраны "!!!"
 
-    async def healthcheck(self):
-        """Асинхронная проверка работоспособности Telegram-бота через get_me
-        Returns:
-            bool: True если бот отвечает, иначе False
-        """
-        try:
-            me = await self.app.bot.get_me()
-            return True if me else False
-        except Exception as e:
-            logger.error(f"Ошибка healthcheck: {e}")
-            return False
-
-    async def send_reply_keyboard(self, chat_id, text, buttons, resize_keyboard=True, one_time_keyboard=True):
-        """Отправить сообщение с ReplyKeyboardMarkup (обычные кнопки)"""
-        markup = ReplyKeyboardMarkup(buttons, resize_keyboard=resize_keyboard, one_time_keyboard=one_time_keyboard)
-        await self.app.bot.send_message(chat_id=chat_id, text=text, reply_markup=markup)
-
-    async def send_inline_keyboard(self, chat_id, text, buttons):
-        """Отправить сообщение с InlineKeyboardMarkup (inline-кнопки)"""
-        markup = InlineKeyboardMarkup(buttons)
-        await self.app.bot.send_message(chat_id=chat_id, text=text, reply_markup=markup)
-
-    async def on_callback_query(self, update: Update, context_ext: CallbackContext):
-        """Обработка callback-запросов от inline-кнопок"""
+    async def on_callback_query(self, update: Update, context: CallbackContext) -> None:
         query = update.callback_query
-        data = query.data
-        user = query.from_user
-        chat_id = update.effective_chat.id
-        
-        logger.info(f"Callback-запрос от {user.id} (@{user.username}), chat_id: {chat_id}, data: {data}")
-        
-        try:
-            await query.answer() # Отвечаем на колбэк как можно раньше
+        # Сразу отвечаем на callback, чтобы убрать "часики" на кнопке
+        await query.answer("Получено") # Можно добавить текст, который всплывет у пользователя
 
-            # Формируем базовый контекст для возможного запуска сценария
-            initial_scenario_context = {
-                "user_id": user.id,
-                "chat_id": chat_id,
-                "username": user.username,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "trigger": "callback_query",
-                "callback_data": data
+        self.logger.info("ON_CALLBACK_QUERY_CALLED_SUCCESSFULLY") # Изменено с critical и убраны "!!!"
+        
+        user_id = query.from_user.id
+        username = query.from_user.username or query.from_user.first_name
+        chat_id = query.message.chat.id if query.message else None # query.message может быть None для inline-режима
+        message_id = query.message.message_id if query.message else None
+        callback_data = query.data
+        message_text = query.message.text if query.message else "N/A (inline)"
+
+        self.logger.info(
+            f"[TELEGRAM_PLUGIN] Получен callback_query от user {user_id} (@{username}) "
+            f"для message_id: {message_id} в chat_id: {chat_id}. Data: '{callback_data}'. "
+            f"Текст сообщения: '{message_text}'"
+        )
+
+        # Для обратной совместимости и для сценариев, которые ожидают input
+        # Проверяем, есть ли активное ожидание для этого сообщения
+        active_await = self.active_input_awaits.get(message_id)
+
+        if query.data == "test_button_callback":
+            self.logger.info(f"[TELEGRAM_PLUGIN] Обработка тестового callback 'test_button_callback' от user {user_id}.")
+            if chat_id:
+                try:
+                    await context.bot.send_message(
+                        chat_id=chat_id,
+                        text=f"Кнопка 'test_button_callback' была нажата пользователем @{username}!"
+                    )
+                    self.logger.info(f"[TELEGRAM_PLUGIN] Ответное сообщение на test_button_callback отправлено в chat_id {chat_id}.")
+                except Exception as e:
+                    self.logger.error(f"[TELEGRAM_PLUGIN] Ошибка при отправке ответного сообщения на test_button_callback: {e}", exc_info=True)
+            else:
+                self.logger.warning("[TELEGRAM_PLUGIN] Не могу отправить ответ на test_button_callback, так как chat_id неизвестен (возможно, inline query).")
+            return # Завершаем обработку, так как это специфический тестовый callback
+
+        if active_await:
+            self.logger.info(f"[TELEGRAM_PLUGIN] Найдено активное ожидание для message_id: {message_id}. Data: {active_await}")
+
+        scenario_executor = context.bot_data.get("scenario_executor")
+        if not scenario_executor:
+            logger.error("[TELEGRAM_PLUGIN] ScenarioExecutor не найден в context.bot_data. Невозможно обработать callback.")
+            return
+
+        if not message_id: 
+            logger.warning(f"[TELEGRAM_PLUGIN] message_id не определен для callback_query. Data: '{callback_data}'. Невозможно найти ожидание по message_id.")
+            return
+
+        found_expectation = False
+        instance_id_to_resume = None
+        
+        logger.debug(f"[TELEGRAM_PLUGIN] Поиск ожидания для message_id: {message_id}. Всего зарегистрировано ожиданий: {len(scenario_executor.waiting_for_input_events)}")
+        
+        # Преобразуем message_id из query.message в int для сравнения, если он еще не int
+        try:
+            current_message_id = int(message_id)
+        except (ValueError, TypeError) as e:
+            logger.error(f"[TELEGRAM_PLUGIN] Не удалось преобразовать current_message_id '{message_id}' в int. Ошибка: {e}")
+            return
+            
+        for instance_id, expectation in list(scenario_executor.waiting_for_input_events.items()):
+            try:
+                expectation_message_id = int(expectation.get("message_id"))
+            except (ValueError, TypeError, AttributeError) as e:
+                logger.warning(f"[TELEGRAM_PLUGIN] Не удалось преобразовать или получить message_id из ожидания (instance: {instance_id}). Ожидание: {expectation}. Ошибка: {e}")
+                continue
+
+            logger.debug(f"[TELEGRAM_PLUGIN] Проверка ожидания: Instance ID: {instance_id}, Ожидаемый message_id: {expectation_message_id}, Текущий message_id: {current_message_id}")
+            if expectation_message_id == current_message_id:
+                logger.info(
+                    f"[TELEGRAM_PLUGIN] Найдено ожидание ввода для scenario_instance_id: {instance_id} "
+                    f"по message_id: {current_message_id}. Данные callback: '{callback_data}'"
+                )
+                instance_id_to_resume = instance_id
+                found_expectation = True
+                break
+
+        if not found_expectation:
+            logger.warning(
+                f"[TELEGRAM_PLUGIN] Не найдено активного ожидания ввода для message_id: {message_id} "
+                f"(user: {user_id}, data: '{callback_data}') или ожидание уже было обработано. "
+                f"Текущие ожидания: {scenario_executor.waiting_for_input_events}"
+            )
+            return
+
+        if instance_id_to_resume:
+            logger.info(f"[TELEGRAM_PLUGIN] Попытка возобновить scenario_instance_id: {instance_id_to_resume} с данными '{callback_data}'.")
+            
+            full_received_input = {
+                "value": callback_data, 
+                "telegram_message_id": message_id,
+                "telegram_chat_id": chat_id, 
+                "telegram_user_id": user_id,
+                "telegram_username": username,
+                "telegram_first_name": query.from_user.first_name,
+                "telegram_last_name": query.from_user.last_name,
+                "raw_telegram_callback_payload": query.to_dict() 
             }
             
-            # Новый разбор callback_data
-            # Пример формата: "action_type:value,param1:value1,param2:value2"
-            # Например: "run_scenario:my_scenario_id,initial_message:Hello"
-            #           "continue_event:button_click,value:option1"
+            resume_result = await scenario_executor.resume_scenario(instance_id_to_resume, full_received_input)
             
-            action_details = {}
-            if ':' in data:
-                parts = data.split(',', 1)
-                action_key_value = parts[0].split(':', 1)
-                action_details["type"] = action_key_value[0] # e.g., "run_scenario" or "event"
-                action_details["value"] = action_key_value[1] if len(action_key_value) > 1 else None
-
-                if len(parts) > 1:
-                    params_str = parts[1]
-                    for param in params_str.split(','):
-                        key_val = param.split(':', 1)
-                        if len(key_val) == 2:
-                            action_details[key_val[0]] = key_val[1]
-            else: # Если нет ':', возможно, это простой идентификатор или старый формат
-                action_details["type"] = "unknown_format"
-                action_details["raw_data"] = data
-                logger.warning(f"Callback data '{data}' не соответствует ожидаемому формату 'type:value,params'.")
-
-            logger.info(f"Разобранный callback: {action_details}")
-
-            scenario_executor = context_ext.bot_data.get("scenario_executor")
-
-            if not scenario_executor:
-                logger.error("ScenarioExecutor не найден в context_ext.bot_data. Невозможно обработать callback.")
-                if query.message:
-                    await query.edit_message_text("Ошибка конфигурации сервера. Пожалуйста, сообщите администратору.")
-                else:
-                    await self.app.bot.send_message(chat_id, "Ошибка конфигурации сервера. Пожалуйста, сообщите администратору.")
-                return
-
-            if action_details.get("type") == "run_scenario" and action_details.get("value"):
-                scenario_id_to_run = action_details["value"]
-                initial_scenario_context.update(action_details) 
-                
-                logger.info(f"Запрос на запуск сценария '{scenario_id_to_run}' для user {user.id} из callback.")
-                try:
-                    result_context = await scenario_executor.run_scenario_by_id(scenario_id_to_run, initial_scenario_context)
-                    if result_context is None:
-                        logger.error(f"Сценарий '{scenario_id_to_run}' не был выполнен из callback. User: {user.id}")
-                        if query.message:
-                            await query.edit_message_text(f"Не удалось запустить запрошенный сценарий ('{scenario_id_to_run}').")
-                        else:
-                            await self.app.bot.send_message(chat_id, f"Не удалось запустить запрошенный сценарий ('{scenario_id_to_run}').")
-                    # Если сценарий запустился и выполнился, он сам должен был обновить сообщение или отправить новое.
-                    # Если мы хотим обязательно отредактировать исходное сообщение (например, убрать кнопки):
-                    # elif query.message: 
-                    #    await query.edit_message_text(text=f"Сценарий '{scenario_id_to_run}' запущен.")
-
-                except Exception as e:
-                    logger.error(f"Исключение при запуске сценария '{scenario_id_to_run}' из callback: {e}", exc_info=True)
-                    if query.message:
-                        await query.edit_message_text("Произошла ошибка при обработке вашего выбора.")
+            if resume_result and resume_result.get("status") == "success":
+                logger.info(
+                    f"[TELEGRAM_PLUGIN] Сценарий {instance_id_to_resume} успешно возобновлен. "
+                    f"Результат: {resume_result.get('message', 'OK')}, "
+                    # f"Финальный контекст сценария (часть): {str(resume_result.get('final_context', {}))[:200]}" # Можно раскомментировать для отладки
+                )
             
-            elif action_details.get("type") == "event": 
-                event_name = action_details.get("value")
-                logger.info(f"Запрос на передачу события '{event_name}' в текущий сценарий user {user.id} с данными: {action_details}")
-                # TODO: Реализовать self.scenario_executor.handle_event(user.id, event_name, action_details)
-                # Эта часть требует доработки ScenarioExecutor и системы управления состоянием активного сценария.
-                if query.message:
-                    await query.edit_message_text(text=f"Событие '{event_name}' получено... (обработка событий в разработке)")
-                else:
-                    await self.app.bot.send_message(chat_id, text=f"Событие '{event_name}' получено... (обработка событий в разработке)")
-            
-            else:
-                logger.warning(f"Неизвестный или неполный тип действия в callback_data: {data} (детали: {action_details})")
-                if query.message:
-                    await query.edit_message_text(text=f"Действие по кнопке '{data}' пока не настроено.")
-                else:
-                    await self.app.bot.send_message(chat_id, text=f"Действие по кнопке '{data}' пока не настроено.")
-                
-        except Exception as e:
-            logger.error(f"Ошибка в on_callback_query при обработке data '{data}': {e}", exc_info=True)
-            if query.message:
-                try:
-                    await query.edit_message_text("Произошла ошибка при обработке вашего выбора.")
-                except Exception as edit_e:
-                    logger.error(f"Не удалось отредактировать сообщение после ошибки в on_callback_query: {edit_e}")
-            else: # Если исходного сообщения нет (маловероятно для callback_query)
-                 await self.app.bot.send_message(chat_id, "Произошла ошибка при обработке вашего выбора.")
+            elif resume_result: 
+                logger.error(
+                    f"[TELEGRAM_PLUGIN] Ошибка при возобновлении сценария {instance_id_to_resume} с данными '{callback_data}'. "
+                    f"Результат: {resume_result}"
+                )
+            else: 
+                logger.error(
+                    f"[TELEGRAM_PLUGIN] Не удалось возобновить сценарий {instance_id_to_resume} с данными '{callback_data}'. "
+                    f"Метод resume_scenario не вернул результат."
+                )
+        else:
+            logger.error("[TELEGRAM_PLUGIN] Логическая ошибка: found_expectation было True, но instance_id_to_resume не установлен.")
 
-    async def send_message(self, chat_id: int, text: str) -> bool:
-        """Отправляет простое текстовое сообщение в указанный чат."""
+    async def handle_text_message(self, update: Update, context: CallbackContext):
+        user_id = update.effective_user.id
+        chat_id = update.effective_chat.id
+        text = update.message.text
+
+        logger.info(f"[TELEGRAM_PLUGIN] Получено текстовое сообщение от user {user_id} в chat {chat_id}: '{text}'")
+
+        # TODO: Реализовать логику обработки текстовых сообщений.
+        # Возможные варианты:
+        # 1. Если активен сценарий, ожидающий текстового ввода от этого пользователя,
+        #    возобновить его с полученным текстом.
+        # 2. Если нет активного сценария, попытаться запустить сценарий по умолчанию или NLP-обработку.
+        # 3. Просто ответить, что команда не распознана, если нет другой логики.
+
+        # Пример простой заглушки ответа:
+        # await context.bot.send_message(
+        #     chat_id=chat_id,
+        #     text=f"Вы написали: '{text}'. Обработка таких сообщений пока не реализована."
+        # )
+
+        # Если есть сценарий, ожидающий ввода (хотя текущая система больше на callback_query):
+        # scenario_executor = context.bot_data.get("scenario_executor")
+        # if scenario_executor:
+        #     # Нужно будет доработать логику ожидания и возобновления для текстовых сообщений
+        #     # Например, по user_id/chat_id, если сценарий явно ждет TEXT_INPUT
+        #     pass 
+        pass # Пока ничего не делаем
+
+    async def send_message(self, chat_id, text, buttons_data=None, reply_markup=None):
+        """Отправить простое сообщение или сообщение с кнопками."""
+        logger.critical(f"TELEGRAM_PLUGIN: SEND_MESSAGE ENTERED. Chat_id: {chat_id}, Text: '{text}', Buttons_data: {buttons_data}")
+
+        actual_reply_markup = None
+        if buttons_data:
+            inline_keyboard = []
+            for row_data in buttons_data:
+                inline_row = []
+                for button_dict in row_data:
+                    btn_text = str(button_dict.get("text", "Button"))
+                    btn_callback_data = str(button_dict.get("callback_data", ""))
+                    inline_row.append(InlineKeyboardButton(btn_text, callback_data=btn_callback_data))
+                inline_keyboard.append(inline_row)
+            if inline_keyboard:
+                actual_reply_markup = InlineKeyboardMarkup(inline_keyboard)
+        elif reply_markup:
+            actual_reply_markup = reply_markup
+
+        message_sent = None
         try:
-            logger.info(f"[send_message] chat_id={chat_id!r} (type={type(chat_id)}), text={text!r}")
-            # Логируем context, если есть в self или через inspect
-            frame = inspect.currentframe()
-            outer = inspect.getouterframes(frame)
-            for f in outer:
-                if 'context' in f.frame.f_locals:
-                    logger.info(f"[send_message] context: {f.frame.f_locals['context']}")
-                    break
-            await self.app.bot.send_message(chat_id=chat_id, text=text)
-            logger.info(f"Отправлено сообщение в чат {chat_id}")
-            return True
+            logger.info(f"TELEGRAM_PLUGIN: Попытка отправки сообщения через self.app.bot.send_message. Chat ID: {chat_id}")
+            message_sent = await self.app.bot.send_message(
+                chat_id=chat_id,
+                text=text,
+                reply_markup=actual_reply_markup,
+                parse_mode='HTML'  # Можно убрать или заменить на ParseMode.HTML, если используется enum
+            )
+            if message_sent:
+                logger.critical(f"TELEGRAM_PLUGIN: УСПЕШНАЯ ОТПРАВКА БОТОМ! Message ID: {message_sent.message_id} в чат {chat_id}.")
+            else:
+                logger.error(f"TELEGRAM_PLUGIN: self.app.bot.send_message вернул None или False для чата {chat_id}.")
         except Exception as e:
-            import traceback
-            logger.error(f"Ошибка при отправке сообщения в чат {chat_id}: {e}\n{traceback.format_exc()}")
-            return False 
+            logger.error(f"TELEGRAM_PLUGIN: ОШИБКА при вызове self.app.bot.send_message для чата {chat_id}: {e}", exc_info=True)
+            # Важно! Если здесь происходит raise, то ScenarioExecutor должен это поймать
+            # Если не делать raise, то ScenarioExecutor не узнает об ошибке, если только message_sent не будет None
+
+        return message_sent
+
+    async def edit_message_text(self, chat_id, message_id, text, buttons_data=None):
+        """Редактировать сообщение с текстом и кнопками."""
+        logger.critical(f"TELEGRAM_PLUGIN: EDIT_MESSAGE_TEXT ENTERED. Chat_id: {chat_id}, Message_id: {message_id}, Text: '{text}', Buttons_data: {buttons_data}")
+
+        actual_reply_markup = None
+        if buttons_data:
+            inline_keyboard = []
+            for row_data in buttons_data:
+                inline_row = []
+                for button_dict in row_data:
+                    btn_text = str(button_dict.get("text", "Button"))
+                    btn_callback_data = str(button_dict.get("callback_data", ""))
+                    inline_row.append(InlineKeyboardButton(btn_text, callback_data=btn_callback_data))
+                inline_keyboard.append(inline_row)
+            if inline_keyboard:
+                actual_reply_markup = InlineKeyboardMarkup(inline_keyboard)
+
+        message_edited = None
+        try:
+            logger.info(f"TELEGRAM_PLUGIN: Попытка редактирования сообщения через self.app.bot.edit_message_text. Chat ID: {chat_id}, Message_id: {message_id}")
+            message_edited = await self.app.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                reply_markup=actual_reply_markup,
+                parse_mode='HTML'  # Можно убрать или заменить на ParseMode.HTML, если используется enum
+            )
+            if message_edited:
+                logger.critical(f"TELEGRAM_PLUGIN: УСПЕШНОЕ РЕДАКТИРОВАНИЕ СООБЩЕНИЯ! Message ID: {message_edited.message_id} в чат {chat_id}.")
+            else:
+                logger.error(f"TELEGRAM_PLUGIN: self.app.bot.edit_message_text вернул None или False для чата {chat_id} и message_id {message_id}.")
+        except Exception as e:
+            logger.error(f"TELEGRAM_PLUGIN: ОШИБКА при вызове self.app.bot.edit_message_text для чата {chat_id} и message_id {message_id}: {e}", exc_info=True)
+            # Важно! Если здесь происходит raise, то ScenarioExecutor должен это поймать
+            # Если не делать raise, то ScenarioExecutor не узнает об ошибке, если только message_edited не будет None
+
+        return message_edited
+
+    def register_input_expectation(self, chat_id: Any, scenario_instance_id: str, step_id: str, output_var: str, message_id_with_buttons: int = None):
+        """Регистрирует, что сценарий ожидает callback_data для указанного chat_id."""
+        # Этот метод, похоже, не используется ScenarioExecutor'ом напрямую для регистрации ожиданий input.
+        # ScenarioExecutor сам управляет self.waiting_for_input_events.
+        # Оставим его, если он используется где-то еще, но для текущей проблемы он нерелевантен.
+        # Вместо self.waiting_for_input будет использоваться scenario_executor.waiting_for_input_events
+        logger.warning("Вызов TelegramPlugin.register_input_expectation. Этот метод может быть устаревшим.")
+        # self.waiting_for_input[str(chat_id)] = {
+        #     "scenario_instance_id": scenario_instance_id,
+        #     "step_id": step_id,
+        #     "output_var": output_var,
+        #     "message_id_with_buttons": message_id_with_buttons
+        # }
+        # logger.info(f"Зарегистрировано ожидание ввода для chat_id {chat_id}: scenario_instance_id={scenario_instance_id}, step_id={step_id}, output_var={output_var}, message_id_with_buttons={message_id_with_buttons}")
+
+    def clear_input_expectation(self, chat_id: Any):
+        """Удаляет ожидание ввода для chat_id."""
+        # Аналогично register_input_expectation, этот метод может быть устаревшим.
+        logger.warning("Вызов TelegramPlugin.clear_input_expectation. Этот метод может быть устаревшим.")
+        # if str(chat_id) in self.waiting_for_input:
+        #     del self.waiting_for_input[str(chat_id)]
+        #     logger.info(f"Ожидание ввода для chat_id {chat_id} очищено.")
+
+    # ++++++++++++++++++++ НОВЫЕ МЕТОДЫ ДЛЯ РЕГИСТРАЦИИ И ОБРАБОТКИ ШАГОВ ++++++++++++++++++++
+    
+    def register_step_handlers(self, step_handlers_dict: Dict[str, Callable]):
+        """Регистрирует обработчики шагов, предоставляемые этим плагином."""
+        step_handlers_dict['telegram_send_message'] = self.handle_step_send_message
+        step_handlers_dict['telegram_edit_message'] = self.handle_step_edit_message
+        # Добавьте другие обработчики, если они есть, например, для специфичных Telegram действий
+        logger.info("TelegramPlugin: Зарегистрированы обработчики для 'telegram_send_message' и 'telegram_edit_message'.")
+
+    async def handle_step_send_message(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Обрабатывает шаг 'telegram_send_message' из сценария."""
+        params = step_data.get("params", {})
+        
+        # Используем _resolve_value_from_context для разрешения плейсхолдеров
+        resolved_chat_id = _resolve_value_from_context(params.get("chat_id"), context)
+        resolved_text = _resolve_value_from_context(params.get("text"), context)
+        resolved_buttons_data = _resolve_value_from_context(params.get("inline_keyboard"), context) # 'buttons_data' or 'inline_keyboard'
+        
+        logger.info(f"[TELEGRAM_PLUGIN][HANDLE_STEP_SEND_MESSAGE] ChatID: {resolved_chat_id}, Text: '{resolved_text}', Buttons: {resolved_buttons_data}")
+
+        if not resolved_chat_id or not resolved_text:
+            error_msg = "[TELEGRAM_PLUGIN][HANDLE_STEP_SEND_MESSAGE] Отсутствует chat_id или text."
+            logger.error(error_msg)
+            context["_step_error"] = error_msg
+            return context
+
+        message_sent = await self.send_message(
+            chat_id=resolved_chat_id,
+            text=resolved_text,
+            buttons_data=resolved_buttons_data
+        )
+
+        if message_sent:
+            context["telegram_last_message_id"] = message_sent.message_id
+            context["telegram_last_message_text"] = resolved_text # или message_sent.text, но resolved_text уже разрешен
+            if resolved_buttons_data:
+                 context["message_id_with_buttons"] = message_sent.message_id
+                 logger.debug(f"[TELEGRAM_PLUGIN][HANDLE_STEP_SEND_MESSAGE] Сохранено message_id_with_buttons: {message_sent.message_id}")
+        else:
+            error_msg = f"[TELEGRAM_PLUGIN][HANDLE_STEP_SEND_MESSAGE] Сообщение не было отправлено в chat_id {resolved_chat_id}."
+            logger.error(error_msg)
+            context["_step_error"] = error_msg
+            
+        return context
+
+    async def handle_step_edit_message(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Обрабатывает шаг 'telegram_edit_message' из сценария."""
+        params = step_data.get("params", {})
+
+        resolved_chat_id = _resolve_value_from_context(params.get("chat_id"), context)
+        # Для редактирования нужен message_id, который должен быть в контексте (например, telegram_last_message_id или message_id_with_buttons)
+        # или передан явно в параметрах шага.
+        # Если message_id передается в params, то params.get("message_id"). 
+        # Если он из контекста, то context.get(params.get("message_id_context_var", "telegram_last_message_id"))
+        
+        message_id_source = params.get("message_id") # Может быть прямым значением или плейсхолдером
+        if not message_id_source: # Если не указан в params, пытаемся взять из контекста по умолчанию
+            message_id_source = "{message_id_with_buttons}" # По умолчанию используем это, если оно есть
+            # Можно сделать это настраиваемым через "message_id_context_var": "my_var_with_msg_id"
+
+        resolved_message_id = _resolve_value_from_context(message_id_source, context)
+        resolved_text = _resolve_value_from_context(params.get("text"), context)
+        resolved_buttons_data = _resolve_value_from_context(params.get("inline_keyboard"), context)
+
+        logger.info(f"[TELEGRAM_PLUGIN][HANDLE_STEP_EDIT_MESSAGE] ChatID: {resolved_chat_id}, MessageID: {resolved_message_id}, Text: '{resolved_text}', Buttons: {resolved_buttons_data}")
+
+        if not resolved_chat_id or not resolved_message_id or not resolved_text:
+            error_msg = "[TELEGRAM_PLUGIN][HANDLE_STEP_EDIT_MESSAGE] Отсутствует chat_id, message_id или text."
+            logger.error(error_msg)
+            context["_step_error"] = error_msg
+            return context
+
+        message_edited = await self.edit_message_text(
+            chat_id=resolved_chat_id,
+            message_id=resolved_message_id,
+            text=resolved_text,
+            buttons_data=resolved_buttons_data
+        )
+
+        if message_edited:
+            # Контекст можно обновить аналогично send_message, если нужно
+            context["telegram_last_edited_message_id"] = message_edited.message_id 
+        else:
+            error_msg = f"[TELEGRAM_PLUGIN][HANDLE_STEP_EDIT_MESSAGE] Сообщение message_id {resolved_message_id} в chat_id {resolved_chat_id} не было отредактировано."
+            logger.error(error_msg)
+            context["_step_error"] = error_msg
+            
+        return context
+    # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 

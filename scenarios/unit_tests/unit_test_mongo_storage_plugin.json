@@ -1,0 +1,130 @@
+{
+  "scenario_id": "unit_test_mongo_storage_plugin",
+  "name": "Unit Test for MongoStoragePlugin Operations",
+  "description": "Tests insert, find, update, and delete operations of MongoStoragePlugin.",
+  "version": "1.0",
+  "created_by_agent_id": "system_dev",
+  "steps": [
+    {
+      "id": "step_1_insert_doc",
+      "type": "mongo_insert_one",
+      "name": "Insert Test Document",
+      "params": {
+        "collection_name": "test_collection_for_unit_tests",
+        "document": {
+          "_id": "mongo_test_doc_123", 
+          "name": "Test Item",
+          "value": 100,
+          "tags": ["test", "mongo"]
+        },
+        "output_var": "insert_result"
+      },
+      "next_step_id": "step_2_log_insert_result"
+    },
+    {
+      "id": "step_2_log_insert_result",
+      "type": "log_message",
+      "config": {"level": "INFO", "message": "Insert result: {insert_result}"},
+      "next_step_id": "step_3_find_doc_after_insert"
+    },
+    {
+      "id": "step_3_find_doc_after_insert",
+      "type": "mongo_find_one",
+      "name": "Find Document After Insert",
+      "params": {
+        "collection_name": "test_collection_for_unit_tests",
+        "query": {"_id": "mongo_test_doc_123"},
+        "find_one": true,
+        "output_var": "found_doc_after_insert"
+      },
+      "next_step_id": "step_4_log_find_after_insert"
+    },
+    {
+      "id": "step_4_log_find_after_insert",
+      "type": "log_message",
+      "config": {"level": "INFO", "message": "Found after insert: {found_doc_after_insert}"},
+      "next_step_id": "step_5_update_doc"
+    },
+    {
+      "id": "step_5_update_doc",
+      "type": "mongo_update_one",
+      "name": "Update Test Document",
+      "params": {
+        "collection_name": "test_collection_for_unit_tests",
+        "query": {"_id": "mongo_test_doc_123"},
+        "update_data": {"$set": {"value": 200, "status": "updated"}},
+        "upsert": false,
+        "output_var": "update_result"
+      },
+      "next_step_id": "step_6_log_update_result"
+    },
+    {
+      "id": "step_6_log_update_result",
+      "type": "log_message",
+      "config": {"level": "INFO", "message": "Update result: {update_result}"},
+      "next_step_id": "step_7_find_doc_after_update"
+    },
+    {
+      "id": "step_7_find_doc_after_update",
+      "type": "mongo_find_one",
+      "name": "Find Document After Update",
+      "params": {
+        "collection_name": "test_collection_for_unit_tests",
+        "query": {"_id": "mongo_test_doc_123"},
+        "find_one": true,
+        "output_var": "found_doc_after_update"
+      },
+      "next_step_id": "step_8_log_find_after_update"
+    },
+    {
+      "id": "step_8_log_find_after_update",
+      "type": "log_message",
+      "config": {"level": "INFO", "message": "Found after update: {found_doc_after_update}"},
+      "next_step_id": "step_9_delete_doc"
+    },
+    {
+      "id": "step_9_delete_doc",
+      "type": "mongo_delete_one",
+      "name": "Delete Test Document",
+      "params": {
+        "collection_name": "test_collection_for_unit_tests",
+        "query": {"_id": "mongo_test_doc_123"},
+        "delete_one": true,
+        "output_var": "delete_result"
+      },
+      "next_step_id": "step_10_log_delete_result"
+    },
+    {
+      "id": "step_10_log_delete_result",
+      "type": "log_message",
+      "config": {"level": "INFO", "message": "Delete result: {delete_result}"},
+      "next_step_id": "step_11_find_doc_after_delete"
+    },
+    {
+      "id": "step_11_find_doc_after_delete",
+      "type": "mongo_find_one",
+      "name": "Find Document After Delete",
+      "params": {
+        "collection_name": "test_collection_for_unit_tests",
+        "query": {"_id": "mongo_test_doc_123"},
+        "find_one": true,
+        "output_var": "found_doc_after_delete"
+      },
+      "next_step_id": "step_12_log_find_after_delete"
+    },
+    {
+      "id": "step_12_log_find_after_delete",
+      "type": "log_message",
+      "config": {"level": "INFO", "message": "Found after delete (should be null/empty): {found_doc_after_delete}"},
+      "next_step_id": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "name": "End of Mongo Storage Test"
+    }
+  ],
+  "initial_context": {
+    "test_case_description": "Mongo CRUD operations test"
+  }
+} 

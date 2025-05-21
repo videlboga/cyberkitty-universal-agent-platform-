@@ -1,0 +1,48 @@
+{
+  "scenario_id": "unit_test_core_sub_scenario_child",
+  "name": "Unit Test: Core Sub-scenario (Child)",
+  "description": "Child scenario to be called by a parent, modifies context.",
+  "version": "1.0",
+  "initial_context": {
+    "child_input": null,
+    "another_child_input": null,
+    "child_internal_value": "ЭтоВнутреннееДляРебенка"
+  },
+  "steps": [
+    {
+      "id": "start_log_child",
+      "type": "log_message",
+      "params": {
+        "message": "UNIT TEST SUB-CHILD: Starting child. child_input: {child_input}, another_child_input: {another_child_input}",
+        "level": "INFO"
+      },
+      "next_step_id": "process_child_data"
+    },
+    {
+      "id": "process_child_data",
+      "type": "action",
+      "params": {
+        "action_type": "update_context",
+        "updates": {
+          "child_output": "{child_input}_МодифицированоРебенком",
+          "child_new_value": "НовоеЗначениеОтРебенка",
+          "child_internal_value": "{child_internal_value}_Обновлено"
+        }
+      },
+      "next_step_id": "log_before_end_child"
+    },
+    {
+      "id": "log_before_end_child",
+      "type": "log_message",
+      "params": {
+        "message": "UNIT TEST SUB-CHILD: Ending child. child_output: {child_output}, child_new_value: {child_new_value}, child_internal_value: {child_internal_value}",
+        "level": "INFO"
+      },
+      "next_step_id": "end_child_scenario"
+    },
+    {
+      "id": "end_child_scenario",
+      "type": "end"
+    }
+  ]
+} 

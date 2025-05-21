@@ -1,0 +1,44 @@
+{
+  "scenario_id": "unit_test_scheduling_plugin",
+  "name": "Unit Test for SchedulingPlugin",
+  "description": "Tests the schedule_scenario_run step.",
+  "version": "1.0",
+  "created_by_agent_id": "system_dev",
+  "steps": [
+    {
+      "id": "step_1_schedule_task",
+      "type": "schedule_scenario_run",
+      "name": "Schedule a Simple Log Scenario",
+      "params": {
+        "agent_id_to_run_scenario": "682c5263a151e0d7d339a02b",
+        "run_at_datetime": null, 
+        "run_in_seconds": 5,
+        "context_to_pass": {
+          "source_test": "unit_test_scheduling_plugin",
+          "initial_payload_data": "Data from scheduling test at {current_datetime}"
+        },
+        "output_var": "schedule_task_output"
+      },
+      "next_step_id": "step_2_log_scheduling_result"
+    },
+    {
+      "id": "step_2_log_scheduling_result",
+      "type": "log_message",
+      "name": "Log Scheduling Attempt",
+      "config": {
+        "level": "INFO",
+        "message": "schedule_scenario_run step executed. Output: {schedule_task_output}"
+      },
+      "next_step_id": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "name": "End of Scheduling Test"
+    }
+  ],
+  "initial_context": {
+    "test_description": "This test schedules another scenario to run after a 5-second delay.",
+    "initiator_user_id": "test_user_for_scheduler_from_scenario_context"
+  }
+} 

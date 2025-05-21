@@ -1,0 +1,51 @@
+{
+  "scenario_id": "unit_test_scheduling_create_task",
+  "name": "Unit Test: SchedulingPlugin Create Task",
+  "description": "Tests the schedule_scenario_run step type.",
+  "version": "1.0",
+  "initial_context": {
+    "user_id": "scheduler_tester_001",
+    "telegram_chat_id": "chat_sched_test",
+    "delay_seconds": 10,
+    "data_for_scheduled_task": "Это данные для отложенной задачи"
+  },
+  "steps": [
+    {
+      "id": "start_log_scheduling",
+      "type": "log_message",
+      "params": {
+        "message": "UNIT TEST SCHEDULING: Starting schedule_scenario_run test for user: {user_id}",
+        "level": "INFO"
+      },
+      "next_step_id": "schedule_the_task"
+    },
+    {
+      "id": "schedule_the_task",
+      "type": "schedule_scenario_run",
+      "params": {
+        "run_in_seconds": "{delay_seconds}",
+        "scenario_id_to_run": "unit_test_scheduling_target_dummy",
+        "context_to_pass": {
+          "original_user_id": "{user_id}",
+          "passed_data": "{data_for_scheduled_task}",
+          "scheduled_at": "{iso_timestamp}"
+        },
+        "task_id_output_var": "scheduled_task_id"
+      },
+      "next_step_id": "log_scheduling_result"
+    },
+    {
+      "id": "log_scheduling_result",
+      "type": "log_message",
+      "params": {
+        "message": "UNIT TEST SCHEDULING: schedule_scenario_run step initiated. Task ID (or error) should be in context.scheduled_task_id: {scheduled_task_id}",
+        "level": "INFO"
+      },
+      "next_step_id": "end_scheduling_test"
+    },
+    {
+      "id": "end_scheduling_test",
+      "type": "end"
+    }
+  ]
+} 

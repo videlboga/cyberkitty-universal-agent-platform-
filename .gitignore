@@ -46,3 +46,23 @@ coverage*
 *.bak
 *.tmp
 *.old
+
+# Temporary test files and results
+test_*.json
+*_test_*.json
+*_result.json
+pizza_*.json
+scenario_execute_result.json
+agent_create_result.json
+scenario_create_result.json
+scenario_import_result.json
+callback_data.log
+
+# Legacy project files and reports
+Отчёт_*.md
+*_report.txt
+*.pdf
+
+# Index and cache directories
+faiss_index/
+src/

@@ -29,6 +29,10 @@ class ScenarioRepository:
             result.append(Scenario(**sanitize_id(scenario_doc)))
         return result
 
+    async def get_all(self, skip: int = 0, limit: int = 100) -> List[Scenario]:
+        """Возвращает все сценарии (алиас get для совместимости с API)"""
+        return await self.get(skip=skip, limit=limit)
+
     async def get_by_id(self, scenario_id_value: str) -> Optional[Scenario]:
         scenario_doc = await find_one_by_id_flexible(scenario_id_value, self.collection, target_field_name="scenario_id")
         if scenario_doc:

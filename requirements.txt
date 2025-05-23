@@ -1,6 +1,6 @@
 python-dotenv
 fastapi
-uvicorn
+uvicorn[standard]
 pydantic
 motor
 celery
@@ -11,12 +11,15 @@ black
 isort
 flake8
 loguru
-httpx==0.27.0
+httpx
 email-validator
 pytest-asyncio
 asgi-lifespan
 requests
-python-telegram-bot==21.8
+python-telegram-bot[job-queue]
 pytz
 pymongo
 tenacity
+passlib[bcrypt]
+python-jose[cryptography]
+apscheduler

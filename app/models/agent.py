@@ -8,6 +8,7 @@ class Agent(BaseModel):
     scenario_id: Optional[str] = None
     plugins: Optional[List[str]] = Field(default_factory=list)
     config: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    settings: Optional[Dict[str, Any]] = Field(default_factory=dict)
     initial_context: Optional[Dict[str, Any]] = Field(default_factory=dict)
     created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
     extra: Optional[Dict[str, Any]] = None

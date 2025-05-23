@@ -4,10 +4,6 @@ from typing import Dict, Any, Optional, List
 from loguru import logger
 import os
 
-# Настройка логирования
-os.makedirs("logs", exist_ok=True)
-logger.add("logs/dialog_state.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True)
-
 class DialogStateManager:
     """
     Класс для управления состоянием диалога пользователя.

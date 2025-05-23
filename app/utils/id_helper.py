@@ -5,9 +5,11 @@ from fastapi import HTTPException
 from loguru import logger
 import pymongo
 import json
+import os
 
-# Добавляем более подробное логирование для отладки
-logger.add("logs/id_helper_debug.log", format="{time} {level} {message}", level="DEBUG", rotation="1 MB", compression="zip", serialize=False)
+# Настройка логирования - УДАЛЯЕМ ЭТУ СТРОКУ
+# os.makedirs("logs", exist_ok=True)
+# logger.add("logs/id_helper_debug.log", format="{time} {level} {message}", level="DEBUG", rotation="1 MB", compression="zip", serialize=False)
 
 def to_object_id(id_value: Any) -> Optional[ObjectId]:
     """

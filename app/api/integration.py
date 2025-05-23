@@ -8,13 +8,13 @@ from app.integrations.amocrm_client import AmoCRMClient
 from app.plugins.rag_plugin import RAGPlugin
 from app.plugins.telegram_plugin import TelegramPlugin
 from app.plugins.mongo_storage_plugin import MongoStoragePlugin
-from app.plugins.scheduling_plugin import SchedulingPlugin
-from app.api.scheduler_updated import scheduler_service as global_scheduler_service
+# from app.plugins.scheduling_plugin import SchedulingPlugin
 from telegram.ext import Application as TelegramApplicationBuilder
 from motor.motor_asyncio import AsyncIOMotorClient
 from app.db.scenario_repository import ScenarioRepository, get_scenario_repository
 from app.db.agent_repository import AgentRepository, get_agent_repository
 from app.core.scenario_executor import ScenarioExecutor
+from app.core.plugin_manager import PluginManager
 from app.models.user import User
 from app.models.scenario import Scenario
 from app.models.agent import Agent
@@ -25,25 +25,15 @@ from typing import Optional, Dict, Any
 # Импортируем глобальные экземпляры из app.core.dependencies
 from app.core.dependencies import (
     mongo_storage_plugin,
-    scheduling_plugin,
     telegram_plugin,
     telegram_app_instance, # Если нужен сам инстанс Application
-    rag_plugin_instance, # <--- ДОБАВЛЕНО
-    llm_plugin_instance, # <--- ДОБАВЛЕНО
+    # rag_plugin_instance, # УДАЛЕНО для MVP
+    # llm_plugin_instance, # УДАЛЕНО для MVP
     # API_BASE_URL, # Если используется здесь, лучше тоже из dependencies
     # MONGO_URI, MONGODB_DATABASE_NAME # Аналогично
 )
 
 router = APIRouter(prefix="/integration", tags=["integration"])
-
-os.makedirs("logs", exist_ok=True)
-logger.add("logs/llm_integration.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True)
-logger.add("logs/rag_integration.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True)
-logger.add("logs/crm_integration.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True)
-logger.add("logs/telegram_integration.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True)
-
-news_plugin = NewsPlugin()
-rag_plugin = RAGPlugin()
 
 # Получаем настройки Telegram из переменных окружения
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
@@ -76,61 +66,38 @@ from app.core.dependencies import API_BASE_URL as CORE_API_BASE_URL # Чтобы
 #     logger.warning("telegram_app_instance не был инициализирован, ScenarioExecutor не добавлен в bot_data.")
 
 # Зависимость для получения ScenarioExecutor
-# Эта функция теперь будет использовать глобальные плагины
+# Используем глобальный экземпляр из dependencies вместо создания нового каждый раз
 async def get_scenario_executor_dependency(
     user_id: str = Depends(get_current_user_id),
     scenario_repo_dep: ScenarioRepository = Depends(get_scenario_repository),
     agent_repo_dep: AgentRepository = Depends(get_agent_repository),
     user_repo_dep: UserRepository = Depends(get_user_repository)
-    # Глобальные плагины будут подставлены напрямую
 ):
-    plugins = {}
-    if mongo_storage_plugin:
-        plugins["mongo_storage"] = mongo_storage_plugin
-    if scheduling_plugin:
-        plugins["scheduling"] = scheduling_plugin
-    if telegram_plugin:
-        plugins["telegram"] = telegram_plugin # Передаем глобальный экземпляр
+    # Импортируем глобальный экземпляр ScenarioExecutor
+    from app.core.dependencies import scenario_executor_instance
     
-    # Прочие плагины, если они управляются глобально и нужны executor'у
-    # if news_plugin: plugins["news"] = news_plugin (если news_plugin тоже глобальный)
-    # if rag_plugin: plugins["rag"] = rag_plugin (если rag_plugin тоже глобальный)
+    if scenario_executor_instance is None:
+        logger.error("Global scenario_executor_instance is None! This should not happen.")
+        # Fallback - создаем новый экземпляр как раньше
+        plugins = []
+        if telegram_plugin:
+            plugins.append(telegram_plugin)
+        if mongo_storage_plugin:
+            plugins.append(mongo_storage_plugin)
+        return ScenarioExecutor(plugins=plugins)
+    
+    logger.info(f"get_scenario_executor_dependency: Returning global scenario_executor_instance (id: {id(scenario_executor_instance)})")
+    return scenario_executor_instance
 
-    # Передаем глобальные плагины напрямую в конструктор ScenarioExecutor
-    # если они требуются и доступны глобально.
-    # В текущей версии конструктора ScenarioExecutor они передаются через словарь plugins,
-    # но для примера, если бы они были отдельными аргументами:
-    # mongo_storage_plugin_instance = mongo_storage_plugin, 
-    # scheduling_plugin_instance = scheduling_plugin,
-    # telegram_plugin_instance = telegram_plugin
-    # Вместо этого, мы передадим их через словарь `plugins` в сам ScenarioExecutor, 
-    # а он уже внутри своего __init__ разберет их и сохранит.
-    # Однако, конструктор ScenarioExecutor ожидает telegram_plugin, mongo_storage_plugin, scheduling_plugin как именованные аргументы.
-
-    return ScenarioExecutor(
-        scenario_repo=scenario_repo_dep,  # ИЗМЕНЕНО
-        agent_repo=agent_repo_dep,        # ИЗМЕНЕНО
-        # user_repository=user_repo_dep, # УБРАНО
-        # plugins=plugins, # Пока закомментируем, т.к. конструктор ожидает плагины именованными аргументами
-        api_base_url=CORE_API_BASE_URL, # Используем импортированный из core.dependencies
-        # user_id=user_id, # УБРАНО
-        # Явное указание плагинов, которые ожидает конструктор ScenarioExecutor
-        telegram_plugin=telegram_plugin, # Глобальный экземпляр
-        mongo_storage_plugin=mongo_storage_plugin, # Глобальный экземпляр
-        scheduling_plugin=scheduling_plugin, # Глобальный экземпляр
-        rag_plugin=rag_plugin_instance, # <--- ДОБАВЛЕНО
-        llm_plugin=llm_plugin_instance  # <--- ДОБАВЛЕНО
-    )
-
-@router.get("/llm/models")
-async def llm_models():
-    """Получить список моделей OpenRouter с полной информацией (цены, инструменты и т.д.)"""
-    try:
-        models = await openrouter_models()
-        return models
-    except Exception as e:
-        logger.error({"event": "llm_models_error", "error": str(e)})
-        return JSONResponse(status_code=500, content={"error": str(e)})
+# @router.get("/llm/models")
+# async def llm_models():
+#     """Получить список моделей OpenRouter с полной информацией (цены, инструменты и т.д.)"""
+#     try:
+#         models = await openrouter_models()
+#         return models
+#     except Exception as e:
+#         logger.error({"event": "llm_models_error", "error": str(e)})
+#         return JSONResponse(status_code=500, content={"error": str(e)})
 
 @router.post("/llm/query")
 async def llm_query(request: Request):
@@ -172,11 +139,11 @@ async def rag_query(request: Request):
         logger.bind(integration="rag").error({"event": "rag_error", "error": str(e), "query": query})
         return JSONResponse(status_code=500, content={"error": str(e)})
 
-@router.post("/crm/query")
-async def crm_query(request: Request):
-    data = await request.json()
-    logger.bind(integration="crm").info({"request": data})
-    return {"result": "CRM mock response", "input": data}
+# @router.post("/crm/query")
+# async def crm_query(request: Request):
+#     data = await request.json()
+#     logger.bind(integration="crm").info({"request": data})
+#     return {"result": "CRM mock response", "input": data}
 
 @router.post("/crm/amocrm/query")
 async def crm_amocrm_query(request: Request):
@@ -196,19 +163,19 @@ async def crm_amocrm_fields(entity: str = "leads"):
         logger.bind(integration="crm").error({"crm": "amocrm", "entity": entity, "error": str(e)})
         return JSONResponse(status_code=500, content={"error": str(e)})
 
-@router.get("/news/latest")
-async def news_latest(topic: str = None):
-    """Получить последние новости (mock)"""
-    result = news_plugin.latest(topic)
-    logger.bind(integration="news").info({"event": "news_latest", "topic": topic, "result": result})
-    return result
+# @router.get("/news/latest")
+# async def news_latest(topic: str = None):
+#     """Получить последние новости (mock)"""
+#     result = news_plugin.latest(topic)
+#     logger.bind(integration="news").info({"event": "news_latest", "topic": topic, "result": result})
+#     return result
 
-@router.get("/news/search")
-async def news_search(query: str):
-    """Поиск новостей по запросу (mock)"""
-    result = news_plugin.search(query)
-    logger.bind(integration="news").info({"event": "news_search", "query": query, "result": result})
-    return result
+# @router.get("/news/search")
+# async def news_search(query: str):
+#     """Поиск новостей по запросу (mock)"""
+#     result = news_plugin.search(query)
+#     logger.bind(integration="news").info({"event": "news_search", "query": query, "result": result})
+#     return result
 
 @router.post("/telegram/send")
 async def telegram_send(request: Request):
@@ -246,15 +213,13 @@ async def send_telegram_test_message(
     except ValueError:
         raise HTTPException(status_code=400, detail="user_id_query должен быть числовым chat_id")
     try:
-        # Адаптируем вызов к handle_step_send_message или используем прямой метод, если есть
         if hasattr(telegram_plugin, 'app') and hasattr(telegram_plugin.app, 'bot'):
             await telegram_plugin.app.bot.send_message(chat_id=chat_id, text=message)
             return {"status": "success", "detail": "Сообщение отправлено через app.bot.send_message"}
         else:
-            # Попытка через handle_step_send_message (требует правильной структуры step_data)
             result = await telegram_plugin.handle_step_send_message(
                 step_data={"params": {"chat_id": chat_id, "text": message}},
-                context={"user_id": str(chat_id)} # Контекст может быть нужен для логики внутри плагина
+                context={"user_id": str(chat_id)}
             )
             if result.get("status") == "success" or result.get("telegram_send_status") == "success":
                 return result

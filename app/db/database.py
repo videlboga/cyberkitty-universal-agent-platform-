@@ -2,10 +2,11 @@ import os
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from loguru import logger
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+MONGO_URI = os.getenv("MONGODB_URI", "mongodb://mongo:27017/universal_agent_platform")
 MONGODB_DATABASE_NAME = os.getenv("MONGODB_DATABASE_NAME", "universal_agent_platform")
 
 logger.info(f"Connecting to MongoDB: {MONGO_URI}, Database: {MONGODB_DATABASE_NAME}")
+logger.critical(f"[DATABASE_INIT_CRITICAL] MONGO_URI used for AsyncIOMotorClient: '{MONGO_URI}'")
 
 client: AsyncIOMotorClient = AsyncIOMotorClient(MONGO_URI)
 db: AsyncIOMotorDatabase = client[MONGODB_DATABASE_NAME]

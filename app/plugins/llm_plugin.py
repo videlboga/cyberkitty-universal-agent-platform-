@@ -3,13 +3,9 @@ import json
 import httpx
 from typing import Dict, Any, List, Optional, Union
 from loguru import logger
-from app.plugins.plugin import PluginBase
+from app.plugins.plugin_base import PluginBase
 from app.integrations.openrouter import openrouter_chat
 from app.core.utils import _resolve_value_from_context
-
-# Настройка логирования
-os.makedirs("logs", exist_ok=True)
-logger.add("logs/llm_plugin.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True)
 
 # Вспомогательная функция для рекурсивного разрешения плейсхолдеров
 def _resolve_placeholders_in_structure_recursive(item: Any, context: Dict[str, Any]) -> Any:
@@ -42,7 +38,7 @@ class LLMPlugin(PluginBase):
         Args:
             config: Конфигурация плагина (API ключи, URL и др.)
         """
-        super().__init__(config or {})
+        super().__init__()
         self.api_key = (config.get('api_key') if config else None) or os.getenv("OPENROUTER_API_KEY", "")
         self.api_url = (config.get('api_url') if config else None) or os.getenv("OPENROUTER_URL", "https://openrouter.ai/api/v1/chat/completions")
         self.default_model = (config.get('default_model') if config else None) or "deepseek/deepseek-chat-v3-0324"

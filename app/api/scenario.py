@@ -11,7 +11,7 @@ from app.db.database import get_database
 
 router = APIRouter(prefix="/scenarios", tags=["scenarios"])
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+MONGO_URI = os.getenv("MONGODB_URI", "mongodb://mongo:27017/universal_agent_platform")
 MONGODB_DATABASE_NAME = os.getenv("MONGODB_DATABASE_NAME", "universal_agent_platform")
 
 client = AsyncIOMotorClient(MONGO_URI)

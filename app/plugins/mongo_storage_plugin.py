@@ -1,13 +1,8 @@
 from motor.motor_asyncio import AsyncIOMotorDatabase, AsyncIOMotorCollection
 from typing import Dict, Any, Callable, Optional, Union
-from loguru import logger
-import os
 from bson import ObjectId
 from pymongo import MongoClient
-
-# Настройка логирования (можно вынести в общую утилиту или настроить централизованно)
-os.makedirs("logs", exist_ok=True)
-logger.add("logs/mongo_storage_plugin.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True)
+from app.plugins.plugin_base import PluginBase
 
 def _resolve_value_from_context(value: Any, context: Dict[str, Any]) -> Any:
     """Рекурсивно подставляет значения из контекста.
@@ -24,12 +19,12 @@ def _resolve_value_from_context(value: Any, context: Dict[str, Any]) -> Any:
         return [_resolve_value_from_context(item, context) for item in value]
     return value
 
-class MongoStoragePlugin:
-    def __init__(self, mongo_uri: str, database_name: str):
-        self.client = MongoClient(mongo_uri)
-        effective_db_name = database_name if database_name else "default_db"
+class MongoStoragePlugin(PluginBase):
+    def __init__(self, mongo_client: MongoClient, db_name: str = "main_db"):
+        super().__init__()
+        self.client = mongo_client
+        effective_db_name = db_name if db_name else "default_db"
         self.db = self.client[effective_db_name]
-        logger.info(f"MongoStoragePlugin инициализирован с БД: {effective_db_name} (использует собственный логгер).")
 
     def register_step_handlers(self, step_handlers: Dict[str, Callable]):
         """Регистрирует обработчики шагов, предоставляемые этим плагином."""

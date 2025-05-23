@@ -42,7 +42,11 @@ def _resolve_value_from_context(value: Any, context: Dict[str, Any], depth=0, ma
         return value
 
     if isinstance(value, str):
-        if value.startswith("{") and value.endswith("}"):
+        # Сначала обрабатываем шаблоны Jinja-стиля с двойными скобками {{ }}
+        if "{{" in value and "}}" in value:
+            return resolve_string_template(value, context)
+        # Затем обрабатываем одинарные скобки {key} для обратной совместимости
+        elif value.startswith("{") and value.endswith("}"):
             key_path = value[1:-1]
             parts = key_path.split('.')
             current_value = context
@@ -72,7 +76,8 @@ def _resolve_value_from_context(value: Any, context: Dict[str, Any], depth=0, ma
             else:
                 return resolve_string_template(value, context)
         else:
-            return resolve_string_template(value, context)
+            # Обычная строка без шаблонов
+            return value
 
     elif isinstance(value, dict):
         return {k: _resolve_value_from_context(v, context, depth + 1, max_depth) for k, v in value.items()}
@@ -82,9 +87,45 @@ def _resolve_value_from_context(value: Any, context: Dict[str, Any], depth=0, ma
 
 def resolve_string_template(template_str: str, ctx: Dict[str, Any]) -> str:
     import re
-    placeholders = re.findall(r"\{([^{}]+)\}", template_str)
+    # Сначала ищем шаблоны с двойными скобками {{ variable_name }}
+    double_braces_pattern = r"\{\{\s*([^{}]+)\s*\}\}"
+    placeholders = re.findall(double_braces_pattern, template_str)
     resolved_str = template_str
+    
     for placeholder in placeholders:
+        key_path = placeholder.strip()
+        parts = key_path.split('.')
+        current_value = ctx
+        resolved_successfully = True
+        for part in parts:
+            if isinstance(current_value, dict) and part in current_value:
+                current_value = current_value[part]
+            elif isinstance(current_value, list):
+                try:
+                    idx = int(part)
+                    if 0 <= idx < len(current_value):
+                        current_value = current_value[idx]
+                    else:
+                        resolved_successfully = False
+                        break
+                except ValueError:
+                    resolved_successfully = False
+                    break
+            else:
+                resolved_successfully = False
+                break
+        
+        if resolved_successfully:
+            replacement_value = str(current_value)
+            # Заменяем с учетом возможных пробелов
+            pattern_to_replace = r"\{\{\s*" + re.escape(placeholder.strip()) + r"\s*\}\}"
+            resolved_str = re.sub(pattern_to_replace, replacement_value, resolved_str)
+    
+    # Также обрабатываем одинарные скобки для обратной совместимости
+    single_braces_pattern = r"\{([^{}]+)\}"
+    single_placeholders = re.findall(single_braces_pattern, resolved_str)
+    
+    for placeholder in single_placeholders:
         key_path = placeholder
         parts = key_path.split('.')
         current_value = ctx
@@ -110,6 +151,7 @@ def resolve_string_template(template_str: str, ctx: Dict[str, Any]) -> str:
         if resolved_successfully:
             replacement_value = str(current_value)
             resolved_str = resolved_str.replace(f"{{{placeholder}}}", replacement_value)
+    
     return resolved_str
 
 class TelegramPlugin(PluginBase):
@@ -243,8 +285,8 @@ class TelegramPlugin(PluginBase):
 
     async def handle_start_command(self, update: Update, context: CallbackContext):
         """Обрабатывает команду /start."""
-        self.logger.info(f"!!!!!!!!!!!!!! TELEGRAM_PLUGIN: handle_start_command ВЫЗВАН! update.message.text: {update.message.text}") # МОЙ НОВЫЙ ЛОГ - ОСТАВЛЕН ПО ПРОСЬБЕ
-        self.logger.info("HANDLE_START_COMMAND CALLED") # Изменено с critical и убраны "!!!"
+        logger.info(f"!!!!!!!!!!!!!! TELEGRAM_PLUGIN: handle_start_command ВЫЗВАН! update.message.text: {update.message.text}") # МОЙ НОВЫЙ ЛОГ - ОСТАВЛЕН ПО ПРОСЬБЕ
+        logger.info("HANDLE_START_COMMAND CALLED") # Изменено с critical и убраны "!!!"
         logger.info(f"Команда /start получена от user_id: {update.effective_user.id}, chat_id: {update.effective_chat.id}")
         
         if update.effective_chat:
@@ -260,17 +302,17 @@ class TelegramPlugin(PluginBase):
                 logger.info(f"Сообщение с тестовой кнопкой на /start успешно отправлено в chat_id: {update.effective_chat.id}")
             except Exception as e:
                 logger.error(f"Ошибка при отправке сообщения с кнопкой в handle_start_command для chat_id {update.effective_chat.id}: {e}", exc_info=True)
-            self.logger.info("Message with button should have been sent (or error logged)") # Изменено с critical и убраны "!!!"
+            logger.info("Message with button should have been sent (or error logged)") # Изменено с critical и убраны "!!!"
         else:
             logger.warning(f"Не удалось определить effective_chat для ответа на /start. Update: {{update.to_json()}}") # Исправлено экранирование
-            self.logger.warning("EFFECTIVE_CHAT WAS NONE") # Изменено с critical и убраны "!!!"
+            logger.warning("EFFECTIVE_CHAT WAS NONE") # Изменено с critical и убраны "!!!"
 
     async def on_callback_query(self, update: Update, context: CallbackContext) -> None:
         query = update.callback_query
         # Сразу отвечаем на callback, чтобы убрать "часики" на кнопке
         await query.answer("Получено") # Можно добавить текст, который всплывет у пользователя
 
-        self.logger.info("ON_CALLBACK_QUERY_CALLED_SUCCESSFULLY") # Изменено с critical и убраны "!!!"
+        logger.info("ON_CALLBACK_QUERY_CALLED_SUCCESSFULLY")
         
         user_id = query.from_user.id
         username = query.from_user.username or query.from_user.first_name
@@ -279,33 +321,26 @@ class TelegramPlugin(PluginBase):
         callback_data = query.data
         message_text = query.message.text if query.message else "N/A (inline)"
 
-        self.logger.info(
+        logger.info(
             f"[TELEGRAM_PLUGIN] Получен callback_query от user {user_id} (@{username}) "
             f"для message_id: {message_id} в chat_id: {chat_id}. Data: '{callback_data}'. "
             f"Текст сообщения: '{message_text}'"
         )
 
-        # Для обратной совместимости и для сценариев, которые ожидают input
-        # Проверяем, есть ли активное ожидание для этого сообщения
-        active_await = self.active_input_awaits.get(message_id)
-
         if query.data == "test_button_callback":
-            self.logger.info(f"[TELEGRAM_PLUGIN] Обработка тестового callback 'test_button_callback' от user {user_id}.")
+            logger.info(f"[TELEGRAM_PLUGIN] Обработка тестового callback 'test_button_callback' от user {user_id}.")
             if chat_id:
                 try:
                     await context.bot.send_message(
                         chat_id=chat_id,
                         text=f"Кнопка 'test_button_callback' была нажата пользователем @{username}!"
                     )
-                    self.logger.info(f"[TELEGRAM_PLUGIN] Ответное сообщение на test_button_callback отправлено в chat_id {chat_id}.")
+                    logger.info(f"[TELEGRAM_PLUGIN] Ответное сообщение на test_button_callback отправлено в chat_id {chat_id}.")
                 except Exception as e:
-                    self.logger.error(f"[TELEGRAM_PLUGIN] Ошибка при отправке ответного сообщения на test_button_callback: {e}", exc_info=True)
+                    logger.error(f"[TELEGRAM_PLUGIN] Ошибка при отправке ответного сообщения на test_button_callback: {e}", exc_info=True)
             else:
-                self.logger.warning("[TELEGRAM_PLUGIN] Не могу отправить ответ на test_button_callback, так как chat_id неизвестен (возможно, inline query).")
+                logger.warning("[TELEGRAM_PLUGIN] Не могу отправить ответ на test_button_callback, так как chat_id неизвестен (возможно, inline query).")
             return # Завершаем обработку, так как это специфический тестовый callback
-
-        if active_await:
-            self.logger.info(f"[TELEGRAM_PLUGIN] Найдено активное ожидание для message_id: {message_id}. Data: {active_await}")
 
         scenario_executor = context.bot_data.get("scenario_executor")
         if not scenario_executor:
@@ -526,14 +561,25 @@ class TelegramPlugin(PluginBase):
         # Добавьте другие обработчики, если они есть, например, для специфичных Telegram действий
         logger.info("TelegramPlugin: Зарегистрированы обработчики для 'telegram_send_message' и 'telegram_edit_message'.")
 
-    async def handle_step_send_message(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Обрабатывает шаг 'telegram_send_message' из сценария."""
+    async def handle_step_send_message(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> None:
+        """Обрабатывает шаг 'telegram_send_message' из сценария. Возвращает None (без паузы)."""
         params = step_data.get("params", {})
         
         # Используем _resolve_value_from_context для разрешения плейсхолдеров
         resolved_chat_id = _resolve_value_from_context(params.get("chat_id"), context)
         resolved_text = _resolve_value_from_context(params.get("text"), context)
-        resolved_buttons_data = _resolve_value_from_context(params.get("inline_keyboard"), context) # 'buttons_data' or 'inline_keyboard'
+        
+        # Правильно обрабатываем кнопки из params
+        buttons_data_template = params.get("buttons_data")
+        buttons_layout_template = params.get("buttons_layout")
+        
+        resolved_buttons_data = None
+        if buttons_data_template:
+            resolved_buttons_data = _resolve_value_from_context(buttons_data_template, context)
+        
+        resolved_buttons_layout = None
+        if buttons_layout_template:
+            resolved_buttons_layout = _resolve_value_from_context(buttons_layout_template, context)
         
         logger.info(f"[TELEGRAM_PLUGIN][HANDLE_STEP_SEND_MESSAGE] ChatID: {resolved_chat_id}, Text: '{resolved_text}', Buttons: {resolved_buttons_data}")
 
@@ -541,26 +587,54 @@ class TelegramPlugin(PluginBase):
             error_msg = "[TELEGRAM_PLUGIN][HANDLE_STEP_SEND_MESSAGE] Отсутствует chat_id или text."
             logger.error(error_msg)
             context["_step_error"] = error_msg
-            return context
+            return None
+
+        # Преобразуем кнопки в формат для send_message
+        formatted_buttons_data = None
+        if resolved_buttons_data and resolved_buttons_layout:
+            formatted_buttons_data = self._format_buttons_for_telegram(resolved_buttons_data, resolved_buttons_layout)
+        elif resolved_buttons_data:
+            # Если нет layout, используем каждую кнопку в отдельной строке
+            formatted_buttons_data = [[button] for button in resolved_buttons_data]
 
         message_sent = await self.send_message(
             chat_id=resolved_chat_id,
             text=resolved_text,
-            buttons_data=resolved_buttons_data
+            buttons_data=formatted_buttons_data
         )
 
         if message_sent:
             context["telegram_last_message_id"] = message_sent.message_id
-            context["telegram_last_message_text"] = resolved_text # или message_sent.text, но resolved_text уже разрешен
-            if resolved_buttons_data:
+            context["telegram_last_message_text"] = resolved_text
+            if formatted_buttons_data:
                  context["message_id_with_buttons"] = message_sent.message_id
                  logger.debug(f"[TELEGRAM_PLUGIN][HANDLE_STEP_SEND_MESSAGE] Сохранено message_id_with_buttons: {message_sent.message_id}")
         else:
             error_msg = f"[TELEGRAM_PLUGIN][HANDLE_STEP_SEND_MESSAGE] Сообщение не было отправлено в chat_id {resolved_chat_id}."
             logger.error(error_msg)
             context["_step_error"] = error_msg
+        return None
+    
+    def _format_buttons_for_telegram(self, buttons_data, buttons_layout):
+        """Преобразует кнопки и layout в формат для Telegram API"""
+        if not buttons_data or not buttons_layout:
+            return None
             
-        return context
+        formatted_rows = []
+        button_index = 0
+        
+        for row_count in buttons_layout:
+            if button_index >= len(buttons_data):
+                break
+            row = []
+            for _ in range(row_count):
+                if button_index < len(buttons_data):
+                    row.append(buttons_data[button_index])
+                    button_index += 1
+            if row:
+                formatted_rows.append(row)
+        
+        return formatted_rows
 
     async def handle_step_edit_message(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Обрабатывает шаг 'telegram_edit_message' из сценария."""

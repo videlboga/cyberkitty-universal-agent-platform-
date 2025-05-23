@@ -1,0 +1,26 @@
+{
+  "name": "Pizza Mongo Test",
+  "description": "Тестовый сценарий: запись в MongoDB и отправка сообщения в Telegram",
+  "steps": [
+    {
+      "id": "save_user",
+      "type": "mongo_insert_one",
+      "params": {
+        "collection_name": "test_users",
+        "document": {"user_id": "{user_id}", "first_name": "{first_name}", "created_at": "{now}"},
+        "output_var": "inserted_id"
+      },
+      "next_step": "send_message"
+    },
+    {
+      "id": "send_message",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{telegram_chat_id}",
+        "text": "Пользователь сохранён в MongoDB! ID: {inserted_id}"
+      },
+      "next_step": null
+    }
+  ],
+  "start_step": "save_user"
+} 

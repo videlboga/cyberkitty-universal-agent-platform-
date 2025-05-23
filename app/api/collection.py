@@ -1,17 +1,13 @@
 from fastapi import APIRouter, Request, Query, HTTPException, status, Body
 from motor.motor_asyncio import AsyncIOMotorClient
-from loguru import logger
-import os
 from bson import ObjectId
 import json
 from typing import Any, Dict, List
 from app.utils.id_helper import sanitize_id, sanitize_ids, ensure_mongo_id, build_id_query, find_one_by_id_flexible
+from app.models.collection import CollectionModel, CollectionItemModel, CollectionItemCreate, CollectionItemUpdate
+from app.db.collection_repository import CollectionRepository, get_collection_repository
 
 router = APIRouter(prefix="/db/collections", tags=["collections"])
-
-os.makedirs("logs", exist_ok=True)
-logger.add("logs/collections.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True)
-logger.add("logs/errors.log", format="{time} {level} {message}", level="ERROR", rotation="10 MB", compression="zip", serialize=True)
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/universal_agent")
 client = AsyncIOMotorClient(MONGO_URI)

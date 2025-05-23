@@ -1,14 +1,14 @@
 import os
 import requests
-from typing import Optional
+from typing import Optional, Dict, Any
 from loguru import logger
 import uuid
 
-os.makedirs("logs", exist_ok=True)
-logger.add("logs/rag_integration.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True)
+from app.plugins.plugin_base import PluginBase
 
-class RAGPlugin:
+class RAGPlugin(PluginBase):
     def __init__(self, base_url: str = None):
+        super().__init__()
         self.base_url = base_url or os.getenv("RAG_URL", "http://rag.cyberkitty.tech/api")
         logger.info(f"RAG плагин инициализирован с URL: {self.base_url}")
 

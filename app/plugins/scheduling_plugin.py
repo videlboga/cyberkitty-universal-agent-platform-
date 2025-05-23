@@ -5,11 +5,18 @@ from datetime import datetime, timedelta
 import uuid
 import json
 
-os.makedirs("logs", exist_ok=True) # <--- РАСКОММЕНТИРОВАНО
-logger.add("logs/scheduling_plugin.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True) # <--- РАСКОММЕНТИРОВАНО
+from app.plugins.plugin_base import PluginBase # <--- ОБНОВЛЕННЫЙ ИМПОРТ
 
-class SchedulingPlugin:
+# Настройка логирования - УДАЛЯЕМ ЭТИ СТРОКИ
+# os.makedirs("logs", exist_ok=True) # <--- РАСКОММЕНТИРОВАНО
+# logger.add("logs/scheduling_plugin.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True) # <--- РАСКОММЕНТИРОВАНО
+
+# from app.utils.scheduler import SchedulerService # Закомментировано из-за цикла
+from typing import TYPE_CHECKING
+
+class SchedulingPlugin(PluginBase): # <--- ДОБАВЛЕНО НАСЛЕДОВАНИЕ
     def __init__(self, scheduler_service: Any): # <--- УБРАН logger из параметров
+        super().__init__() # <--- ВЫЗОВ КОНСТРУКТОРА БАЗОВОГО КЛАССА
         if scheduler_service is None:
             raise ValueError("Экземпляр SchedulerService не может быть None")
         self.scheduler_service = scheduler_service

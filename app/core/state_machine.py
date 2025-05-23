@@ -1,11 +1,12 @@
 import json
-from loguru import logger
 import os
-from typing import Any, Dict, Optional, List, Callable
+from loguru import logger
+from typing import Any, Dict, Optional, List, Callable, Union
 
-os.makedirs("logs", exist_ok=True)
-logger.add("logs/events.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True)
-logger.add("logs/debug_state_machine.log", format="{time} {level} {message}", level="DEBUG", rotation="10 MB", compression="zip", serialize=True)
+# Настройка логирования - УДАЛЯЕМ ЭТИ СТРОКИ
+# os.makedirs("logs", exist_ok=True)
+# logger.add("logs/events.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True)
+# logger.add("logs/debug_state_machine.log", format="{time} {level} {message}", level="DEBUG", rotation="10 MB", compression="zip", serialize=True)
 
 class ScenarioStateMachine:
     """
@@ -271,6 +272,7 @@ class ScenarioStateMachine:
         
         logger.info({"event": "end_of_scenario", "context": self.context})
         logger.debug("Достигнут конец сценария")
+        self.is_finished = True  # Устанавливаем флаг завершения
         return None
 
     def serialize(self) -> Dict[str, Any]:

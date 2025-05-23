@@ -13,102 +13,129 @@ from app.plugins.telegram_plugin import TelegramPlugin
 # from app.plugins.llm_plugin import LLMPlugin 
 # Вместо этого, тип LLMPlugin будет использоваться только в аннотациях и через TYPE_CHECKING, если понадобится
 from app.plugins.mongo_storage_plugin import MongoStoragePlugin
-from app.plugins.scheduling_plugin import SchedulingPlugin
+# from app.plugins.scheduling_plugin import SchedulingPlugin
 from telegram.ext import Application
 import requests
 from app.db.scenario_repository import ScenarioRepository
 from app.db.agent_repository import AgentRepository
-from app.models.scenario import Scenario
+from app.models.scenario import Scenario, ScenarioStep, PluginActionStep, BranchStep, LogStep, StartStep, EndStep, SwitchScenarioStep
 from app.core.utils import _resolve_value_from_context, resolve_string_template # <-- ДОБАВЛЕН ИМПОРТ
 
 # Для разрешения циклических зависимостей при аннотации типов
 if TYPE_CHECKING:
     from app.plugins.llm_plugin import LLMPlugin # <--- Импорт LLMPlugin для аннотаций
 
-# Настройка логирования
-os.makedirs("logs", exist_ok=True)
-logger.add("logs/scenario_executor.log", format="{time} {level} {message}", level="DEBUG", rotation="10 MB", compression="zip", serialize=True) # Уровень INFO изменен на DEBUG
-
 # Получаем токен из переменных окружения
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
 class ScenarioExecutor:
-    def __init__(self,
-                 scenario_repo: ScenarioRepository,
-                 agent_repo: AgentRepository,
-                 api_base_url: str = "http://localhost:8000",
-                 telegram_plugin: Optional[TelegramPlugin] = None,
-                 mongo_storage_plugin: Optional[MongoStoragePlugin] = None,
-                 scheduling_plugin: Optional[SchedulingPlugin] = None,
-                 rag_plugin: Optional[RAGPlugin] = None,
-                 llm_plugin: Optional['LLMPlugin'] = None): # <--- LLMPlugin теперь в кавычках как Forward Reference
-        self.scenario_repo = scenario_repo
-        self.agent_repo = agent_repo
-        self.api_base_url = api_base_url
-        self.step_handlers = {}
-        self._plugins: tuple = tuple() 
-        self._plugins_initialized_flag = False
-        self.waiting_for_input_events = {} 
-        self.paused_scenarios = {} 
-        
-        temp_plugins_list = []
-        if telegram_plugin: temp_plugins_list.append(telegram_plugin)
-        if mongo_storage_plugin: temp_plugins_list.append(mongo_storage_plugin)
-        if scheduling_plugin: temp_plugins_list.append(scheduling_plugin)
-        if rag_plugin: temp_plugins_list.append(rag_plugin)
-        if llm_plugin: temp_plugins_list.append(llm_plugin)
-        
-        self._plugins = tuple(temp_plugins_list) 
-        self._plugins_initialized_flag = True
-
-        logger.info(f"[SCENARIO_EXECUTOR __init__] Initial self._plugins (tuple): {self._plugins}")
-        self._register_default_handlers()
-        self._init_plugins()
-        self.step_handlers["execute_sub_scenario"] = self._handle_execute_sub_scenario
-        logger.info("ScenarioExecutor инициализирован")
-        logger.info(f"[SCENARIO_EXECUTOR __init__ END] id(self): {id(self)}, id(self._plugins): {id(self._plugins)}, self._plugins: {self._plugins}")
-
-    @property
-    def plugins(self) -> tuple:
-        logger.debug(f"[SCENARIO_EXECUTOR .plugins GETTER] id(self): {id(self)}, Reading self._plugins: {self._plugins}")
-        return self._plugins
-
-    @plugins.setter
-    def plugins(self, value: tuple):
-        logger.warning(f"[SCENARIO_EXECUTOR .plugins SETTER ATTEMPT] id(self): {id(self)}, Attempting to set self.plugins to: {value}.")
-        if not self._plugins_initialized_flag:
-            self._plugins = value
-            logger.info(f"[SCENARIO_EXECUTOR .plugins SETTER] self._plugins set to: {self._plugins} during initial setup.")
-        else:
-            logger.error(f"[SCENARIO_EXECUTOR .plugins SETTER] CRITICAL: Attempt to modify self.plugins after initialization!")
-
-    def _register_default_handlers(self):
-        self.step_handlers["message"] = self.handle_message
-        self.step_handlers["input"] = self.handle_input
-        self.step_handlers["branch"] = self.handle_branch
-        self.step_handlers["rag_search"] = self.handle_rag_search # Предполагая, что RAGPlugin будет передан и инициализирован
-        self.step_handlers["action"] = self.handle_action
-        self.step_handlers["start"] = self.handle_start
-        self.step_handlers["end"] = self.handle_end
-        self.step_handlers["execute_code"] = self.handle_execute_code
-        self.step_handlers["log_message"] = self.handle_log_message
-        self.step_handlers["telegram_send_message"] = self.telegram_send_message
-        self.step_handlers["telegram_edit_message"] = self.telegram_edit_message
-        logger.info("Зарегистрированы обработчики для стандартных типов шагов.")
+    # Константы для типов шагов
+    AUTO_EXECUTABLE_STEP_TYPES = ["action", "branch", "log_message", "start", "end"]
     
-    def _init_plugins(self):
-        logger.info(f"[SCENARIO_EXECUTOR _init_plugins START] self.plugins: {[p.__class__.__name__ for p in self.plugins]}")
-        for plugin in self.plugins:
-            plugin_name = plugin.__class__.__name__
-            if hasattr(plugin, 'register_step_handlers') and callable(plugin.register_step_handlers):
-                try:
+    def __init__(self, plugins: List[Any]):
+        self.plugins = {p.__class__.__name__: p for p in plugins}
+        logger.info(f"[ScenarioExecutor] Инициализирован с плагинами: {list(self.plugins.keys())}")
+        
+        # Инициализируем словарь обработчиков шагов
+        self.step_handlers: Dict[str, Callable] = {}
+        self.waiting_for_input_events: Dict[str, Any] = {}
+        self.paused_scenarios: Dict[str, Any] = {}
+        
+        # Регистрируем базовые обработчики из самого executor
+        self._register_core_handlers()
+        
+        # Регистрируем обработчики из плагинов
+        self._register_plugin_handlers()
+        
+        logger.info(f"[ScenarioExecutor] Инициализация завершена. Зарегистрировано обработчиков: {len(self.step_handlers)}")
+        logger.debug(f"[ScenarioExecutor] Список обработчиков: {list(self.step_handlers.keys())}")
+    
+    def _register_core_handlers(self):
+        """Регистрирует базовые обработчики шагов"""
+        self.step_handlers.update({
+            "action": self.handle_action,
+            "branch": self.handle_branch,
+            "log_message": self.handle_log_message,
+            "log": self.handle_log_message,  # Алиас для log_message
+            "start": self.handle_start,
+            "end": self.handle_end,
+            "message": self.handle_message,
+            "input": self.handle_input,
+            "rag_search": self.handle_rag_search,
+            "execute_code": self.handle_execute_code,
+        })
+        logger.info(f"[ScenarioExecutor] Зарегистрированы базовые обработчики: {list(self.step_handlers.keys())}")
+    
+    def _register_plugin_handlers(self):
+        """Регистрирует обработчики шагов из плагинов"""
+        for plugin_name, plugin in self.plugins.items():
+            try:
+                if hasattr(plugin, 'register_step_handlers'):
                     plugin.register_step_handlers(self.step_handlers)
-                    logger.info(f"Обработчики {plugin_name} зарегистрированы. Keys: {list(self.step_handlers.keys())}")
-                except Exception as e:
-                    logger.error(f"Ошибка при регистрации обработчиков для {plugin_name}: {e}")
-            else:
-                logger.warning(f"Плагин {plugin_name} не имеет метода register_step_handlers.")
-        logger.info(f"[SCENARIO_EXECUTOR _init_plugins END] Final step_handlers keys: {list(self.step_handlers.keys())}")
+                    logger.info(f"[ScenarioExecutor] Обработчики от плагина '{plugin_name}' зарегистрированы")
+                else:
+                    logger.warning(f"[ScenarioExecutor] Плагин '{plugin_name}' не имеет метода register_step_handlers")
+            except Exception as e:
+                logger.error(f"[ScenarioExecutor] Ошибка регистрации обработчиков от плагина '{plugin_name}': {e}")
+
+    def get_plugin(self, name: str):
+        plugin = self.plugins.get(name)
+        if not plugin:
+            logger.error(f"[ScenarioExecutor] Плагин '{name}' не найден!")
+        return plugin
+
+    async def execute_scenario(self, scenario: Scenario, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        context = context.copy() if context else {}
+        steps = scenario.steps
+        step_idx = 0
+        step_id_map = {step.id: idx for idx, step in enumerate(steps)}
+        logger.info(f"[ScenarioExecutor] Запуск сценария '{scenario.name}' ({scenario.scenario_id})")
+        while step_idx < len(steps):
+            step = steps[step_idx]
+            logger.info(f"[ScenarioExecutor] Шаг {step.id} ({step.type})")
+            try:
+                if isinstance(step, PluginActionStep):
+                    plugin = self.get_plugin(step.plugin)
+                    if not plugin:
+                        raise Exception(f"Плагин '{step.plugin}' не найден")
+                    params = {k: _resolve_value_from_context(v, context) for k, v in step.params.items()}
+                    result = await plugin.execute_action(step.action, params, context)
+                    context[step.result_var] = result
+                    logger.info(f"[ScenarioExecutor] Результат шага '{step.id}' сохранён в '{step.result_var}': {result}")
+                    next_step = step.next_step
+                elif isinstance(step, BranchStep):
+                    cond = _resolve_value_from_context(step.condition, context)
+                    logger.info(f"[ScenarioExecutor] Ветвление: условие '{step.condition}' => {cond}")
+                    next_step = step.true_next if cond else step.false_next
+                elif isinstance(step, LogStep):
+                    msg = _resolve_value_from_context(step.params.get("message", ""), context)
+                    level = step.params.get("level", "INFO").upper()
+                    getattr(logger, level.lower(), logger.info)(f"[ScenarioExecutor][LOG] {msg}")
+                    next_step = step.next_step
+                elif isinstance(step, SwitchScenarioStep):
+                    new_scenario_id = _resolve_value_from_context(step.params.get("new_scenario_id"), context)
+                    logger.info(f"[ScenarioExecutor] Переключение на сценарий '{new_scenario_id}'")
+                    return {"switch_scenario": new_scenario_id, "context": context}
+                elif isinstance(step, EndStep):
+                    logger.info(f"[ScenarioExecutor] Сценарий завершён на шаге '{step.id}'")
+                    break
+                else:
+                    raise Exception(f"Неизвестный тип шага: {step.type}")
+
+                # Переход к следующему шагу
+                if next_step:
+                    if next_step in step_id_map:
+                        step_idx = step_id_map[next_step]
+                    else:
+                        logger.error(f"[ScenarioExecutor] Не найден шаг с id '{next_step}'")
+                        break
+                else:
+                    step_idx += 1
+            except Exception as e:
+                logger.error(f"[ScenarioExecutor] Ошибка на шаге '{step.id}': {e}")
+                context["__step_error__"] = str(e)
+                break
+        return context
 
     async def handle_message(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         message_text = step_data.get("params", {}).get("text", "(пустое сообщение)")
@@ -125,7 +152,7 @@ class ScenarioExecutor:
             output_var = step_params.get("output_var")
             if output_var and output_var in context and context[output_var] is not None:
                 logger.info(f"Шаг input ({step_id}) типа 'callback_query': Ввод уже предоставлен. Продолжаем.")
-                return context 
+                return None  # Возвращаем None вместо context для продолжения
 
             logger.info(f"Шаг input ({step_id}) типа 'callback_query'. Ввод еще не предоставлен. Регистрация ожидания.")
             chat_id = context.get("telegram_chat_id") or context.get("chat_id")
@@ -136,7 +163,7 @@ class ScenarioExecutor:
                 err_msg = f"Input step ({step_id}): Missing data for scenario_instance_id (chat_id, user_id, scenario_id)"
                 logger.error(err_msg)
                 context["__step_error__"] = err_msg
-                return context
+                return None  # Возвращаем None для завершенных шагов
 
             scenario_instance_id = context.get("__scenario_instance_id__")
             if not scenario_instance_id: # Должен быть создан в execute_scenario
@@ -158,13 +185,13 @@ class ScenarioExecutor:
             return "PAUSED_WAITING_FOR_CALLBACK"
             
         logger.warning(f"Шаг input ({step_id}) с неизвестным input_type='{input_type}' или не указан. Возвращаем контекст.")
-        return context
+        return None  # Возвращаем None для завершенных шагов
     
-    async def handle_branch(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        return context # Логика в ScenarioStateMachine
+    async def handle_branch(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> None:
+        return None # Логика в ScenarioStateMachine
     
     async def handle_rag_search(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        rag_plugin = self.get_plugin_by_type("RAGPlugin")
+        rag_plugin = self.get_plugin("RAGPlugin")
         if not rag_plugin:
             logger.error("RAGPlugin не найден в ScenarioExecutor для шага rag_search.")
             context["__step_error__"] = "RAGPlugin not found"
@@ -263,13 +290,13 @@ class ScenarioExecutor:
         
         return context # Возвращаем измененный context (который state_machine_obj.context)
 
-    async def handle_start(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_start(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> None:
         logger.info(f"Обработчик handle_start: Начало сценария '{context.get('__current_scenario_id__', 'N/A')}'")
-        return context
+        return None
     
-    async def handle_end(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_end(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> None:
         logger.info(f"Обработчик handle_end: Завершение сценария '{context.get('__current_scenario_id__', 'N/A')}'")
-        return context
+        return None
     
     async def handle_execute_code(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         # Этот обработчик вызывается, если тип шага "execute_code", а не "action" с "action_type: execute_code"
@@ -292,7 +319,7 @@ class ScenarioExecutor:
             context["__step_error__"] = error_msg
         return context
     
-    async def handle_log_message(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_log_message(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> None:
         params = step_data.get("params", {}) # Изменено с config на params для единообразия
         message_template = params.get("message", "")
         level = params.get("level", "INFO").upper()
@@ -304,86 +331,52 @@ class ScenarioExecutor:
         elif level == "ERROR": logger.error(resolved_message)
         elif level == "CRITICAL": logger.critical(resolved_message)
         else: logger.info(f"({level}) {resolved_message}")
-        return context
+        return None  # Возвращаем None для завершенных шагов
 
     async def execute_step(self, step_data: Dict[str, Any], state_machine: ScenarioStateMachine, scenario_id_for_log: str) -> Optional[str]:
         step_type = step_data.get("type")
-        step_id = step_data.get('id', 'UNKNOWN_STEP')
-        step_data["step_id_for_log"] = step_id # Добавляем для использования в обработчиках, если нужно
-
-        logger.debug(f"[execute_step SCENARIO_ID:{scenario_id_for_log} STEP_ID:{step_id}] Type:'{step_type}'. Initial SM context ID: {id(state_machine.context)}")
+        handler = self.step_handlers.get(step_type)
+        logger.info(f"[DEBUG] execute_step: step_type={step_type}, handler type={type(handler)}, handler value={handler}")
+        if not handler:
+            logger.error(f"Нет обработчика для типа шага: {step_type}. Проверьте, что нужный плагин зарегистрирован.")
+            raise Exception(f"No handler for step type: {step_type}")
         
-        # Разрешаем плейсхолдеры во всем step_data перед передачей в обработчик
-        # Это гарантирует, что обработчик получает уже разрезолвенные параметры
-        current_step_data_for_handler = _resolve_value_from_context(step_data.copy(), state_machine.context)
-        logger.debug(f"[execute_step SCENARIO_ID:{scenario_id_for_log} STEP_ID:{step_id}] Resolved step_data_for_handler: {json.dumps(current_step_data_for_handler, indent=2, default=str, ensure_ascii=False)}")
-
-        handler_result = None
-        try:
-            if step_type not in self.step_handlers:
-                raise ValueError(f"Обработчик для типа шага '{step_type}' не зарегистрирован.")
-
-            handler_fn = self.step_handlers[step_type]
-            sig = inspect.signature(handler_fn)
-            
-            # Изменение: все обработчики теперь принимают (step_data, state_machine_object) или (step_data, context_dict)
-            # Для handle_action передаем state_machine_object, для остальных - context dict
-            if step_type == "action": # Особый случай для handle_action
-                 if asyncio.iscoroutinefunction(handler_fn):
-                    handler_result = await handler_fn(current_step_data_for_handler, state_machine)
-                 else:
-                    handler_result = handler_fn(current_step_data_for_handler, state_machine)
-            else: # Для остальных обработчиков
-                if asyncio.iscoroutinefunction(handler_fn):
-                    handler_result = await handler_fn(current_step_data_for_handler, state_machine.context)
-                else:
-                    handler_result = handler_fn(current_step_data_for_handler, state_machine.context)
-
-            # После вызова обработчика, state_machine.context мог быть изменен НАПРЯМУЮ обработчиком (особенно handle_action)
-            # Если обработчик вернул словарь, это И ЕСТЬ обновленный контекст, который нужно присвоить state_machine.context.
-            # Если обработчик (кроме handle_action) изменяет контекст по ссылке и возвращает его же, это тоже ок.
-
-            if isinstance(handler_result, str) and handler_result.startswith("PAUSED_WAITING_FOR_"):
-                logger.info(f"[execute_step SCENARIO_ID:{scenario_id_for_log} STEP_ID:{step_id}] Шаг вернул маркер паузы: {handler_result}")
-                return handler_result 
-            
-            # ИСПРАВЛЕНИЕ: Как обрабатывать результат от плагина
-            if handler_result is not None: # Если плагин что-то вернул (не None)
-                output_var_name = current_step_data_for_handler.get("params", {}).get("output_var")
-                if output_var_name:
-                    # Кладём результат плагина в контекст под именем из output_var
-                    state_machine.context[output_var_name] = handler_result 
-                    logger.debug(f"[execute_step SCENARIO_ID:{scenario_id_for_log} STEP_ID:{step_id}] Plugin returned a result. Stored in context['{output_var_name}']. Context updated.")
-                else:
-                    # Если output_var не указан, но плагин вернул что-то (кроме None),
-                    # это может быть неожиданным. Просто логируем.
-                    # Если это был dict, и мы хотели бы его смержить, нужна доп. логика.
-                    logger.warning(f"[execute_step SCENARIO_ID:{scenario_id_for_log} STEP_ID:{step_id}] Plugin returned a result, but no 'output_var' specified in step params. Result: {handler_result}. Context NOT automatically updated with this result unless done by plugin itself.")
-            
-            # Если __step_error__ уже в контексте (установлен обработчиком), то он там и останется.
-            if state_machine.context.get("__step_error__"):
-                 logger.warning(f"[execute_step SCENARIO_ID:{scenario_id_for_log} STEP_ID:{step_id}] Ошибка в контексте после выполнения обработчика: {state_machine.context['__step_error__']}")
-            else:
-                logger.info(f"[execute_step SCENARIO_ID:{scenario_id_for_log} STEP_ID:{step_id}] Шаг '{step_type}' успешно выполнен (или обработчик не вернул ошибку явно).")
-            
-            return None # Успешное выполнение (или ошибка записана в контекст)
-
-        except Exception as e:
-            logger.error(f"[execute_step SCENARIO_ID:{scenario_id_for_log} STEP_ID:{step_id}] Ошибка при вызове/выполнении обработчика: {e}", exc_info=True)
-            state_machine.context["__step_error__"] = f"Критическая ошибка на шаге {step_id}: {str(e)}"
-            return None 
+        # Проверяем сигнатуру handler чтобы понять какие параметры передавать
+        import inspect
+        sig = inspect.signature(handler)
+        param_names = list(sig.parameters.keys())
         
+        # Если handler принимает state_machine (как handle_action), передаем его
+        if len(param_names) >= 2 and 'state_machine' in param_names[1] or 'state_machine_obj' in param_names[1]:
+            return await handler(step_data, state_machine)
+        else:
+            # Обычные обработчики получают только context
+            return await handler(step_data, state_machine.context)
+
     async def execute_scenario(self, scenario_doc: Union[Dict[str, Any], Scenario], initial_context_from_runner: Optional[Dict[str, Any]] = None, agent_id_from_runner: Optional[str] = None) -> Dict[str, Any]:
+        logger.critical(f"[EXECUTE_SCENARIO_ENTRY] scenario_doc type: {type(scenario_doc)}, initial_context_from_runner type: {type(initial_context_from_runner)}, agent_id_from_runner: {agent_id_from_runner}")
+
         if isinstance(scenario_doc, Scenario): # Если это Pydantic модель
-            scenario_data = scenario_doc.model_dump(exclude_none=True)
+            try:
+                scenario_data = scenario_doc.model_dump(exclude_none=True)
+            except Exception as e_dump:
+                logger.critical(f"[EXECUTE_SCENARIO_CRITICAL_ERROR] Error during scenario_doc.model_dump(): {e_dump}", exc_info=True)
+                return {"status": "error", "message": f"Error dumping scenario model: {e_dump}"}
         elif isinstance(scenario_doc, dict):
             scenario_data = scenario_doc
         else:
             logger.error(f"execute_scenario: scenario_doc должен быть dict или Scenario, получено {type(scenario_doc)}")
+            logger.critical(f"[EXECUTE_SCENARIO_CRITICAL_ERROR] Invalid scenario_doc type: {type(scenario_doc)}")
             return {"status": "error", "message": "Invalid scenario_doc type."}
+
+        if not isinstance(scenario_data, dict):
+            err_msg = f"Internal error: scenario_data is not a dict after processing scenario_doc. Type: {type(scenario_data)}"
+            logger.critical(f"[EXECUTE_SCENARIO_CRITICAL_ERROR] {err_msg}")
+            return {"status": "error", "message": err_msg}
 
         scenario_id = scenario_data.get("scenario_id", "unknown_scenario")
         scenario_name = scenario_data.get("name", scenario_id)
+        
         logger.info(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] Starting execution. Agent ID from runner: {agent_id_from_runner}")
         logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] Initial context from runner: {json.dumps(initial_context_from_runner, indent=2, default=str, ensure_ascii=False)}")
 
@@ -397,30 +390,10 @@ class ScenarioExecutor:
         logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] 1.1 effective_sm_context after scenario_data['initial_context']: {json.dumps(effective_sm_context, indent=2, default=str, ensure_ascii=False)}")
         
         # 1.2 Контекст из настроек агента (если agent_id известен)
-        current_agent_id = agent_id_from_runner or (initial_context_from_runner.get("agent_id") if initial_context_from_runner else None)
-        if current_agent_id:
-            agent_doc = await self.agent_repo.get_by_id(current_agent_id)
-            if agent_doc: # Агент найден
-                if agent_doc.initial_context:
-                    effective_sm_context.update(agent_doc.initial_context)
-                    logger.info(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] Loaded initial_context from agent '{current_agent_id}'.")
-                logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] 1.2a effective_sm_context after agent_doc.initial_context: {json.dumps(effective_sm_context, indent=2, default=str, ensure_ascii=False)}")
-                
-                logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] Agent settings dump: {agent_doc.settings}")
-                agent_default_chat_id = agent_doc.settings.get("default_telegram_chat_id") if agent_doc.settings else None
-                logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] Extracted agent_default_chat_id: {agent_default_chat_id}")
-                logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] current effective_sm_context.get('telegram_chat_id'): {effective_sm_context.get('telegram_chat_id')}")
-
-                if agent_default_chat_id and not effective_sm_context.get("telegram_chat_id"):
-                    effective_sm_context["telegram_chat_id"] = agent_default_chat_id
-                    logger.info(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] Set 'telegram_chat_id' from agent settings: {agent_default_chat_id}")
-                    if not effective_sm_context.get("user_id"):
-                        effective_sm_context["user_id"] = str(agent_default_chat_id) 
-                        logger.info(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] Set 'user_id' from agent's default_telegram_chat_id: {agent_default_chat_id}")
-                else:
-                    logger.info(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] 'telegram_chat_id' NOT set from agent settings. Reason: agent_default_chat_id is '{agent_default_chat_id}' OR effective_sm_context already has telegram_chat_id '{effective_sm_context.get('telegram_chat_id')}'")
-                logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] 1.2b effective_sm_context after agent_settings (chat_id/user_id): {json.dumps(effective_sm_context, indent=2, default=str, ensure_ascii=False)}")
-
+        # УДАЛЕНО: if current_agent_id: ... agent_doc = await self.agent_repo.get_by_id(current_agent_id) ...
+        # Теперь executor не обращается к репозиторию агентов, а работает только с тем, что пришло в initial_context_from_runner
+        logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] 1.2a effective_sm_context after initial_context_from_runner: {json.dumps(effective_sm_context, indent=2, default=str, ensure_ascii=False)}")
+        
         # 1.3 Контекст, переданный при вызове /run или /execute (самый высокий приоритет)
         if initial_context_from_runner:
             effective_sm_context.update(initial_context_from_runner)
@@ -428,9 +401,9 @@ class ScenarioExecutor:
         
         # 1.4 Системные переменные (перезаписывают все предыдущие, если есть коллизии)
         effective_sm_context["__current_scenario_id__"] = scenario_id
-        if current_agent_id: # Убедимся, что agent_id есть
-            effective_sm_context["agent_id"] = current_agent_id # Это основной ключ для использования в сценариях
-            effective_sm_context["__current_agent_id__"] = current_agent_id # Системный, для внутренних нужд
+        if agent_id_from_runner: # Убедимся, что agent_id есть
+            effective_sm_context["agent_id"] = agent_id_from_runner # Это основной ключ для использования в сценариях
+            effective_sm_context["__current_agent_id__"] = agent_id_from_runner # Системный, для внутренних нужд
         logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] 1.4 effective_sm_context after system vars: {json.dumps(effective_sm_context, indent=2, default=str, ensure_ascii=False)}")
 
         if "__scenario_instance_id__" not in effective_sm_context: # Генерируем, если не пришел (не возобновление)
@@ -441,6 +414,9 @@ class ScenarioExecutor:
             logger.info(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] Generated new __scenario_instance_id__: {effective_sm_context['__scenario_instance_id__']}")
         
         logger.debug(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id}] Effective initial context for SM: {json.dumps(effective_sm_context, indent=2, default=str, ensure_ascii=False)}")
+
+        logger.critical(f"[EXECUTE_SCENARIO PRE-SM-INIT DUMP SCENARIO_ID:{scenario_id}] scenario_data: {json.dumps(scenario_data, indent=2, default=str, ensure_ascii=False)}")
+        logger.critical(f"[EXECUTE_SCENARIO PRE-SM-INIT DUMP SCENARIO_ID:{scenario_id}] effective_sm_context: {json.dumps(effective_sm_context, indent=2, default=str, ensure_ascii=False)}")
 
         sm = ScenarioStateMachine(
             scenario=scenario_data, 
@@ -458,8 +434,12 @@ class ScenarioExecutor:
             step_type_for_log = current_step_details.get('type', "N/A")
             logger.info(f"[EXECUTE_SCENARIO SCENARIO_ID:{scenario_id} STEP_ID:{step_id_for_log}] Executing Type:'{step_type_for_log}'. SM context ID: {id(sm.context)}")
             
+            logger.critical(f"[EXECUTE_SCENARIO LOOP SCENARIO_ID:{scenario_id} STEP_ID:{step_id_for_log}] current_step_details: {json.dumps(current_step_details, indent=2, default=str, ensure_ascii=False)}")
+            logger.critical(f"[EXECUTE_SCENARIO LOOP SCENARIO_ID:{scenario_id} STEP_ID:{step_id_for_log}] sm.context BEFORE execute_step: {json.dumps(sm.context, indent=2, default=str, ensure_ascii=False)}")
+            
             try:
                 result_after_step_execution = await self.execute_step(current_step_details, sm, scenario_id)
+                logger.info(f"[DEBUG] result_after_step_execution: type={type(result_after_step_execution)}, value={result_after_step_execution}")
 
                 if sm.context.get("__step_error__"):
                     error_message = sm.context["__step_error__"]
@@ -490,7 +470,7 @@ class ScenarioExecutor:
                         execution_successful = False
                         break
                 
-                elif result_after_step_execution is not None: # execute_step должен вернуть None или маркер паузы
+                elif result_after_step_execution is not None:
                     error_message = f"Internal logic error: execute_step returned unexpected value: '{result_after_step_execution}'."
                     logger.error(error_message)
                     sm.context["__step_error__"] = error_message
@@ -507,7 +487,7 @@ class ScenarioExecutor:
             # Переход к следующему шагу. Контекст SM мог быть изменен в execute_step.
             current_step_details = sm.next_step() # sm.next_step() использует sm.context
             
-            if not current_step_details and not sm.is_finished():
+            if not current_step_details and not sm.is_finished:
                 if not sm.context.get("__step_error__"): 
                     error_message = f"Failed to determine next step after '{step_id_for_log}' during resume. Scenario '{scenario_name}' ended unexpectedly."
                     logger.error(error_message)
@@ -518,10 +498,10 @@ class ScenarioExecutor:
         # Формирование финального ответа
         final_context_to_return = sm.context.copy() # Берем актуальный контекст из SM
         final_context_to_return["scenario_id"] = scenario_id # Убедимся, что ID сценария есть
-        if current_agent_id:
-            final_context_to_return["agent_id"] = current_agent_id
+        if agent_id_from_runner:
+            final_context_to_return["agent_id"] = agent_id_from_runner
 
-        if execution_successful and sm.is_finished():
+        if execution_successful and sm.is_finished:
             final_context_to_return["success"] = True
             final_context_to_return["message"] = f"Scenario '{scenario_name}' executed successfully."
             logger.info(final_context_to_return["message"])
@@ -557,6 +537,11 @@ class ScenarioExecutor:
             del final_context_to_return["_step_error"]
         if "__step_error__" in final_context_to_return:
             del final_context_to_return["__step_error__"]
+        
+        # Добавляем детальное логирование перед возвратом
+        logger.critical(f"[EXECUTE_SCENARIO_RETURN] final_context_to_return keys: {list(final_context_to_return.keys())}")
+        for key, value in final_context_to_return.items():
+            logger.critical(f"[EXECUTE_SCENARIO_RETURN] {key}: type={type(value)}, value={str(value)[:100]}...")
             
         return final_context_to_return
 
@@ -695,6 +680,7 @@ class ScenarioExecutor:
             
             try:
                 result_after_step_execution = await self.execute_step(current_step_details, sm, scenario_id)
+                logger.info(f"[DEBUG] result_after_step_execution: type={type(result_after_step_execution)}, value={result_after_step_execution}")
 
                 if sm.context.get("__step_error__"):
                     error_message = sm.context["__step_error__"]
@@ -728,7 +714,7 @@ class ScenarioExecutor:
             
             current_step_details = sm.next_step()
             
-            if not current_step_details and not sm.is_finished():
+            if not current_step_details and not sm.is_finished:
                 if not sm.context.get("__step_error__"): 
                     error_message = f"Failed to determine next step after '{step_id_for_log}' during resume. Scenario '{scenario_name}' ended unexpectedly."
                     logger.error(error_message)
@@ -742,7 +728,7 @@ class ScenarioExecutor:
         final_context_to_return["scenario_instance_id"] = scenario_instance_id
 
 
-        if execution_successful and sm.is_finished():
+        if execution_successful and sm.is_finished:
             final_context_to_return["success"] = True
             final_context_to_return["message"] = f"Scenario '{scenario_name}' (instance: {scenario_instance_id}) resumed and completed successfully."
             logger.info(final_context_to_return["message"])
@@ -762,6 +748,7 @@ class ScenarioExecutor:
         text_template = params.get("text")
         # inline_keyboard из параметров шага (должен быть уже в правильном формате списка списков)
         inline_keyboard_template = params.get("inline_keyboard") 
+        buttons_layout_template = params.get("buttons_layout")
 
         if not chat_id_template or not text_template:
             err_msg = f"Шаг {step_id} (telegram_send_message): Не указан chat_id или text."
@@ -769,36 +756,58 @@ class ScenarioExecutor:
             context["__step_error__"] = err_msg
             return context
 
-        chat_id = str(_resolve_value_from_context(chat_id_template, context))
-        resolved_text = str(_resolve_value_from_context(text_template, context))
-        resolved_inline_keyboard = _resolve_value_from_context(inline_keyboard_template, context) if inline_keyboard_template else None
+        chat_id = _resolve_value_from_context(chat_id_template, context)
+        text = str(_resolve_value_from_context(text_template, context))
         
-        telegram_plugin = self.get_plugin_by_type("TelegramPlugin")
+        # Параметры для кнопок
+        buttons_data_template = params.get("buttons_data") # Используем buttons_data из сценария
+        buttons_layout_template = params.get("buttons_layout")
+
+        buttons_data_resolved = None
+        if buttons_data_template:
+            if isinstance(buttons_data_template, list):
+                buttons_data_resolved = []
+                for button_template_item in buttons_data_template:
+                    if isinstance(button_template_item, dict):
+                        resolved_button_item = {}
+                        for k, v_template in button_template_item.items():
+                            resolved_button_item[k] = _resolve_value_from_context(v_template, context)
+                        buttons_data_resolved.append(resolved_button_item)
+                    else:
+                        buttons_data_resolved.append(button_template_item) 
+            else:
+                buttons_data_resolved = _resolve_value_from_context(buttons_data_template, context)
+        
+        buttons_layout_resolved = _resolve_value_from_context(buttons_layout_template, context) if buttons_layout_template else None
+        
+        logger.debug(f"[TELEGRAM_SEND_MESSAGE_EXECUTOR] chat_id:'{chat_id}', text:'{text}', resolved_buttons_data:'{buttons_data_resolved}', resolved_buttons_layout:'{buttons_layout_resolved}'")
+
+        telegram_plugin = self.get_plugin("TelegramPlugin")
         if not telegram_plugin:
             err_msg = f"Шаг {step_id}: TelegramPlugin не найден в ScenarioExecutor."
             logger.error(err_msg)
             context["__step_error__"] = err_msg
             return context
         
-        logger.debug(f"[telegram_send_message STEP_ID:{step_id}] Chat ID: {chat_id}, Text: '{resolved_text}', Keyboard: {resolved_inline_keyboard}")
+        logger.debug(f"[telegram_send_message STEP_ID:{step_id}] Chat ID: {chat_id}, Text: '{text}', Keyboard: {buttons_data_resolved}")
         
         try:
-            # TelegramPlugin.send_message ожидает inline_keyboard как список списков словарей
-            message_receipt = await telegram_plugin.send_message(
-                chat_id=chat_id,
-                text=resolved_text,
-                buttons_data=resolved_inline_keyboard # buttons_data это inline_keyboard для плагина
+            response = await telegram_plugin.send_message(
+                chat_id=str(chat_id),
+                text=text,
+                buttons_data=buttons_data_resolved, # Передаем resolved buttons_data
+                buttons_layout=buttons_layout_resolved # Передаем resolved buttons_layout
             )
             
-            if message_receipt and hasattr(message_receipt, 'message_id'):
+            if response and hasattr(response, 'message_id'):
                  # Сохраняем ID сообщения, которое содержит кнопки, для возможного использования в input шаге
                  # или для редактирования сообщения в будущем
-                 context["message_id_with_buttons"] = message_receipt.message_id 
-                 context[f"__last_message_id_{step_id}"] = message_receipt.message_id # Для специфичного отслеживания
-                 context["__last_message_id"] = message_receipt.message_id # Общий последний ID
-                 logger.info(f"[telegram_send_message STEP_ID:{step_id}] Message ID {message_receipt.message_id} сохранен в контекст (message_id_with_buttons).")
-            elif message_receipt:
-                logger.warning(f"[telegram_send_message STEP_ID:{step_id}] telegram_plugin.send_message вернул ответ, но без message_id: {message_receipt}")
+                 context["message_id_with_buttons"] = response.message_id 
+                 context[f"__last_message_id_{step_id}"] = response.message_id # Для специфичного отслеживания
+                 context["__last_message_id"] = response.message_id # Общий последний ID
+                 logger.info(f"[telegram_send_message STEP_ID:{step_id}] Message ID {response.message_id} сохранен в контекст (message_id_with_buttons).")
+            elif response:
+                logger.warning(f"[telegram_send_message STEP_ID:{step_id}] telegram_plugin.send_message вернул ответ, но без message_id: {response}")
             else: # Если send_message вернул None (например, из-за ошибки внутри плагина, которая не вызвала исключение)
                 logger.warning(f"[telegram_send_message STEP_ID:{step_id}] telegram_plugin.send_message не вернул результат (None).")
                 if "__plugin_error__" not in context: # Если плагин сам не установил ошибку
@@ -815,8 +824,8 @@ class ScenarioExecutor:
         return context
 
     def get_plugin_by_type(self, plugin_type_name: str) -> Optional[Any]:
-        logger.debug(f"[GET_PLUGIN_BY_TYPE] Searching for '{plugin_type_name}'. Available: {[p.__class__.__name__ for p in self.plugins]}")
-        for plugin in self.plugins:
+        logger.debug(f"[GET_PLUGIN_BY_TYPE] Searching for '{plugin_type_name}'. Available: {[p.__class__.__name__ for p in self.plugins.values()]}")
+        for plugin in self.plugins.values():
             if plugin.__class__.__name__ == plugin_type_name:
                 return plugin
         logger.warning(f"Плагин '{plugin_type_name}' не найден.")

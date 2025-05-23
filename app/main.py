@@ -12,23 +12,28 @@ logger.info("!!!!!!!!!!!!!!!!! MAIN.PY LOGGER INITIALIZED !!!!!!!!!!!!!!!!!!") #
 
 from dotenv import load_dotenv
 import os
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
-from app.api import agent, scenario, runner, integration, learning, scheduler_updated, user # Добавляем user
+from app.api import agent, scenario, runner, integration, learning, user # Добавляем user
 from app.core.dependencies import (
     db_client, 
-    scheduler_service,             # Используем этот экземпляр
+    # scheduler_service,             # УДАЛЕНО для MVP
     telegram_app_instance, 
     telegram_plugin, 
-    scenario_executor_instance, 
-    plugin_manager_instance      # <--- ДОБАВЛЕНО для использования в lifespan
+    scenario_executor_instance
+    # plugin_manager_instance      # УДАЛЕНО для MVP
 )
 import asyncio
 from typing import Optional, List, Dict, Any
 from telegram import Update # Update остается здесь
 from telegram.ext import CallbackContext, CallbackQueryHandler # CallbackContext и CallbackQueryHandler из telegram.ext
 from telegram.ext import Application, ApplicationBuilder, CommandHandler # <--- ИЗМЕНЕНИЕ: добавлен Application
+
+from app.core.logging_config import setup_logging # <--- НОВЫЙ ИМПОРТ
+
+# Вызываем настройку логирования ДО инициализации других модулей, которые могут использовать logger
+setup_logging() # <--- ВЫЗОВ ФУНКЦИИ НАСТРОЙКИ
 
 # Определяем путь к файлу .env или .env.local в корне проекта
 # (app/main.py -> app/ -> корень)
@@ -135,7 +140,6 @@ def _start_telegram_polling_thread_blocking(app_instance: Application):
         # --- КОНЕЦ ВОССТАНОВЛЕНИЯ ---
         logger.critical(f"ПОТОК TELEGRAM ({thread_name}): функция _start_telegram_polling_thread_blocking ЗАВЕРШЕНА (блок finally).")
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global telegram_polling_thread 
@@ -148,32 +152,20 @@ async def lifespan(app: FastAPI):
     # plugin_manager_instance УЖЕ импортирован и доступен
 
     if db_client:
-        logger.info("Закрытие соединения с MongoDB (lifespan)...")
-        # db_client.close() # Закрывать будем при shutdown
-        logger.info("Соединение с MongoDB НЕ закрыто на старте (будет закрыто при shutdown).")
+        logger.info("Соединение с MongoDB НЕ будет закрыто на старте (lifespan) (будет закрыто при shutdown).")
     else:
-        logger.error("db_client is None, cannot close MongoDB connection.")
+        logger.error("db_client is None, cannot check MongoDB connection for startup log.")
+
 
     if telegram_app_instance: # Используем импортированный экземпляр
         logger.info(f"Lifespan: Используем импортированный telegram_app_instance (id: {id(telegram_app_instance)}).")
         if "scenario_executor" in telegram_app_instance.bot_data:
             logger.info(f"Lifespan: scenario_executor (id: {id(telegram_app_instance.bot_data['scenario_executor'])}) найден в bot_data telegram_app_instance.")
         else:
-            # Это может быть нормально, если executor добавляется позже или не всегда нужен в bot_data до старта polling
             logger.warning("Lifespan: scenario_executor НЕ НАЙДЕН в bot_data telegram_app_instance на момент старта lifespan.")
     else:
         logger.error("Lifespan: telegram_app_instance (импортированный из dependencies) отсутствует! Polling НЕ БУДЕТ запущен.")
 
-    if plugin_manager_instance:
-        logger.info(f"Lifespan: PluginManager instance (id: {id(plugin_manager_instance)}) существует. Зарегистрированные плагины: {list(plugin_manager_instance.get_all_plugins().keys())}")
-    else:
-        logger.warning("Lifespan: plugin_manager_instance отсутствует.")
-    
-    if telegram_plugin:
-        logger.info(f"Lifespan: telegram_plugin instance (id: {id(telegram_plugin)}) существует.")
-    else:
-        logger.warning("Lifespan: telegram_plugin отсутствует.")
-    
     if scenario_executor_instance:
         logger.info(f"Lifespan: scenario_executor_instance (id: {id(scenario_executor_instance)}) существует.")
     else:
@@ -184,9 +176,9 @@ async def lifespan(app: FastAPI):
         logger.info("Lifespan: Условие для запуска Telegram polling thread пройдено (telegram_app_instance существует). Запускаем поток...")
         telegram_polling_thread = threading.Thread(
             target=_start_telegram_polling_thread_blocking, 
-            args=(telegram_app_instance,), # Передаем экземпляр в поток
+            args=(telegram_app_instance,), 
             daemon=True,
-            name="TelegramPollingThread" # Даем потоку имя
+            name="TelegramPollingThread" 
         )
         telegram_polling_thread.start()
         logger.info(f"Lifespan: Поток Telegram polling ЗАПУЩЕН (is_alive: {telegram_polling_thread.is_alive()}). Имя потока: {telegram_polling_thread.name}")
@@ -214,13 +206,13 @@ async def lifespan(app: FastAPI):
                 logger.warning("Lifespan Shutdown (async): telegram_app_instance отсутствует, stop_polling() не может быть вызван.")
 
         try:
-            loop = asyncio.get_event_loop_policy().get_event_loop() # Получаем текущий цикл событий FastAPI
-            if loop.is_running(): # Если он еще работает
+            loop = asyncio.get_event_loop_policy().get_event_loop() 
+            if loop.is_running(): 
                 logger.info(f"Lifespan Shutdown: Запуск do_stop_polling_gracefully через run_coroutine_threadsafe в цикле {id(loop)}.")
                 future = asyncio.run_coroutine_threadsafe(do_stop_polling_gracefully(), loop)
-                future.result(timeout=10) # Ждем результат с таймаутом
+                future.result(timeout=10) 
                 logger.info(f"Lifespan Shutdown: future.result() для do_stop_polling_gracefully() получен.")
-            else: # Если основной цикл уже остановлен, пытаемся запустить в новом
+            else: 
                 logger.warning(f"Lifespan Shutdown: Основной event loop ({id(loop)}) не запущен. Пытаемся запустить do_stop_polling_gracefully через asyncio.run().")
                 asyncio.run(do_stop_polling_gracefully())
             logger.info(f"Lifespan Shutdown: Попытка остановить polling через do_stop_polling_gracefully() выполнена.")
@@ -253,16 +245,19 @@ async def lifespan(app: FastAPI):
     
     logger.info("Application shutdown complete (lifespan).")
 
-# Переносим создание FastAPI app и подключение роутеров сюда, в самый конец файла.
-
-logger.critical("!!!!!!!!!!!!!! MAIN.PY: ПЕРЕД СОЗДАНИЕМ ЭКЗЕМПЛЯРА FastAPI !!!!!!!!!!!!!!") # <--- НОВЫЙ ЛОГ
-
 app = FastAPI(
     title="Universal Agent Platform API",
     version="0.1.0",
     description="API for managing agents, scenarios, and their execution.",
-    lifespan=lifespan # lifespan привязывается здесь
+    lifespan=lifespan
 )
+logger.info("!!!!!!!!!!!!!! MAIN.PY: ЭКЗЕМПЛЯР FastAPI СОЗДАН (без lifespan) !!!!!!!!!!!!!!") # <--- НОВЫЙ ЛОГ
+
+# Health check endpoint
+@app.get("/health", status_code=status.HTTP_200_OK)
+async def health_check():
+    logger.debug("Health check endpoint called")
+    return {"status": "ok", "message": "API is healthy"}
 
 # Подключение роутеров API
 logger.info("MAIN.PY: Подключение API роутеров...")
@@ -271,7 +266,7 @@ app.include_router(scenario.router, prefix="/api/v1")
 app.include_router(runner.router, prefix="/api/v1")
 app.include_router(integration.router, prefix="/api/v1")
 app.include_router(learning.router, prefix="/api/v1")
-app.include_router(scheduler_updated.router, prefix="/api/v1") # Обновленный роутер для планировщика
+# from app.api import scheduler_updated # УДАЛЕНО для MVP
 app.include_router(user.router, prefix="/api/v1") # Добавляем роутер user
 logger.info("MAIN.PY: API роутеры подключены.")
 

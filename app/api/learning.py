@@ -4,19 +4,16 @@ from pydantic import BaseModel, Field
 from app.db.scenario_repository import ScenarioRepository
 from app.db.agent_repository import AgentRepository
 from app.core.scenario_executor import ScenarioExecutor
-from loguru import logger
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import json
 
 # Добавляем новый импорт для функции-зависимости
 from app.api.integration import get_scenario_executor_dependency
+# from app.models.user import UserProfile, LearningPlanDB # ЗАКОММЕНТИРОВАНО: этих классов нет в models.user
+from app.core.dependencies import scenario_executor_instance
 
 router = APIRouter(prefix="/learning", tags=["learning"])
-
-# Настройка логирования
-os.makedirs("logs", exist_ok=True)
-logger.add("logs/learning_api.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True)
 
 # Инициализация подключения к MongoDB
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/universal_agent")
@@ -52,16 +49,8 @@ async def start_onboarding(
     request: OnboardingRequest = Body(...),
     executor: ScenarioExecutor = Depends(get_scenario_executor_dependency)
 ):
-    """
-    Запускает сценарий онбординга для пользователя 
-    и отправляет первое сообщение через Telegram
-    
-    Args:
-        request: Данные пользователя для старта онбординга
-        
-    Returns:
-        dict: Результат запуска сценария
-    """
+    logger.info(f"Запрос на онбординг для user_id: {request.user_id}, chat_id: {request.chat_id}")
+
     try:
         # Поиск сценария по имени
         scenarios = await scenario_repo.find({"name": "Онбординг пользователя"})
@@ -189,4 +178,44 @@ async def get_learning_plan(user_id: str):
         raise HTTPException(
             status_code=500,
             detail=f"Ошибка при получении плана обучения: {str(e)}"
-        ) 
+        )
+
+@router.post("/plans/{user_id}/generate", status_code=status.HTTP_201_CREATED)
+async def generate_new_learning_plan(user_id: str):
+    # ... existing code ...
+    pass
+
+@router.get("/progress/{user_id}/{plan_id}", status_code=status.HTTP_200_OK)
+async def get_learning_progress(user_id: str, plan_id: str):
+    # ... existing code ...
+    pass
+
+# @router.post("/dialog_state/{user_id}", status_code=status.HTTP_200_OK)
+# async def update_dialog_state_endpoint(user_id: str, state_data: DialogState = Body(...)):
+#     # ... existing code ...
+#     pass
+
+# @router.post("/generate_content_demo")
+# async def generate_content_demo_endpoint(
+#     request_body: GenerateContentRequest = Body(...),
+# ):
+#     # ... existing code ...
+#     pass
+
+# @router.post("/save_solution", status_code=status.HTTP_201_CREATED)
+# async def save_user_solution(solution_data: UserSolution = Body(...)):
+#     # ... existing code ...
+#     pass
+
+# @router.post("/submit_feedback", status_code=status.HTTP_201_CREATED)
+# async def submit_user_feedback(feedback_data: UserFeedback = Body(...)):
+#     # ... existing code ...
+#     pass
+
+# ВРЕМЕННАЯ ЗАГЛУШКА, ПОКА LEARNING_SERVICE НЕ РЕАЛИЗОВАН
+# logger.warning(f"Конечная точка /onboard вызвана, но LearningService и связанная логика закомментированы. UserID: {request.user_id}")
+# return {
+#     "status": "onboarding_skipped_no_service",
+#     "message": "Функционал онбординга временно неактивен (LearningService не реализован).",
+#     "user_details": request.model_dump()
+# } 

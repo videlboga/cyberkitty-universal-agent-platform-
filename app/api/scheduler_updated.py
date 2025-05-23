@@ -8,7 +8,7 @@ import os
 # from app.api.integration import telegram_plugin as global_telegram_plugin # УДАЛЯЕМ СТАРЫЙ ЦИКЛИЧЕСКИЙ ИМПОРТ
 
 # ИМПОРТИРУЕМ ГЛОБАЛЬНЫЕ ЭКЗЕМПЛЯРЫ ИЗ dependencies.py
-from app.core.dependencies import scheduler_service, telegram_plugin as global_telegram_plugin # Используем тот же alias
+# from app.core.dependencies import scheduler_service, telegram_plugin as global_telegram_plugin # УДАЛЕНО для MVP
 
 router = APIRouter(prefix="/scheduler", tags=["scheduler"])
 

@@ -1,0 +1,47 @@
+{
+  "name": "Minimal No Plugins",
+  "scenario_id": "minimal_no_plugins",
+  "steps": [
+    {
+      "id": "log_start",
+      "type": "log",
+      "params": {
+        "level": "INFO",
+        "message": "Сценарий стартовал!"
+      },
+      "next_step": "branch1"
+    },
+    {
+      "id": "branch1",
+      "type": "branch",
+      "condition": "{{ test_flag }}",
+      "true_next": "log_true",
+      "false_next": "log_false"
+    },
+    {
+      "id": "log_true",
+      "type": "log",
+      "params": {
+        "level": "INFO",
+        "message": "Ветка TRUE"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "log_false",
+      "type": "log",
+      "params": {
+        "level": "INFO",
+        "message": "Ветка FALSE"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  "initial_context": {
+    "test_flag": true
+  }
+} 

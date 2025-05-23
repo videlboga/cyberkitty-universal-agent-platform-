@@ -594,3 +594,187 @@ curl -X POST "http://localhost:8000/runner/manager/execute" \
       "chat_id": "123456789"
     }
   }' 
+```
+
+## Примеры минималистичных сценариев (JSON)
+
+### 1. Приветствие в Telegram
+```json
+{
+  "name": "Greeting Scenario",
+  "steps": [
+    {
+      "id": "step1",
+      "type": "plugin_action",
+      "plugin": "TelegramPlugin",
+      "action": "send_message",
+      "params": {
+        "chat_id": "{{ telegram_chat_id }}",
+        "text": "Добро пожаловать!"
+      },
+      "result_var": "greeting_result"
+    },
+    {
+      "id": "step2",
+      "type": "end"
+    }
+  ],
+  "initial_context": {
+    "telegram_chat_id": "648981358"
+  }
+}
+```
+
+### 2. Ветвление по ответу пользователя
+```json
+{
+  "name": "Branching Scenario",
+  "steps": [
+    {
+      "id": "step1",
+      "type": "plugin_action",
+      "plugin": "TelegramPlugin",
+      "action": "send_message",
+      "params": {
+        "chat_id": "{{ telegram_chat_id }}",
+        "text": "Ты человек? (да/нет)"
+      },
+      "result_var": "ask_result"
+    },
+    {
+      "id": "step2",
+      "type": "plugin_action",
+      "plugin": "TelegramPlugin",
+      "action": "wait_for_reply",
+      "params": {
+        "chat_id": "{{ telegram_chat_id }}"
+      },
+      "result_var": "user_reply"
+    },
+    {
+      "id": "step3",
+      "type": "branch",
+      "condition": "{{ user_reply.text | lower == 'да' }}",
+      "true_next": "step4",
+      "false_next": "step5"
+    },
+    {
+      "id": "step4",
+      "type": "plugin_action",
+      "plugin": "TelegramPlugin",
+      "action": "send_message",
+      "params": {
+        "chat_id": "{{ telegram_chat_id }}",
+        "text": "Отлично, человек!"
+      },
+      "result_var": "final_result"
+    },
+    {
+      "id": "step5",
+      "type": "plugin_action",
+      "plugin": "TelegramPlugin",
+      "action": "send_message",
+      "params": {
+        "chat_id": "{{ telegram_chat_id }}",
+        "text": "Жаль, что не человек :("
+      },
+      "result_var": "final_result"
+    },
+    {
+      "id": "step6",
+      "type": "end"
+    }
+  ],
+  "initial_context": {
+    "telegram_chat_id": "648981358"
+  }
+}
+```
+
+### 3. Переключение на другой сценарий
+```json
+{
+  "name": "Switch Scenario",
+  "steps": [
+    {
+      "id": "step1",
+      "type": "plugin_action",
+      "plugin": "TelegramPlugin",
+      "action": "send_message",
+      "params": {
+        "chat_id": "{{ telegram_chat_id }}",
+        "text": "Сейчас переключу тебя на другой сценарий!"
+      },
+      "result_var": "switch_msg"
+    },
+    {
+      "id": "step2",
+      "type": "switch_scenario",
+      "params": {
+        "new_scenario_id": "ANOTHER_SCENARIO_ID"
+      }
+    }
+  ],
+  "initial_context": {
+    "telegram_chat_id": "648981358"
+  }
+}
+```
+
+### 4. Логирование и завершение
+```json
+{
+  "name": "Log and End",
+  "steps": [
+    {
+      "id": "step1",
+      "type": "log",
+      "params": {
+        "level": "INFO",
+        "message": "Сценарий стартовал!"
+      }
+    },
+    {
+      "id": "step2",
+      "type": "end"
+    }
+  ]
+}
+```
+
+### 5. Использование результата плагина в следующем шаге
+```json
+{
+  "name": "Use Plugin Result",
+  "steps": [
+    {
+      "id": "step1",
+      "type": "plugin_action",
+      "plugin": "SomePlugin",
+      "action": "get_data",
+      "params": {
+        "param1": "value"
+      },
+      "result_var": "data_result"
+    },
+    {
+      "id": "step2",
+      "type": "plugin_action",
+      "plugin": "TelegramPlugin",
+      "action": "send_message",
+      "params": {
+        "chat_id": "{{ telegram_chat_id }}",
+        "text": "Результат: {{ data_result.value }}"
+      },
+      "result_var": "send_result"
+    },
+    {
+      "id": "step3",
+      "type": "end"
+    }
+  ],
+  "initial_context": {
+    "telegram_chat_id": "648981358"
+  }
+}
+``` 

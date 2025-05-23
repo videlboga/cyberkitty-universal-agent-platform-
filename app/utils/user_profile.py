@@ -5,10 +5,6 @@ from loguru import logger
 import os
 from datetime import datetime
 
-# Настройка логирования
-os.makedirs("logs", exist_ok=True)
-logger.add("logs/user_profile.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True)
-
 class UserProfileManager:
     """
     Класс для управления профилями пользователей.

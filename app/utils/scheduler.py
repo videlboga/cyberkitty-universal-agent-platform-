@@ -12,10 +12,7 @@ from app.utils.dialog_state import DialogStateManager
 from app.utils.user_profile import UserProfileManager
 from motor.motor_asyncio import AsyncIOMotorClient
 from app.utils.id_helper import ensure_mongo_id
-
-# Настройка логирования
-os.makedirs("logs", exist_ok=True)
-logger.add("logs/scheduler.log", format="{time} {level} {message}", level="INFO", rotation="10 MB", compression="zip", serialize=True)
+from apscheduler.jobstores.mongodb import MongoDBJobStore
 
 class SchedulerService:
     """
@@ -34,7 +31,7 @@ class SchedulerService:
     - api_call: произвольный вызов API
     """
     
-    def __init__(self, api_base_url: str = None, mongo_uri: str = None):
+    def __init__(self, scenario_executor_instance, api_base_url: str = None, mongo_uri: str = None):
         """
         Инициализация сервиса планировщика
         

@@ -1,12 +1,11 @@
-from fastapi import APIRouter, HTTPException, status, Body
+import os
+from fastapi import APIRouter, HTTPException, status, Body, Depends
 from app.models.agent import Agent
 from app.models.scenario import Scenario
-from app.db.agent_repository import AgentRepository
-from app.db.scenario_repository import ScenarioRepository
+from app.db.agent_repository import AgentRepository, get_agent_repository
+from app.db.scenario_repository import ScenarioRepository, get_scenario_repository
 from loguru import logger
 from typing import List, Optional, Dict, Any, Tuple
-from motor.motor_asyncio import AsyncIOMotorClient
-import os
 from pydantic import BaseModel
 
 # Модель для запроса на обновление агента
@@ -19,15 +18,6 @@ class AgentUpdateRequest(BaseModel):
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-MONGODB_DATABASE_NAME = os.getenv("MONGODB_DATABASE_NAME", "universal_agent_platform")
-
-client = AsyncIOMotorClient(MONGO_URI)
-db = client[MONGODB_DATABASE_NAME]
-agent_repo = AgentRepository(db)
-scenario_repo = ScenarioRepository(db)
-
-# TODO: Реализовать или импортировать функцию проверки совместимости
 async def check_agent_scenario_compatibility(agent_data: Agent | AgentUpdateRequest, scenario_data: Scenario) -> Tuple[bool, Optional[str]]: # Возвращаем также сообщение об ошибке
     # В реальной реализации здесь будет проверка, например, по agent_data.plugins и scenario_data.required_plugins
     logger.debug(f"Проверка совместимости для агента (plugins: {getattr(agent_data, 'plugins', [])}) и сценария {scenario_data.id} (required: {getattr(scenario_data, 'required_plugins', [])})")
@@ -58,7 +48,11 @@ async def check_agent_scenario_compatibility(agent_data: Agent | AgentUpdateRequ
     return True, None
 
 @router.post("/", response_model=Agent, status_code=status.HTTP_201_CREATED)
-async def create_agent(agent_payload: Agent):
+async def create_agent(
+    agent_payload: Agent,
+    agent_repo: AgentRepository = Depends(get_agent_repository),
+    scenario_repo: ScenarioRepository = Depends(get_scenario_repository)
+):
     # Добавляем логику для default_telegram_chat_id
     # Pydantic v2 с extra='allow' должен сделать 'settings' доступным как атрибут,
     # если он был в JSON-запросе.
@@ -117,13 +111,20 @@ async def create_agent(agent_payload: Agent):
     return created_agent
 
 @router.get("/", response_model=List[Agent])
-async def list_agents(skip: int = 0, limit: int = 100):
+async def list_agents(
+    skip: int = 0, 
+    limit: int = 100,
+    agent_repo: AgentRepository = Depends(get_agent_repository)
+):
     agents = await agent_repo.get(skip=skip, limit=limit)
     logger.info(f"Запрошен список агентов: {len(agents)} найдено")
     return agents
 
 @router.get("/{agent_id}", response_model=Agent)
-async def get_agent(agent_id: str):
+async def get_agent(
+    agent_id: str,
+    agent_repo: AgentRepository = Depends(get_agent_repository)
+):
     agent = await agent_repo.get_by_id(agent_id)
     if not agent:
         logger.warning(f"Агент не найден: {agent_id}")
@@ -132,13 +133,18 @@ async def get_agent(agent_id: str):
     return agent
 
 @router.patch("/{agent_id}", response_model=Agent)
-async def update_agent(agent_id: str, agent_update_payload: AgentUpdateRequest = Body(...)):
+async def update_agent(
+    agent_id: str, 
+    agent_update_payload: AgentUpdateRequest = Body(...),
+    agent_repo: AgentRepository = Depends(get_agent_repository),
+    scenario_repo: ScenarioRepository = Depends(get_scenario_repository)
+):
     existing_agent = await agent_repo.get_by_id(agent_id)
     if not existing_agent:
         logger.warning(f"Агент не найден для обновления: {agent_id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
-    update_data = agent_update_payload.dict(exclude_unset=True)
+    update_data = agent_update_payload.model_dump(exclude_unset=True)
     
     # Если сценарий обновляется, нужно проверить совместимость
     # Для этого нам нужна "финальная" версия данных агента после предполагаемого обновления
@@ -184,7 +190,10 @@ async def update_agent(agent_id: str, agent_update_payload: AgentUpdateRequest =
     return updated_agent
 
 @router.delete("/{agent_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_agent(agent_id: str):
+async def delete_agent(
+    agent_id: str,
+    agent_repo: AgentRepository = Depends(get_agent_repository)
+):
     agent = await agent_repo.get_by_id(agent_id)
     if not agent:
         logger.warning(f"Агент не найден для удаления: {agent_id}")

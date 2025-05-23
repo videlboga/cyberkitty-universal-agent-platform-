@@ -18,7 +18,7 @@ from app.db.agent_repository import AgentRepository
 from app.core.plugin_manager import PluginManager
 # Предполагаем, что LLM и RAG плагины находятся здесь (путь может отличаться)
 from app.plugins.llm_plugin import LLMPlugin
-# from app.plugins.rag_plugin import RAGPlugin
+from app.plugins.rag_plugin import RAGPlugin
 
 # --- Конфигурация ---
 MONGO_URI = os.getenv("MONGO_URI", os.getenv("MONGO_URL", "mongodb://mongo:27017/"))
@@ -49,10 +49,10 @@ except Exception as e:
 #     scheduler_service = None
 
 # --- Инициализация MongoStoragePlugin ---
-mongo_client = MongoClient(MONGO_URI)
+mongo_async_client = AsyncIOMotorClient(MONGO_URI)
 try:
     mongo_storage_plugin = MongoStoragePlugin(
-        mongo_client,
+        mongo_async_client,
         db_name=MONGODB_DATABASE_NAME
     )
     logger.info("Core Dependencies: MongoStoragePlugin инициализирован.")
@@ -99,7 +99,7 @@ else:
         # telegram_app_instance и telegram_plugin останутся None
 
 # --- Инициализация RAG и LLM плагинов ---
-# rag_plugin_instance = RAGPlugin()
+rag_plugin_instance = RAGPlugin()
 llm_plugin_instance = LLMPlugin()
 
 # --- Инициализация Repositories ---
@@ -139,9 +139,13 @@ if scenario_repo_instance and agent_repo_instance:
             plugins_list.append(mongo_storage_plugin)
         if llm_plugin_instance:
             plugins_list.append(llm_plugin_instance)
+        if rag_plugin_instance:
+            plugins_list.append(rag_plugin_instance)
         
-        scenario_executor_instance = ScenarioExecutor(plugins=plugins_list)
-        logger.info(f"ScenarioExecutor instance created successfully in dependencies: id(self)={id(scenario_executor_instance)}, id(plugins)={id(scenario_executor_instance.plugins)}, plugins={[p.__class__.__name__ for p in scenario_executor_instance.plugins]}")
+        scenario_executor_instance = ScenarioExecutor(plugins=plugins_list, scenario_repo=scenario_repo_instance)
+        logger.info(f"ScenarioExecutor instance created successfully in dependencies: id(self)={id(scenario_executor_instance)}")
+        logger.info(f"Plugins registered: {[p.__class__.__name__ for p in plugins_list]}")
+        logger.info(f"Step handlers available: {list(scenario_executor_instance.step_handlers.keys())}")
 
         # !!! КЛЮЧЕВОЙ МОМЕНТ: Добавляем scenario_executor в bot_data Telegram !!!
         if telegram_app_instance:

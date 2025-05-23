@@ -12,6 +12,8 @@ services:
     container_name: universal_agent_system-app-1
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     volumes:
       - ./app:/app/app
       - ./logs:/app/logs
@@ -30,6 +32,8 @@ services:
       - REDIS_PORT=6379
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - OPENROUTER_API_KEY=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
+      - OPENROUTER_URL=https://openrouter.ai/api/v1/chat/completions
       - FASTAPI_APP_URL=http://app:8000
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-level trace
     networks:

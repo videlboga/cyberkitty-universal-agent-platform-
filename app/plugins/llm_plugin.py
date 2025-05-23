@@ -39,15 +39,15 @@ class LLMPlugin(PluginBase):
             config: Конфигурация плагина (API ключи, URL и др.)
         """
         super().__init__()
-        self.api_key = (config.get('api_key') if config else None) or os.getenv("OPENROUTER_API_KEY", "")
-        self.api_url = (config.get('api_url') if config else None) or os.getenv("OPENROUTER_URL", "https://openrouter.ai/api/v1/chat/completions")
-        self.default_model = (config.get('default_model') if config else None) or "deepseek/deepseek-chat-v3-0324"
+        self.api_key = (config.get('api_key') if config else None) or os.getenv("OPENROUTER_API_KEY") or None
+        self.base_url = (config.get('base_url') if config else None) or os.getenv("OPENROUTER_URL", "https://openrouter.ai/api/v1/chat/completions")
+        self.default_model = (config.get('default_model') if config else None) or os.getenv("LLM_DEFAULT_MODEL", "meta-llama/llama-3.2-3b-instruct:free")
         
         # Проверка наличия API ключа при инициализации
         if not self.api_key:
             logger.warning("LLMPlugin: OPENROUTER_API_KEY не найден. Запросы к OpenRouter будут невозможны.")
         else:
-            logger.info(f"LLMPlugin инициализирован с API ключом: {self.api_key[:5]}...{self.api_key[-5:] if len(self.api_key) > 10 else ''}")
+            logger.info(f"LLMPlugin инициализирован с API ключом: {self.api_key[:5]}...{self.api_key[-5:] if self.api_key and len(self.api_key) > 10 else ''}")
         logger.info(f"LLMPlugin: Модель по умолчанию: {self.default_model}")
     
     async def query(self, 
@@ -108,7 +108,7 @@ class LLMPlugin(PluginBase):
             logger.debug(f"LLMPlugin.query: Payload для OpenRouter: {json.dumps(request_payload, ensure_ascii=False)}")
             
             # ===== ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ ПЕРЕД ВЫЗОВОМ OPENROUTER_CHAT =====
-            logger.info(f"[LLMPlugin.query - PRE-CALL DEBUG] Готовлюсь вызвать openrouter_chat. API Key: {self.api_key[:5]}...{self.api_key[-5:] if len(self.api_key) > 10 else ''}")
+            logger.info(f"[LLMPlugin.query - PRE-CALL DEBUG] Готовлюсь вызвать openrouter_chat. API Key: {self.api_key[:5]}...{self.api_key[-5:] if self.api_key and len(self.api_key) > 10 else ''}")
             logger.info(f"[LLMPlugin.query - PRE-CALL DEBUG] Actual Model: {actual_model}")
             logger.info(f"[LLMPlugin.query - PRE-CALL DEBUG] Full Request Payload to be sent to openrouter_chat:")
             logger.info(json.dumps(request_payload, indent=2, ensure_ascii=False))
@@ -177,7 +177,7 @@ class LLMPlugin(PluginBase):
             context=context
         )
     
-    async def handle_llm_query(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def handle_llm_query(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> None:
         """
         Обработчик шага типа llm_query - отправка запроса к LLM
         
@@ -186,7 +186,7 @@ class LLMPlugin(PluginBase):
             context: Контекст сценария
             
         Returns:
-            Результат LLM запроса (обычно словарь) или None в случае ошибки конфигурации шага.
+            None - результат сохраняется в контекст, а не возвращается
         """
         params = step_data.get("params", {})
         scenario_id = context.get("__current_scenario_id__", "unknown_scenario")
@@ -229,8 +229,17 @@ class LLMPlugin(PluginBase):
         )
         
         if api_result_envelope.get("status") == "ok":
-            logger.info(f"[LLMPlugin.handle_llm_query SCENARIO_ID:{scenario_id} STEP_ID:{step_id}] Запрос к LLM успешно обработан плагином.")
-            return api_result_envelope.get("response")
+            # Успешный ответ - извлекаем содержимое текста и сохраняем в контекст
+            api_response = api_result_envelope["response"]
+            if "choices" in api_response and len(api_response["choices"]) > 0:
+                content = api_response["choices"][0]["message"]["content"]
+                context[output_var] = content  # Сохраняем результат в контекст
+                logger.info(f"[LLMPlugin.handle_llm_query SCENARIO_ID:{scenario_id} STEP_ID:{step_id}] Запрос к LLM успешно обработан. Результат сохранен в '{output_var}': {content[:100]}...")
+                return None  # Возвращаем None, результат уже в контексте
+            else:
+                logger.error(f"[LLMPlugin.handle_llm_query SCENARIO_ID:{scenario_id} STEP_ID:{step_id}] Неожиданный формат ответа API: нет choices")
+                context["__step_error__"] = f"LLMPlugin: Неожиданный формат ответа API (нет choices). Детали: {api_response}"
+                return None
         else:
             error_msg = api_result_envelope.get("message", "Неизвестная ошибка от LLMPlugin.query")
             logger.error(f"[LLMPlugin.handle_llm_query SCENARIO_ID:{scenario_id} STEP_ID:{step_id}] Ошибка при выполнении LLM запроса: {error_msg}")
@@ -262,7 +271,7 @@ class LLMPlugin(PluginBase):
         return {
             "api_key": "YOUR_OPENROUTER_API_KEY",
             "api_url": "https://openrouter.ai/api/v1/chat/completions",
-            "default_model": "deepseek/deepseek-chat-v3-0324"
+            "default_model": "meta-llama/llama-3.2-3b-instruct:free"
         }
 
     def get_config_description(self) -> Dict[str, str]:

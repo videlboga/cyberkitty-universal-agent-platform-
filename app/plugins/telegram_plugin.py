@@ -270,16 +270,49 @@ class TelegramPlugin(PluginBase):
         # ... existing code ...
 
     async def handle_super_test_command(self, update: Update, context: CallbackContext): # <--- НОВЫЙ МЕТОД
-        logger.info("SUPER_DUPER_TEST_COMMAND HANDLER CALLED") # Изменено с critical и убраны "!!!"
+        logger.info("🚀 SUPER_DUPER_TEST_COMMAND: Запуск LLM тестового сценария")
         if update.effective_chat:
             try:
+                # Получаем scenario_executor из context.bot_data
+                scenario_executor = context.bot_data.get("scenario_executor")
+                if not scenario_executor:
+                    logger.error("ScenarioExecutor не найден в context.bot_data")
+                    await context.bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text="❌ Ошибка: ScenarioExecutor не найден"
+                    )
+                    return
+
+                # Запускаем LLM тестовый сценарий
+                chat_id = str(update.effective_chat.id)
+                initial_context = {
+                    "chat_id": chat_id,
+                    "user_telegram_id": update.effective_user.id,
+                    "username": update.effective_user.username or update.effective_user.first_name
+                }
+                
+                logger.info(f"🤖 Запуск LLM сценария 'llm_test_telegram' для chat_id: {chat_id}")
+                
+                result = await scenario_executor.run_scenario_by_id(
+                    scenario_id="llm_test_telegram",
+                    initial_context=initial_context
+                )
+                
+                if result and result.get("success"):
+                    logger.info(f"✅ LLM сценарий успешно выполнен: {result.get('message', 'OK')}")
+                else:
+                    logger.error(f"❌ Ошибка выполнения LLM сценария: {result}")
+                    await context.bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text=f"❌ Ошибка выполнения LLM сценария: {result.get('message', 'Неизвестная ошибка')}"
+                    )
+                    
+            except Exception as e:
+                logger.error(f"Ошибка при запуске LLM сценария в handle_super_test_command для chat_id {update.effective_chat.id}: {e}", exc_info=True)
                 await context.bot.send_message(
                     chat_id=update.effective_chat.id,
-                    text="SUPER DUPER TEST COMMAND RECEIVED!"
+                    text=f"❌ Ошибка при запуске LLM тестового сценария: {str(e)}"
                 )
-                logger.info(f"Ответ на /superdupertestcommand123 успешно отправлен в chat_id: {update.effective_chat.id}")
-            except Exception as e:
-                logger.error(f"Ошибка при отправке сообщения в handle_super_test_command для chat_id {update.effective_chat.id}: {e}", exc_info=True)
         else:
             logger.warning("Не удалось определить effective_chat для ответа на /superdupertestcommand123")
 
@@ -565,17 +598,25 @@ class TelegramPlugin(PluginBase):
         """Обрабатывает шаг 'telegram_send_message' из сценария. Возвращает None (без паузы)."""
         params = step_data.get("params", {})
         
-        # Используем _resolve_value_from_context для разрешения плейсхолдеров
-        resolved_chat_id = _resolve_value_from_context(params.get("chat_id"), context)
-        resolved_text = _resolve_value_from_context(params.get("text"), context)
+        # Используем ту же логику fallback что и в ScenarioExecutor.telegram_send_message
+        chat_id_template = params.get("chat_id", context.get("telegram_chat_id", context.get("chat_id")))
+        text_template = params.get("text")
+        
+        # Разрешаем значения
+        resolved_chat_id = _resolve_value_from_context(chat_id_template, context)
+        resolved_text = _resolve_value_from_context(text_template, context)
         
         # Правильно обрабатываем кнопки из params
         buttons_data_template = params.get("buttons_data")
         buttons_layout_template = params.get("buttons_layout")
+        inline_keyboard_template = params.get("inline_keyboard")  # Для совместимости со старыми сценариями
         
         resolved_buttons_data = None
         if buttons_data_template:
             resolved_buttons_data = _resolve_value_from_context(buttons_data_template, context)
+        elif inline_keyboard_template:
+            # Поддержка старого формата inline_keyboard 
+            resolved_buttons_data = _resolve_value_from_context(inline_keyboard_template, context)
         
         resolved_buttons_layout = None
         if buttons_layout_template:
@@ -594,8 +635,14 @@ class TelegramPlugin(PluginBase):
         if resolved_buttons_data and resolved_buttons_layout:
             formatted_buttons_data = self._format_buttons_for_telegram(resolved_buttons_data, resolved_buttons_layout)
         elif resolved_buttons_data:
-            # Если нет layout, используем каждую кнопку в отдельной строке
-            formatted_buttons_data = [[button] for button in resolved_buttons_data]
+            # Если нет layout, используем resolved_buttons_data как есть (предполагая что это уже массив массивов)
+            if isinstance(resolved_buttons_data, list) and len(resolved_buttons_data) > 0:
+                if isinstance(resolved_buttons_data[0], list):
+                    # Уже правильный формат [[{},{}], [{}]]
+                    formatted_buttons_data = resolved_buttons_data
+                else:
+                    # Формат [{},{},{}] - каждую кнопку в отдельной строке
+                    formatted_buttons_data = [[button] for button in resolved_buttons_data]
 
         message_sent = await self.send_message(
             chat_id=resolved_chat_id,

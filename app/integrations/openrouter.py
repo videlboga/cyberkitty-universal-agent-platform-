@@ -12,7 +12,7 @@ OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 if not OPENROUTER_API_KEY:
     logger.error("OPENROUTER_API_KEY не найден в переменных окружения")
 else:
-    logger.info(f"OPENROUTER_API_KEY найден: {OPENROUTER_API_KEY[:5]}...{OPENROUTER_API_KEY[-5:] if len(OPENROUTER_API_KEY) > 10 else ''}")
+    logger.info(f"OPENROUTER_API_KEY найден: {OPENROUTER_API_KEY[:5]}...{OPENROUTER_API_KEY[-5:] if OPENROUTER_API_KEY and len(OPENROUTER_API_KEY) > 10 else ''}")
 
 HEADERS = {
     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -21,18 +21,36 @@ HEADERS = {
     "X-Title": os.getenv("OPENROUTER_X_TITLE", "Universal Agent System")
 }
 
-async def openrouter_chat(prompt: str, model: str = "openai/gpt-3.5-turbo", **kwargs) -> Dict[str, Any]:
+async def openrouter_chat(
+    prompt: str = None, 
+    model: str = "openai/gpt-3.5-turbo", 
+    messages: list = None,
+    **kwargs
+) -> Dict[str, Any]:
     if not OPENROUTER_API_KEY:
         logger.error("Невозможно выполнить запрос к OpenRouter: отсутствует API ключ")
         return {"error": "API key not found"}
     
     try:
+        # Определяем messages для запроса
+        if messages:
+            # Если передан messages, используем его
+            request_messages = messages
+            logger.debug(f"Отправка запроса к OpenRouter: модель={model}, кол-во сообщений={len(messages)}")
+        elif prompt:
+            # Если передан prompt, создаем messages из него
+            request_messages = [{"role": "user", "content": prompt}]
+            logger.debug(f"Отправка запроса к OpenRouter: модель={model}, длина промпта={len(prompt)}")
+        else:
+            logger.error("Не указан ни prompt, ни messages для запроса к OpenRouter")
+            return {"error": "Either prompt or messages must be provided"}
+        
         payload = {
             "model": model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": request_messages,
             **kwargs
         }
-        logger.debug(f"Отправка запроса к OpenRouter: модель={model}, длина запроса={len(prompt)}")
+        
         # --- Новый блок: логируем curl-команду ---
         import json as _json
         # Формируем заголовки для curl как строку

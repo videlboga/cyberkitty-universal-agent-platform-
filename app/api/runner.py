@@ -209,9 +209,16 @@ async def execute_scenario_endpoint(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Scenario '{final_scenario_id}' not found.")
 
     initial_context_for_executor = {}
+    
+    # ДОБАВЛЯЕМ initial_context АГЕНТА (базовые значения с низким приоритетом)
+    if agent_doc.initial_context:
+        initial_context_for_executor.update(agent_doc.initial_context)
+        logger.info(f"Добавлен initial_context агента в контекст для executor: {agent_doc.initial_context}")
+    
+    # ДОБАВЛЯЕМ контекст из payload (высокий приоритет, перезаписывает агентские значения)
     if payload and isinstance(payload.get("context"), dict):
-        initial_context_for_executor = payload["context"].copy()
-        logger.info(f"Начальный контекст для executor загружен из payload['context'] для агента '{agent_doc.id}'.")
+        initial_context_for_executor.update(payload["context"])
+        logger.info(f"Обновлен контекст из payload['context'] для агента '{agent_doc.id}'.")
     
     # Добавляем agent_id, если его еще нет
     if "agent_id" not in initial_context_for_executor:
@@ -258,12 +265,12 @@ async def execute_scenario_endpoint(
                 elif key in safe_keys:
                     cleaned_result[key] = value
                 elif key in potentially_large_keys:
-                    cleaned_result[key] = value
+                    cleaned_result[key] = value 
                 elif key.startswith("__") and key.endswith("__"):
                     continue
                 elif isinstance(value, (str, int, float, bool, list, dict, type(None))):
                     try:
-                        json.dumps(value, default=str)
+                        json.dumps(value, default=str) 
                         cleaned_result[key] = value
                     except (TypeError, OverflowError):
                         cleaned_result[key] = f"<unserializable_data_omitted type:{type(value).__name__}>"

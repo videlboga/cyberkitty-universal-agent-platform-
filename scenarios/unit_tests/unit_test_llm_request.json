@@ -11,20 +11,20 @@
       "name": "Simple LLM Request",
       "params": {
         "prompt": "Translate 'hello' to French.",
-        "model": "gpt-3.5-turbo",
+        "model": "deepseek/deepseek-chat",
         "output_var": "llm_translation_output"
       },
-      "next_step_id": "step_2_check_output"
+      "next_step": "step_2_check_output"
     },
     {
       "id": "step_2_check_output",
-      "type": "log_message",
+      "type": "log",
       "name": "Log LLM Output (or lack thereof)",
-      "config": {
+      "params": {
         "level": "INFO",
         "message": "LLM output for translation: {llm_translation_output}"
       },
-      "next_step_id": "end"
+      "next_step": "end"
     },
     {
       "id": "end",

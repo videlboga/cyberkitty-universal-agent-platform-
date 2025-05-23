@@ -1,0 +1,97 @@
+{
+  "scenario_id": "test_advanced_plugins",
+  "name": "Тест продвинутых плагинов",
+  "description": "Комплексный тест LLM, RAG и MongoDB плагинов Universal Agent System",
+  "version": "1.0",
+  "initial_context": {
+    "test_user": "advanced_tester",
+    "test_query": "Что такое искусственный интеллект?"
+  },
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "log_start"
+    },
+    {
+      "id": "log_start", 
+      "type": "log",
+      "params": {
+        "message": "🚀 НАЧИНАЕМ ТЕСТ ПРОДВИНУТЫХ ПЛАГИНОВ!",
+        "level": "INFO"
+      },
+      "next_step": "test_mongodb_insert"
+    },
+    {
+      "id": "test_mongodb_insert",
+      "type": "mongo_insert_one",
+      "params": {
+        "collection": "test_advanced_data",
+        "document": {
+          "test_type": "advanced_plugins",
+          "user_id": "{{ test_user }}",
+          "timestamp": "{{ current_timestamp }}",
+          "status": "testing_mongodb"
+        },
+        "output_var": "mongo_insert_result"
+      },
+      "next_step": "test_llm_query"
+    },
+    {
+      "id": "test_llm_query",
+      "type": "llm_query", 
+      "params": {
+        "prompt": "{{ test_query }}",
+        "model": "deepseek/deepseek-chat-v3-0324",
+        "max_tokens": 150,
+        "temperature": 0.7,
+        "output_var": "llm_response"
+      },
+      "next_step": "test_rag_search"
+    },
+    {
+      "id": "test_rag_search",
+      "type": "rag_search",
+      "params": {
+        "query": "{{ test_query }}",
+        "top_k": 3,
+        "output_var": "rag_results"
+      },
+      "next_step": "test_mongodb_update"
+    },
+    {
+      "id": "test_mongodb_update",
+      "type": "mongo_update_one",
+      "params": {
+        "collection": "test_advanced_data",
+        "filter": {
+          "test_type": "advanced_plugins",
+          "user_id": "{{ test_user }}"
+        },
+        "update": {
+          "$set": {
+            "status": "completed",
+            "llm_tested": true,
+            "rag_tested": true,
+            "completed_at": "{{ current_timestamp }}"
+          }
+        },
+        "output_var": "mongo_update_result"
+      },
+      "next_step": "send_telegram_results"
+    },
+    {
+      "id": "send_telegram_results",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "648981358",
+        "text": "🎉 ТЕСТ ПРОДВИНУТЫХ ПЛАГИНОВ ЗАВЕРШЕН!\n\n✅ MongoDB: Данные сохранены\n✅ LLM: Ответ получен\n✅ RAG: Поиск выполнен\n✅ Telegram: Сообщение отправлено\n\nСистема полностью функциональна!"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ]
+} 

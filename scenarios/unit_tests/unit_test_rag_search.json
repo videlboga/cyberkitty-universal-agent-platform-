@@ -1,41 +1,40 @@
 {
   "scenario_id": "unit_test_rag_search",
   "name": "Unit Test: RAGPlugin Search",
-  "description": "Tests the rag_search step type.",
+  "description": "Tests the rag_search step type with correct API format.",
   "version": "1.0",
   "initial_context": {
     "user_id": "rag_tester_007",
-    "search_query_for_rag": "Что такое мультиагентные системы?"
+    "search_query_for_rag": "что такое искусственный интеллект"
   },
   "steps": [
     {
       "id": "start_log_rag",
-      "type": "log_message",
+      "type": "log",
       "params": {
         "message": "UNIT TEST RAG: Starting rag_search test for user: {user_id}",
         "level": "INFO"
       },
-      "next_step_id": "perform_rag_search"
+      "next_step": "perform_rag_search"
     },
     {
       "id": "perform_rag_search",
       "type": "rag_search",
       "params": {
         "query": "{search_query_for_rag}",
-        "collection_name": "test_knowledge_base",
         "top_k": 3,
         "output_var": "rag_test_results"
       },
-      "next_step_id": "log_rag_results"
+      "next_step": "log_rag_results"
     },
     {
       "id": "log_rag_results",
-      "type": "log_message",
+      "type": "log",
       "params": {
-        "message": "UNIT TEST RAG: rag_search step initiated. Results (or error) should be in context.rag_test_results: {rag_test_results}",
+        "message": "UNIT TEST RAG: rag_search step completed. Results: {rag_test_results}",
         "level": "INFO"
       },
-      "next_step_id": "end_rag_test"
+      "next_step": "end_rag_test"
     },
     {
       "id": "end_rag_test",

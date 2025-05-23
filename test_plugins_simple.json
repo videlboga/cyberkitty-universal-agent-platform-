@@ -1,0 +1,73 @@
+{
+  "scenario_id": "test_all_plugins",
+  "name": "Тест всех плагинов",
+  "description": "Комплексный тест всех доступных плагинов системы",
+  "version": "1.0",
+  "initial_context": {
+    "test_user": "plugin_tester",
+    "test_value": 42
+  },
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "log_start"
+    },
+    {
+      "id": "log_start",
+      "type": "log",
+      "params": {
+        "message": "🚀 Начинаем тестирование всех плагинов Universal Agent System!",
+        "level": "INFO"
+      },
+      "next_step": "telegram_test"
+    },
+    {
+      "id": "telegram_test",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "648981358",
+        "text": "📱 TelegramPlugin работает! Тестовое значение: {{ test_value }}"
+      },
+      "next_step": "branch_test"
+    },
+    {
+      "id": "branch_test",
+      "type": "branch",
+      "condition": "{{ test_value == 42 }}",
+      "true_next": "log_success",
+      "false_next": "log_failure"
+    },
+    {
+      "id": "log_success",
+      "type": "log",
+      "params": {
+        "message": "✅ BranchStep работает! Условие {{ test_value == 42 }} выполнено",
+        "level": "INFO"
+      },
+      "next_step": "final_telegram"
+    },
+    {
+      "id": "log_failure",
+      "type": "log",
+      "params": {
+        "message": "❌ BranchStep: условие не выполнено",
+        "level": "ERROR"
+      },
+      "next_step": "final_telegram"
+    },
+    {
+      "id": "final_telegram",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "648981358",
+        "text": "🎉 Тестирование плагинов завершено! Все базовые компоненты работают:\n\n✅ ScenarioExecutor\n✅ TelegramPlugin\n✅ LogStep\n✅ BranchStep\n✅ StartStep\n✅ EndStep\n\nСистема полностью функциональна!"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ]
+} 

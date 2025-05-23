@@ -32,8 +32,9 @@ class ScenarioExecutor:
     # Константы для типов шагов
     AUTO_EXECUTABLE_STEP_TYPES = ["action", "branch", "log_message", "start", "end"]
     
-    def __init__(self, plugins: List[Any]):
+    def __init__(self, plugins: List[Any], scenario_repo: Optional[Any] = None):
         self.plugins = {p.__class__.__name__: p for p in plugins}
+        self.scenario_repo = scenario_repo
         logger.info(f"[ScenarioExecutor] Инициализирован с плагинами: {list(self.plugins.keys())}")
         
         # Инициализируем словарь обработчиков шагов
@@ -61,7 +62,6 @@ class ScenarioExecutor:
             "end": self.handle_end,
             "message": self.handle_message,
             "input": self.handle_input,
-            "rag_search": self.handle_rag_search,
             "execute_code": self.handle_execute_code,
         })
         logger.info(f"[ScenarioExecutor] Зарегистрированы базовые обработчики: {list(self.step_handlers.keys())}")
@@ -189,28 +189,6 @@ class ScenarioExecutor:
     
     async def handle_branch(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> None:
         return None # Логика в ScenarioStateMachine
-    
-    async def handle_rag_search(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        rag_plugin = self.get_plugin("RAGPlugin")
-        if not rag_plugin:
-            logger.error("RAGPlugin не найден в ScenarioExecutor для шага rag_search.")
-            context["__step_error__"] = "RAGPlugin not found"
-            return context
-        
-        params = step_data.get("params", {})
-        query_template = params.get("query", "")
-        query = _resolve_value_from_context(query_template, context)
-        collection_name = _resolve_value_from_context(params.get("collection_name", "default"), context)
-        output_var = params.get("output_var", "rag_results")
-        
-        try:
-            results = await rag_plugin.search(query, collection_name)
-            context[output_var] = results
-            logger.info(f"RAG поиск: колл='{collection_name}', запрос='{query}', найдено={len(results) if results else 0}")
-        except Exception as e:
-            logger.error(f"Ошибка RAG поиска: {e}")
-            context[output_var] = {"error": str(e)}
-        return context
     
     async def _update_context_from_updates(self, updates: Dict[str, Any], context: Dict[str, Any], scenario_id: str, step_id: str) -> Dict[str, Any]:
         logger.debug(f"[_update_context_from_updates SCENARIO_ID:{scenario_id} STEP_ID:{step_id}] Original context ID: {id(context)}, Context BEFORE updates: {json.dumps(context, indent=2, default=str, ensure_ascii=False)}")

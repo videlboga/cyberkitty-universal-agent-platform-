@@ -1,0 +1,53 @@
+{
+  "scenario_id": "llm_test_telegram",
+  "name": "🤖 Тест LLM через Telegram",
+  "description": "Простой тест LLM плагина с OpenRouter и Llama",
+  "version": "1.0",
+  "initial_context": {
+    "chat_id": "648981358"
+  },
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "params": null,
+      "next_step": "welcome_msg"
+    },
+    {
+      "id": "welcome_msg", 
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{{ chat_id }}",
+        "text": "🚀 Тестирую LLM плагин с OpenRouter!\n\nЗапрашиваю ответ от Llama..."
+      },
+      "next_step": "llm_request"
+    },
+    {
+      "id": "llm_request",
+      "type": "llm_query",
+      "params": {
+        "model": "meta-llama/llama-3.2-3b-instruct:free",
+        "prompt": "Привет! Ответь мне дружелюбно и кратко (до 50 слов) на русском языке. Скажи что ты Llama и работаешь через OpenRouter в Universal Agent System.",
+        "max_tokens": 100,
+        "temperature": 0.7
+      },
+      "result_var": "llm_response",
+      "next_step": "send_result"
+    },
+    {
+      "id": "send_result",
+      "type": "telegram_send_message", 
+      "params": {
+        "chat_id": "{{ chat_id }}",
+        "text": "🤖 **LLM Ответ от Llama:**\n\n{{ llm_response }}\n\n✅ Тест успешно завершен!"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "params": null,
+      "next_step": null
+    }
+  ]
+} 

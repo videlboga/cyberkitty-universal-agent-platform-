@@ -10,12 +10,12 @@
   "steps": [
     {
       "id": "start_log_telegram",
-      "type": "log_message",
+      "type": "log",
       "params": {
         "message": "UNIT TEST TELEGRAM: Starting send_message test. Target chat_id will be taken from TEST_TELEGRAM_CHAT_ID env var.",
         "level": "INFO"
       },
-      "next_step_id": "send_simple_message"
+      "next_step": "send_simple_message"
     },
     {
       "id": "send_simple_message",
@@ -23,7 +23,7 @@
       "params": {
         "text": "Привет от юнит-теста Telegram! Это простое сообщение."
       },
-      "next_step_id": "send_message_with_placeholder"
+      "next_step": "send_message_with_placeholder"
     },
     {
       "id": "send_message_with_placeholder",
@@ -31,7 +31,7 @@
       "params": {
         "text": "Ваш товар: {item_name}. Спасибо за использование, {user_id}!"
       },
-      "next_step_id": "send_message_with_inline_keyboard"
+      "next_step": "send_message_with_inline_keyboard"
     },
     {
       "id": "send_message_with_inline_keyboard",
@@ -48,16 +48,16 @@
           ]
         ]
       },
-      "next_step_id": "log_completion_telegram"
+      "next_step": "log_completion_telegram"
     },
     {
       "id": "log_completion_telegram",
-      "type": "log_message",
+      "type": "log",
       "params": {
         "message": "UNIT TEST TELEGRAM: send_message steps completed.",
         "level": "INFO"
       },
-      "next_step_id": "end_telegram_test"
+      "next_step": "end_telegram_test"
     },
     {
       "id": "end_telegram_test",

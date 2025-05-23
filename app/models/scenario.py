@@ -20,6 +20,34 @@ class TelegramSendMessageStep(StepBase):
     type: Literal["telegram_send_message"]
     params: Dict[str, Any]
 
+class TelegramEditMessageStep(StepBase):
+    type: Literal["telegram_edit_message"]
+    params: Dict[str, Any]
+
+class LLMQueryStep(StepBase):
+    type: Literal["llm_query"]
+    params: Dict[str, Any]
+
+class RAGSearchStep(StepBase):
+    type: Literal["rag_search"]
+    params: Dict[str, Any]
+
+class MongoInsertOneStep(StepBase):
+    type: Literal["mongo_insert_one"]
+    params: Dict[str, Any]
+
+class MongoFindOneStep(StepBase):
+    type: Literal["mongo_find_one"]
+    params: Dict[str, Any]
+
+class MongoUpdateOneStep(StepBase):
+    type: Literal["mongo_update_one"]
+    params: Dict[str, Any]
+
+class MongoDeleteOneStep(StepBase):
+    type: Literal["mongo_delete_one"]
+    params: Dict[str, Any]
+
 class BranchStep(StepBase):
     type: Literal["branch"]
     condition: str  # шаблон-условие
@@ -46,7 +74,14 @@ class InputStep(StepBase):
 
 ScenarioStep = Union[
     PluginActionStep,
-    TelegramSendMessageStep, 
+    TelegramSendMessageStep,
+    TelegramEditMessageStep,
+    LLMQueryStep,
+    RAGSearchStep,
+    MongoInsertOneStep,
+    MongoFindOneStep,
+    MongoUpdateOneStep,
+    MongoDeleteOneStep,
     BranchStep,
     LogStep,
     StartStep,

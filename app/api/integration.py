@@ -27,8 +27,8 @@ from app.core.dependencies import (
     mongo_storage_plugin,
     telegram_plugin,
     telegram_app_instance, # Если нужен сам инстанс Application
-    # rag_plugin_instance, # УДАЛЕНО для MVP
-    # llm_plugin_instance, # УДАЛЕНО для MVP
+    rag_plugin_instance, # Разкомментирован для RAG функциональности
+    llm_plugin_instance, # Разкомментирован для LLM функциональности
     # API_BASE_URL, # Если используется здесь, лучше тоже из dependencies
     # MONGO_URI, MONGODB_DATABASE_NAME # Аналогично
 )
@@ -89,15 +89,15 @@ async def get_scenario_executor_dependency(
     logger.info(f"get_scenario_executor_dependency: Returning global scenario_executor_instance (id: {id(scenario_executor_instance)})")
     return scenario_executor_instance
 
-# @router.get("/llm/models")
-# async def llm_models():
-#     """Получить список моделей OpenRouter с полной информацией (цены, инструменты и т.д.)"""
-#     try:
-#         models = await openrouter_models()
-#         return models
-#     except Exception as e:
-#         logger.error({"event": "llm_models_error", "error": str(e)})
-#         return JSONResponse(status_code=500, content={"error": str(e)})
+@router.get("/llm/models")
+async def llm_models():
+    """Получить список моделей OpenRouter с полной информацией (цены, инструменты и т.д.)"""
+    try:
+        models = await openrouter_models()
+        return models
+    except Exception as e:
+        logger.error({"event": "llm_models_error", "error": str(e)})
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 @router.post("/llm/query")
 async def llm_query(request: Request):
@@ -128,11 +128,11 @@ async def rag_query(request: Request):
         return JSONResponse(status_code=400, content={"error": "query is required"})
     
     try:
-        if not rag_plugin.healthcheck():
+        if not rag_plugin_instance.healthcheck():
             logger.bind(integration="rag").warning({"event": "rag_mock_fallback", "query": query})
             return {"result": "RAG mock response (сервис недоступен)", "input": data}
         
-        results = rag_plugin.search(query, top_k=top_k)
+        results = rag_plugin_instance.search(query, top_k=top_k)
         logger.bind(integration="rag").info({"event": "rag_query", "query": query, "results": results})
         return {"result": results, "input": data}
     except Exception as e:

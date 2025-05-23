@@ -1,0 +1,11 @@
+{
+  "name": "Агент регистрации пользователей",
+  "scenario_id": "template_user_registration",
+  "plugins": ["MongoDBPlugin"],
+  "initial_context": {
+    "greeting": "Добро пожаловать! Давайте создадим ваш профиль в нашей системе.",
+    "collection_name": "users",
+    "registration_source": "agent_registration",
+    "current_timestamp": "2024-12-01T00:00:00Z"
+  }
+} 

@@ -1,0 +1,16 @@
+{
+  "name": "FAQ бот с RAG поиском",
+  "scenario_id": "template_faq_rag",
+  "plugins": ["RAGPlugin", "LLMPlugin", "MongoDBPlugin"],
+  "initial_context": {
+    "bot_name": "FAQ Помощник",
+    "knowledge_base": "company_docs",
+    "search_threshold": 0.7,
+    "max_search_results": 3,
+    "llm_model": "deepseek/deepseek-chat",
+    "fallback_message": "К сожалению, я не нашёл ответа на ваш вопрос в нашей базе знаний.",
+    "greeting": "Привет! Я FAQ помощник. Задайте мне любой вопрос о нашей компании, продуктах или услугах.",
+    "current_timestamp": "2024-12-01T00:00:00Z",
+    "session_id": "faq_session_001"
+  }
+} 

@@ -1,0 +1,17 @@
+{
+  "name": "Оркестратор сценариев",
+  "scenario_id": "template_orchestrator",
+  "plugins": ["OrchestratorPlugin", "MongoDBPlugin"],
+  "initial_context": {
+    "orchestration_mode": "sequential",
+    "available_scenarios": [
+      "template_user_registration",
+      "template_llm_chat",
+      "template_faq_rag",
+      "template_llm_multi_step"
+    ],
+    "max_parallel_scenarios": 3,
+    "timeout_seconds": 1800,
+    "current_timestamp": "2024-12-01T00:00:00Z"
+  }
+} 

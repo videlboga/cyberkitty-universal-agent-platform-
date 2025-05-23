@@ -1,0 +1,335 @@
+{
+  "scenario_id": "template_orchestrator",
+  "name": "Шаблон: Оркестратор сценариев",
+  "description": "Главный сценарий для координации и управления выполнением других сценариев в различных режимах",
+  "version": "1.0",
+  "initial_context": {
+    "orchestration_mode": "sequential",
+    "available_scenarios": [
+      "template_user_registration",
+      "template_llm_chat", 
+      "template_faq_rag",
+      "template_llm_multi_step"
+    ],
+    "max_parallel_scenarios": 3,
+    "timeout_seconds": 1800
+  },
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "params": {},
+      "next_step": "welcome_orchestrator"
+    },
+    {
+      "id": "welcome_orchestrator",
+      "type": "message",
+      "params": {
+        "text": "🎭 **Добро пожаловать в Оркестратор сценариев!**\n\nЯ могу управлять выполнением нескольких сценариев в различных режимах:\n\n1️⃣ **Последовательное выполнение** - сценарии выполняются один за другим\n2️⃣ **Параллельное выполнение** - несколько сценариев одновременно\n3️⃣ **Условное выполнение** - сценарии по условиям\n4️⃣ **Полный рабочий процесс** - комплексный процесс регистрации → чат → FAQ"
+      },
+      "next_step": "get_orchestration_mode"
+    },
+    {
+      "id": "get_orchestration_mode",
+      "type": "input",
+      "params": {
+        "prompt": "Выберите режим работы (1-4):",
+        "input_type": "text",
+        "output_var": "mode_choice"
+      },
+      "next_step": "determine_mode"
+    },
+    {
+      "id": "determine_mode",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.get('mode_choice') == '1'",
+            "next_step": "sequential_mode"
+          },
+          {
+            "condition": "context.get('mode_choice') == '2'",
+            "next_step": "parallel_mode"
+          },
+          {
+            "condition": "context.get('mode_choice') == '3'",
+            "next_step": "conditional_mode"
+          },
+          {
+            "condition": "context.get('mode_choice') == '4'",
+            "next_step": "workflow_mode"
+          }
+        ],
+        "default_next_step": "invalid_mode_choice"
+      }
+    },
+    {
+      "id": "invalid_mode_choice",
+      "type": "message",
+      "params": {
+        "text": "❌ Некорректный выбор. Пожалуйста, введите число от 1 до 4."
+      },
+      "next_step": "get_orchestration_mode"
+    },
+    {
+      "id": "sequential_mode",
+      "type": "message",
+      "params": {
+        "text": "📋 **Последовательный режим**\n\nВыполню сценарии один за другим с передачей контекста между ними."
+      },
+      "next_step": "run_sequential_scenarios"
+    },
+    {
+      "id": "run_sequential_scenarios",
+      "type": "execute_scenarios_sequence",
+      "params": {
+        "scenarios": [
+          {
+            "scenario_id": "template_user_registration",
+            "input_context": {
+              "greeting": "Начинаем с регистрации пользователя..."
+            }
+          },
+          {
+            "scenario_id": "template_llm_chat",
+            "input_context": {
+              "bot_name": "Персональный Ассистент",
+              "user_email": "{user_email}"
+            }
+          }
+        ],
+        "stop_on_error": true,
+        "pass_context": true,
+        "output_var": "sequential_results"
+      },
+      "next_step": "show_sequential_results"
+    },
+    {
+      "id": "show_sequential_results",
+      "type": "message",
+      "params": {
+        "text": "✅ **Последовательное выполнение завершено!**\n\n📊 Результаты:\n{sequential_results}\n\nВсе сценарии выполнены успешно с передачей контекста."
+      },
+      "next_step": "ask_continue"
+    },
+    {
+      "id": "parallel_mode",
+      "type": "message",
+      "params": {
+        "text": "⚡ **Параллельный режим**\n\nЗапущу несколько независимых сценариев одновременно."
+      },
+      "next_step": "run_parallel_scenarios"
+    },
+    {
+      "id": "run_parallel_scenarios",
+      "type": "execute_scenarios_parallel",
+      "params": {
+        "scenarios": [
+          {
+            "scenario_id": "template_faq_rag",
+            "input_context": {
+              "knowledge_base": "general_faq",
+              "greeting": "FAQ бот запущен в параллельном режиме"
+            }
+          },
+          {
+            "scenario_id": "template_llm_multi_step",
+            "input_context": {
+              "process_type": "analysis",
+              "user_email": "demo@example.com"
+            }
+          }
+        ],
+        "timeout_seconds": "{timeout_seconds}",
+        "wait_for_all": true,
+        "output_var": "parallel_results"
+      },
+      "next_step": "show_parallel_results"
+    },
+    {
+      "id": "show_parallel_results",
+      "type": "message",
+      "params": {
+        "text": "⚡ **Параллельное выполнение завершено!**\n\n📊 Результаты:\n{parallel_results}\n\nВсе сценарии выполнялись одновременно."
+      },
+      "next_step": "ask_continue"
+    },
+    {
+      "id": "conditional_mode",
+      "type": "input",
+      "params": {
+        "prompt": "Введите ваш уровень (beginner/advanced):",
+        "input_type": "text",
+        "output_var": "user_level"
+      },
+      "next_step": "run_conditional_scenarios"
+    },
+    {
+      "id": "run_conditional_scenarios",
+      "type": "conditional_execute",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.get('user_level') == 'beginner'",
+            "scenario_id": "template_user_registration",
+            "input_context": {
+              "greeting": "Добро пожаловать, новичок! Начнём с простой регистрации."
+            }
+          },
+          {
+            "condition": "context.get('user_level') == 'advanced'", 
+            "scenario_id": "template_llm_multi_step",
+            "input_context": {
+              "process_type": "advanced_analysis",
+              "user_email": "advanced@example.com"
+            }
+          }
+        ],
+        "default_scenario": {
+          "scenario_id": "template_llm_chat",
+          "input_context": {
+            "bot_name": "Универсальный Помощник"
+          }
+        },
+        "output_var": "conditional_result"
+      },
+      "next_step": "show_conditional_results"
+    },
+    {
+      "id": "show_conditional_results",
+      "type": "message",
+      "params": {
+        "text": "🎯 **Условное выполнение завершено!**\n\n📊 Результат:\n{conditional_result}\n\nСценарий выбран на основе вашего уровня: {user_level}"
+      },
+      "next_step": "ask_continue"
+    },
+    {
+      "id": "workflow_mode",
+      "type": "message",
+      "params": {
+        "text": "🔄 **Полный рабочий процесс**\n\nЗапускаю комплексный процесс:\n1. Регистрация пользователя\n2. Персонализированный чат\n3. FAQ поддержка\n\nЭто может занять несколько минут..."
+      },
+      "next_step": "workflow_step1_registration"
+    },
+    {
+      "id": "workflow_step1_registration", 
+      "type": "execute_scenario",
+      "params": {
+        "scenario_id": "template_user_registration",
+        "input_context": {
+          "greeting": "🔄 Шаг 1/3: Регистрация пользователя в рамках полного рабочего процесса"
+        },
+        "timeout_seconds": 600,
+        "output_var": "registration_result",
+        "output_mapping": {
+          "registered_user_email": "user_email",
+          "registered_user_name": "user_name"
+        }
+      },
+      "next_step": "workflow_step2_chat"
+    },
+    {
+      "id": "workflow_step2_chat",
+      "type": "execute_scenario",
+      "params": {
+        "scenario_id": "template_llm_chat",
+        "input_context": {
+          "bot_name": "Персональный Ассистент",
+          "user_email": "{registered_user_email}",
+          "greeting": "🔄 Шаг 2/3: Теперь давайте пообщаемся! Я знаю о вас: {registered_user_name}"
+        },
+        "timeout_seconds": 600,
+        "output_var": "chat_result"
+      },
+      "next_step": "workflow_step3_faq"
+    },
+    {
+      "id": "workflow_step3_faq",
+      "type": "execute_scenario",
+      "params": {
+        "scenario_id": "template_faq_rag",
+        "input_context": {
+          "knowledge_base": "workflow_faq",
+          "greeting": "🔄 Шаг 3/3: FAQ поддержка. У вас есть вопросы по завершению процесса?"
+        },
+        "timeout_seconds": 600,
+        "output_var": "faq_result"
+      },
+      "next_step": "workflow_complete"
+    },
+    {
+      "id": "workflow_complete",
+      "type": "message",
+      "params": {
+        "text": "🎉 **Полный рабочий процесс завершён!**\n\n✅ **Выполненные этапы:**\n1. ✅ Регистрация: {registration_result.status}\n2. ✅ Персональный чат: {chat_result.status}\n3. ✅ FAQ поддержка: {faq_result.status}\n\n📋 **Сводка:**\n• Зарегистрированный пользователь: {registered_user_name}\n• Email: {registered_user_email}\n• Все системы протестированы и работают корректно\n\n🚀 Вы готовы к полноценному использованию платформы!"
+      },
+      "next_step": "save_workflow_results"
+    },
+    {
+      "id": "save_workflow_results",
+      "type": "mongo_insert_one",
+      "params": {
+        "collection": "orchestrator_workflows",
+        "document": {
+          "workflow_type": "full_process",
+          "user_email": "{registered_user_email}",
+          "user_name": "{registered_user_name}",
+          "steps_completed": 3,
+          "registration_result": "{registration_result}",
+          "chat_result": "{chat_result}",
+          "faq_result": "{faq_result}",
+          "completion_time": "{current_timestamp}",
+          "status": "completed"
+        },
+        "output_var": "workflow_saved"
+      },
+      "next_step": "ask_continue"
+    },
+    {
+      "id": "ask_continue",
+      "type": "input",
+      "params": {
+        "prompt": "Хотите запустить ещё один режим оркестрации? (да/нет)",
+        "input_type": "text",
+        "output_var": "continue_orchestration"
+      },
+      "next_step": "check_continue"
+    },
+    {
+      "id": "check_continue",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.get('continue_orchestration', '').lower().strip() in ['да', 'yes', 'y', 'конечно']",
+            "next_step": "get_orchestration_mode"
+          }
+        ],
+        "default_next_step": "orchestrator_farewell"
+      }
+    },
+    {
+      "id": "orchestrator_farewell",
+      "type": "message",
+      "params": {
+        "text": "🎭 **Оркестратор завершает работу**\n\nСпасибо за использование системы управления сценариями!\n\n📊 **Возможности, которые вы изучили:**\n• Последовательное выполнение сценариев\n• Параллельные процессы\n• Условная логика\n• Комплексные рабочие процессы\n\n🚀 Теперь вы можете создавать сложные автоматизированные процессы!"
+      },
+      "next_step": "log_orchestrator_session"
+    },
+    {
+      "id": "log_orchestrator_session",
+      "type": "log",
+      "params": {
+        "message": "Orchestrator session completed. Mode used: {mode_choice}",
+        "level": "INFO"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "params": {}
+    }
+  ]
+} 

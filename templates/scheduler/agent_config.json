@@ -1,0 +1,16 @@
+{
+  "name": "Планировщик сценариев",
+  "scenario_id": "template_scheduler",
+  "plugins": ["SchedulerPlugin", "MongoDBPlugin"],
+  "initial_context": {
+    "available_scenarios": [
+      "template_user_registration",
+      "template_llm_chat",
+      "template_faq_rag",
+      "template_llm_multi_step"
+    ],
+    "max_concurrent_tasks": 5,
+    "default_timeout": 1800,
+    "current_timestamp": "2024-12-01T00:00:00Z"
+  }
+}

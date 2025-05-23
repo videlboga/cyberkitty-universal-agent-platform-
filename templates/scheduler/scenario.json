@@ -1,0 +1,385 @@
+{
+  "scenario_id": "template_scheduler",
+  "name": "Шаблон: Планировщик сценариев",
+  "description": "Система управления отложенными и периодическими запусками сценариев с расширенными возможностями планирования",
+  "version": "1.0",
+  "initial_context": {
+    "available_scenarios": [
+      "template_user_registration",
+      "template_llm_chat",
+      "template_faq_rag",
+      "template_llm_multi_step"
+    ],
+    "max_concurrent_tasks": 5,
+    "default_timeout": 1800
+  },
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "params": {},
+      "next_step": "welcome_scheduler"
+    },
+    {
+      "id": "welcome_scheduler",
+      "type": "message",
+      "params": {
+        "text": "⏰ **Добро пожаловать в Планировщик сценариев!**\n\nЯ могу планировать выполнение сценариев:\n\n1️⃣ **Отложенный запуск** - через определённое время\n2️⃣ **Запуск по времени** - в конкретный момент\n3️⃣ **Периодические запуски** - повторяющиеся задачи\n4️⃣ **Управление задачами** - просмотр и отмена\n5️⃣ **Демо режим** - быстрые примеры"
+      },
+      "next_step": "get_scheduler_mode"
+    },
+    {
+      "id": "get_scheduler_mode",
+      "type": "input",
+      "params": {
+        "prompt": "Выберите режим работы (1-5):",
+        "input_type": "text",
+        "output_var": "scheduler_mode"
+      },
+      "next_step": "determine_scheduler_mode"
+    },
+    {
+      "id": "determine_scheduler_mode",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.get('scheduler_mode') == '1'",
+            "next_step": "delayed_mode"
+          },
+          {
+            "condition": "context.get('scheduler_mode') == '2'",
+            "next_step": "timed_mode"
+          },
+          {
+            "condition": "context.get('scheduler_mode') == '3'",
+            "next_step": "periodic_mode"
+          },
+          {
+            "condition": "context.get('scheduler_mode') == '4'",
+            "next_step": "management_mode"
+          },
+          {
+            "condition": "context.get('scheduler_mode') == '5'",
+            "next_step": "demo_mode"
+          }
+        ],
+        "default_next_step": "invalid_scheduler_choice"
+      }
+    },
+    {
+      "id": "invalid_scheduler_choice",
+      "type": "message",
+      "params": {
+        "text": "❌ Некорректный выбор. Пожалуйста, введите число от 1 до 5."
+      },
+      "next_step": "get_scheduler_mode"
+    },
+    {
+      "id": "delayed_mode",
+      "type": "message",
+      "params": {
+        "text": "⏳ **Отложенный запуск**\n\nНастройка запуска сценария через заданное время."
+      },
+      "next_step": "get_delay_scenario"
+    },
+    {
+      "id": "get_delay_scenario",
+      "type": "input",
+      "params": {
+        "prompt": "Выберите сценарий для отложенного запуска:\n1. Регистрация пользователя\n2. LLM чат\n3. FAQ RAG\n4. Многошаговый LLM\n\nВведите номер:",
+        "input_type": "text",
+        "output_var": "delay_scenario_choice"
+      },
+      "next_step": "get_delay_time"
+    },
+    {
+      "id": "get_delay_time",
+      "type": "input",
+      "params": {
+        "prompt": "Через сколько минут запустить? (например: 1, 5, 10):",
+        "input_type": "text",
+        "output_var": "delay_minutes"
+      },
+      "next_step": "schedule_delayed_task"
+    },
+    {
+      "id": "schedule_delayed_task",
+      "type": "schedule_delay",
+      "params": {
+        "scenario_id": "template_llm_chat",
+        "delay_minutes": "{delay_minutes}",
+        "context": {
+          "scheduled_by": "user",
+          "delay_mode": true,
+          "original_delay": "{delay_minutes} минут"
+        },
+        "output_var": "delayed_task_id"
+      },
+      "next_step": "confirm_delayed_task"
+    },
+    {
+      "id": "confirm_delayed_task",
+      "type": "message",
+      "params": {
+        "text": "✅ **Отложенный запуск настроен!**\n\n📋 **Детали:**\n• Сценарий: LLM чат\n• Запуск через: {delay_minutes} мин\n• ID задачи: {delayed_task_id}\n\n⏰ Сценарий запустится автоматически через указанное время."
+      },
+      "next_step": "ask_scheduler_continue"
+    },
+    {
+      "id": "timed_mode",
+      "type": "input",
+      "params": {
+        "prompt": "Введите время запуска в формате YYYY-MM-DDTHH:MM:SS\n(например: 2024-12-01T15:30:00):",
+        "input_type": "text",
+        "output_var": "target_time"
+      },
+      "next_step": "schedule_timed_task"
+    },
+    {
+      "id": "schedule_timed_task",
+      "type": "schedule_at",
+      "params": {
+        "scenario_id": "template_faq_rag",
+        "target_time": "{target_time}",
+        "context": {
+          "scheduled_by": "user",
+          "target_time_mode": true,
+          "knowledge_base": "scheduled_faq"
+        },
+        "output_var": "timed_task_id"
+      },
+      "next_step": "confirm_timed_task"
+    },
+    {
+      "id": "confirm_timed_task",
+      "type": "message",
+      "params": {
+        "text": "✅ **Запуск по времени настроен!**\n\n📋 **Детали:**\n• Сценарий: FAQ RAG\n• Время запуска: {target_time}\n• ID задачи: {timed_task_id}\n\n⏰ Сценарий запустится точно в указанное время."
+      },
+      "next_step": "ask_scheduler_continue"
+    },
+    {
+      "id": "periodic_mode",
+      "type": "input",
+      "params": {
+        "prompt": "Настройка периодического запуска:\n\nИнтервал в минутах (например: 5, 10, 30):",
+        "input_type": "text",
+        "output_var": "interval_minutes"
+      },
+      "next_step": "get_max_runs"
+    },
+    {
+      "id": "get_max_runs",
+      "type": "input",
+      "params": {
+        "prompt": "Максимальное количество запусков (-1 для бесконечности):",
+        "input_type": "text",
+        "output_var": "max_runs"
+      },
+      "next_step": "schedule_periodic_task"
+    },
+    {
+      "id": "schedule_periodic_task",
+      "type": "schedule_periodic",
+      "params": {
+        "scenario_id": "template_llm_multi_step",
+        "interval_minutes": "{interval_minutes}",
+        "max_runs": "{max_runs}",
+        "context": {
+          "scheduled_by": "user",
+          "periodic_mode": true,
+          "process_type": "automated"
+        },
+        "output_var": "periodic_task_id"
+      },
+      "next_step": "confirm_periodic_task"
+    },
+    {
+      "id": "confirm_periodic_task",
+      "type": "message",
+      "params": {
+        "text": "✅ **Периодический запуск настроен!**\n\n📋 **Детали:**\n• Сценарий: Многошаговый LLM\n• Интервал: каждые {interval_minutes} мин\n• Максимум запусков: {max_runs}\n• ID задачи: {periodic_task_id}\n\n🔄 Сценарий будет выполняться автоматически."
+      },
+      "next_step": "ask_scheduler_continue"
+    },
+    {
+      "id": "management_mode",
+      "type": "message",
+      "params": {
+        "text": "🛠️ **Управление задачами**\n\nВы можете отменить запланированные задачи."
+      },
+      "next_step": "get_task_to_cancel"
+    },
+    {
+      "id": "get_task_to_cancel",
+      "type": "input",
+      "params": {
+        "prompt": "Введите ID задачи для отмены (или 'список' для просмотра):",
+        "input_type": "text",
+        "output_var": "task_id_to_cancel"
+      },
+      "next_step": "process_task_management"
+    },
+    {
+      "id": "process_task_management",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.get('task_id_to_cancel', '').lower() == 'список'",
+            "next_step": "show_task_list"
+          }
+        ],
+        "default_next_step": "cancel_task"
+      }
+    },
+    {
+      "id": "show_task_list",
+      "type": "message",
+      "params": {
+        "text": "📋 **Активные задачи:**\n\n• {delayed_task_id} - Отложенный запуск\n• {timed_task_id} - Запуск по времени\n• {periodic_task_id} - Периодический запуск\n\n💡 Введите ID для отмены или 'назад' для возврата."
+      },
+      "next_step": "get_task_to_cancel"
+    },
+    {
+      "id": "cancel_task",
+      "type": "cancel_schedule",
+      "params": {
+        "task_id": "{task_id_to_cancel}",
+        "output_var": "cancellation_result"
+      },
+      "next_step": "confirm_cancellation"
+    },
+    {
+      "id": "confirm_cancellation",
+      "type": "message",
+      "params": {
+        "text": "🗑️ **Результат отмены:**\n\nЗадача {task_id_to_cancel}: {cancellation_result}\n\n✅ Если задача была найдена, она отменена."
+      },
+      "next_step": "ask_scheduler_continue"
+    },
+    {
+      "id": "demo_mode",
+      "type": "message",
+      "params": {
+        "text": "🎬 **Демо режим**\n\nЗапускаю быстрые примеры всех типов планирования..."
+      },
+      "next_step": "demo_delayed"
+    },
+    {
+      "id": "demo_delayed",
+      "type": "schedule_delay",
+      "params": {
+        "scenario_id": "template_llm_chat",
+        "delay_seconds": 10,
+        "context": {
+          "demo_mode": true,
+          "bot_name": "Демо Бот"
+        },
+        "output_var": "demo_delayed_id"
+      },
+      "next_step": "demo_periodic"
+    },
+    {
+      "id": "demo_periodic",
+      "type": "schedule_periodic",
+      "params": {
+        "scenario_id": "template_user_registration",
+        "interval_minutes": 1,
+        "max_runs": 2,
+        "context": {
+          "demo_mode": true,
+          "greeting": "Демо регистрация"
+        },
+        "output_var": "demo_periodic_id"
+      },
+      "next_step": "demo_results"
+    },
+    {
+      "id": "demo_results",
+      "type": "message",
+      "params": {
+        "text": "🎬 **Демо запущено!**\n\n📋 **Созданные задачи:**\n• Отложенный (10 сек): {demo_delayed_id}\n• Периодический (1 мин, 2 раза): {demo_periodic_id}\n\n⏰ Наблюдайте за выполнением в логах системы."
+      },
+      "next_step": "ask_scheduler_continue"
+    },
+    {
+      "id": "ask_scheduler_continue",
+      "type": "input",
+      "params": {
+        "prompt": "Хотите настроить ещё один запуск? (да/нет)",
+        "input_type": "text",
+        "output_var": "continue_scheduling"
+      },
+      "next_step": "check_scheduler_continue"
+    },
+    {
+      "id": "check_scheduler_continue",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.get('continue_scheduling', '').lower().strip() in ['да', 'yes', 'y', 'конечно']",
+            "next_step": "get_scheduler_mode"
+          }
+        ],
+        "default_next_step": "scheduler_farewell"
+      }
+    },
+    {
+      "id": "scheduler_farewell",
+      "type": "message",
+      "params": {
+        "text": "⏰ **Планировщик завершает работу**\n\nСпасибо за использование системы планирования!\n\n📊 **Возможности планировщика:**\n• ⏳ Отложенные запуски\n• 🕐 Запуски по времени\n• 🔄 Периодические процессы\n• 🛠️ Управление задачами\n\n🚀 Ваши задачи будут выполняться автоматически!"
+      },
+      "next_step": "save_scheduler_session"
+    },
+    {
+      "id": "save_scheduler_session",
+      "type": "mongo_insert_one",
+      "params": {
+        "collection": "scheduler_sessions",
+        "document": {
+          "session_type": "planning",
+          "mode_used": "{scheduler_mode}",
+          "tasks_created": [
+            {
+              "type": "delayed",
+              "id": "{delayed_task_id}",
+              "delay": "{delay_minutes} min"
+            },
+            {
+              "type": "timed",
+              "id": "{timed_task_id}",
+              "target_time": "{target_time}"
+            },
+            {
+              "type": "periodic",
+              "id": "{periodic_task_id}",
+              "interval": "{interval_minutes} min"
+            }
+          ],
+          "completion_time": "{current_timestamp}",
+          "status": "completed"
+        },
+        "output_var": "session_saved"
+      },
+      "next_step": "log_scheduler_session"
+    },
+    {
+      "id": "log_scheduler_session",
+      "type": "log",
+      "params": {
+        "message": "Scheduler session completed. Mode: {scheduler_mode}, Tasks created: {tasks_created}",
+        "level": "INFO"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "params": {}
+    }
+  ]
+} 

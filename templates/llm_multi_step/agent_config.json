@@ -1,0 +1,19 @@
+{
+  "name": "Агент многошагового LLM процесса",
+  "scenario_id": "template_llm_multi_step",
+  "plugins": ["LLMPlugin", "MongoDBPlugin"],
+  "initial_context": {
+    "process_type": "creative_writing",
+    "user_collection": "users",
+    "models": {
+      "fast": "gpt-3.5-turbo",
+      "smart": "gpt-4",
+      "creative": "claude-3-sonnet",
+      "coding": "deepseek/deepseek-coder"
+    },
+    "max_tokens": 300,
+    "temperature_creative": 0.9,
+    "temperature_analytical": 0.3,
+    "current_timestamp": "2024-12-01T00:00:00Z"
+  }
+} 

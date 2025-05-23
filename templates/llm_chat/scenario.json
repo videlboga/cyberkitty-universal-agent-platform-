@@ -1,0 +1,213 @@
+{
+  "scenario_id": "template_llm_chat",
+  "name": "Шаблон: Умный чат-бот с LLM",
+  "description": "Персонализированный чат-бот, который использует данные пользователя из БД для создания контекстных ответов через LLM",
+  "version": "1.0",
+  "initial_context": {
+    "bot_name": "AI Ассистент",
+    "user_collection": "users",
+    "conversation_collection": "conversations",
+    "default_model": "deepseek/deepseek-chat",
+    "max_tokens": 200,
+    "temperature": 0.7,
+    "system_prompt": "Ты дружелюбный и полезный AI-ассистент. Отвечай на русском языке."
+  },
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "params": {},
+      "next_step": "get_user_id"
+    },
+    {
+      "id": "get_user_id",
+      "type": "input",
+      "params": {
+        "prompt": "Укажите ваш email для персонализации общения:",
+        "input_type": "text",
+        "output_var": "user_email"
+      },
+      "next_step": "find_user"
+    },
+    {
+      "id": "find_user",
+      "type": "mongo_find_one",
+      "params": {
+        "collection": "{user_collection}",
+        "filter": {
+          "email": "{user_email}"
+        },
+        "output_var": "user_data"
+      },
+      "next_step": "check_user_found"
+    },
+    {
+      "id": "check_user_found",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.get('user_data') is not None",
+            "next_step": "welcome_known_user"
+          }
+        ],
+        "default_next_step": "welcome_new_user"
+      }
+    },
+    {
+      "id": "welcome_new_user",
+      "type": "message",
+      "params": {
+        "text": "Привет! Я {bot_name}. Я не нашёл вас в своей базе данных, но всё равно готов помочь. Что вас интересует?"
+      },
+      "next_step": "get_user_message"
+    },
+    {
+      "id": "welcome_known_user",
+      "type": "message",
+      "params": {
+        "text": "Привет, {user_data.name}! Рад снова вас видеть. Как дела в городе {user_data.city}? Чем могу помочь?"
+      },
+      "next_step": "get_user_message"
+    },
+    {
+      "id": "get_user_message",
+      "type": "input",
+      "params": {
+        "prompt": "Напишите ваш вопрос или сообщение:",
+        "input_type": "text",
+        "output_var": "user_message"
+      },
+      "next_step": "prepare_llm_context"
+    },
+    {
+      "id": "prepare_llm_context",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.get('user_data') is not None",
+            "next_step": "llm_with_user_context"
+          }
+        ],
+        "default_next_step": "llm_without_context"
+      }
+    },
+    {
+      "id": "llm_with_user_context",
+      "type": "llm_request",
+      "params": {
+        "prompt": "{system_prompt}\n\nИнформация о пользователе:\n- Имя: {user_data.name}\n- Email: {user_data.email}\n- Город: {user_data.city}\n- Возраст: {user_data.age}\n- Телефон: {user_data.phone}\n\nВопрос пользователя: {user_message}\n\nОтветь персонализированно, учитывая информацию о пользователе:",
+        "model": "{default_model}",
+        "max_tokens": "{max_tokens}",
+        "temperature": "{temperature}",
+        "output_var": "llm_response"
+      },
+      "next_step": "show_response"
+    },
+    {
+      "id": "llm_without_context",
+      "type": "llm_request",
+      "params": {
+        "prompt": "{system_prompt}\n\nВопрос пользователя: {user_message}\n\nОтветь дружелюбно и полезно:",
+        "model": "{default_model}",
+        "max_tokens": "{max_tokens}",
+        "temperature": "{temperature}",
+        "output_var": "llm_response"
+      },
+      "next_step": "show_response"
+    },
+    {
+      "id": "show_response",
+      "type": "message",
+      "params": {
+        "text": "🤖 {bot_name}: {llm_response}"
+      },
+      "next_step": "save_conversation"
+    },
+    {
+      "id": "save_conversation",
+      "type": "mongo_insert_one",
+      "params": {
+        "collection": "{conversation_collection}",
+        "document": {
+          "user_email": "{user_email}",
+          "user_name": "{user_data.name}",
+          "user_message": "{user_message}",
+          "bot_response": "{llm_response}",
+          "model_used": "{default_model}",
+          "timestamp": "{current_timestamp}",
+          "session_id": "{session_id}"
+        },
+        "output_var": "conversation_saved"
+      },
+      "next_step": "ask_continue"
+    },
+    {
+      "id": "ask_continue",
+      "type": "input",
+      "params": {
+        "prompt": "Хотите ли вы задать ещё один вопрос? (да/нет)",
+        "input_type": "text",
+        "output_var": "continue_choice"
+      },
+      "next_step": "check_continue"
+    },
+    {
+      "id": "check_continue",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.get('continue_choice', '').lower().strip() in ['да', 'yes', 'y', 'д', '1', 'конечно', 'продолжим']",
+            "next_step": "get_user_message"
+          }
+        ],
+        "default_next_step": "farewell"
+      }
+    },
+    {
+      "id": "farewell",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.get('user_data') is not None",
+            "next_step": "farewell_known_user"
+          }
+        ],
+        "default_next_step": "farewell_new_user"
+      }
+    },
+    {
+      "id": "farewell_known_user",
+      "type": "message",
+      "params": {
+        "text": "До свидания, {user_data.name}! Было приятно с вами пообщаться. Обращайтесь в любое время!"
+      },
+      "next_step": "log_session_end"
+    },
+    {
+      "id": "farewell_new_user",
+      "type": "message",
+      "params": {
+        "text": "До свидания! Было приятно с вами пообщаться. Обращайтесь в любое время!"
+      },
+      "next_step": "log_session_end"
+    },
+    {
+      "id": "log_session_end",
+      "type": "log",
+      "params": {
+        "message": "Chat session ended for user: {user_email}",
+        "level": "INFO"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "params": {}
+    }
+  ]
+} 

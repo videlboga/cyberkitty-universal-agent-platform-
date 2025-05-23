@@ -1,0 +1,233 @@
+{
+  "scenario_id": "template_faq_rag",
+  "name": "Шаблон: FAQ бот с RAG поиском",
+  "description": "Интеллектуальный FAQ бот, который использует семантический поиск по базе знаний и генерирует ответы через LLM",
+  "version": "1.0",
+  "initial_context": {
+    "bot_name": "FAQ Помощник",
+    "knowledge_base": "company_docs",
+    "search_threshold": 0.7,
+    "max_search_results": 3,
+    "llm_model": "deepseek/deepseek-chat",
+    "fallback_message": "К сожалению, я не нашёл ответа на ваш вопрос в нашей базе знаний.",
+    "greeting": "Привет! Я FAQ помощник. Задайте мне любой вопрос о нашей компании, продуктах или услугах."
+  },
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "params": {},
+      "next_step": "welcome"
+    },
+    {
+      "id": "welcome",
+      "type": "message",
+      "params": {
+        "text": "{greeting}\n\n💡 Примеры вопросов:\n• Как работает ваш продукт?\n• Какие тарифы у вас есть?\n• Как связаться с поддержкой?\n• Что делать если возникла проблема?"
+      },
+      "next_step": "get_question"
+    },
+    {
+      "id": "get_question",
+      "type": "input",
+      "params": {
+        "prompt": "Задайте ваш вопрос:",
+        "input_type": "text",
+        "output_var": "user_question"
+      },
+      "next_step": "check_exit_intent"
+    },
+    {
+      "id": "check_exit_intent",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.get('user_question', '').lower().strip() in ['выход', 'exit', 'пока', 'спасибо', 'хватит', 'стоп']",
+            "next_step": "farewell"
+          }
+        ],
+        "default_next_step": "search_knowledge_base"
+      }
+    },
+    {
+      "id": "search_knowledge_base",
+      "type": "rag_search",
+      "params": {
+        "query": "{user_question}",
+        "knowledge_base": "{knowledge_base}",
+        "max_results": "{max_search_results}",
+        "threshold": "{search_threshold}",
+        "output_var": "search_results"
+      },
+      "next_step": "evaluate_search_results"
+    },
+    {
+      "id": "evaluate_search_results",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.get('search_results') and len(context.get('search_results', [])) > 0",
+            "next_step": "generate_answer"
+          }
+        ],
+        "default_next_step": "no_results_found"
+      }
+    },
+    {
+      "id": "generate_answer",
+      "type": "llm_request",
+      "params": {
+        "prompt": "Ты помощник службы поддержки. Пользователь задал вопрос: \"{user_question}\"\n\nЯ нашёл следующую релевантную информацию в базе знаний:\n\n{search_results}\n\nИспользуя эту информацию, дай точный и полезный ответ на вопрос пользователя. Если информация неполная, укажи это и предложи связаться с поддержкой.\n\nОтвечай дружелюбно и структурированно. Используй маркированные списки где это уместно.",
+        "model": "{llm_model}",
+        "max_tokens": 400,
+        "temperature": 0.3,
+        "output_var": "generated_answer"
+      },
+      "next_step": "show_answer"
+    },
+    {
+      "id": "show_answer",
+      "type": "message",
+      "params": {
+        "text": "🤖 **{bot_name}:**\n\n{generated_answer}\n\n---\n📚 *Ответ основан на поиске по базе знаний*"
+      },
+      "next_step": "ask_satisfaction"
+    },
+    {
+      "id": "no_results_found",
+      "type": "llm_request",
+      "params": {
+        "prompt": "Пользователь задал вопрос: \"{user_question}\"\n\nЯ не нашёл релевантной информации в базе знаний. Сгенерируй вежливое сообщение о том, что информация не найдена, и предложи:\n1. Переформулировать вопрос\n2. Связаться с поддержкой\n3. Проверить FAQ на сайте\n\nБудь дружелюбным и извинись за неудобства.",
+        "model": "{llm_model}",
+        "max_tokens": 200,
+        "temperature": 0.3,
+        "output_var": "no_results_message"
+      },
+      "next_step": "show_no_results"
+    },
+    {
+      "id": "show_no_results",
+      "type": "message",
+      "params": {
+        "text": "🤖 **{bot_name}:**\n\n{no_results_message}\n\n📞 **Контакты поддержки:**\n• Email: support@company.com\n• Телефон: +7 (800) 123-45-67\n• Чат на сайте: company.com"
+      },
+      "next_step": "ask_new_question"
+    },
+    {
+      "id": "ask_satisfaction",
+      "type": "input",
+      "params": {
+        "prompt": "Помог ли мой ответ? (да/нет/частично)",
+        "input_type": "text",
+        "output_var": "satisfaction"
+      },
+      "next_step": "process_satisfaction"
+    },
+    {
+      "id": "process_satisfaction",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.get('satisfaction', '').lower().strip() in ['да', 'yes', 'помог', 'спасибо', 'отлично']",
+            "next_step": "satisfied_response"
+          },
+          {
+            "condition": "context.get('satisfaction', '').lower().strip() in ['частично', 'не очень', 'так себе']",
+            "next_step": "partially_satisfied"
+          }
+        ],
+        "default_next_step": "not_satisfied"
+      }
+    },
+    {
+      "id": "satisfied_response",
+      "type": "message",
+      "params": {
+        "text": "Отлично! Рад, что смог помочь! 😊"
+      },
+      "next_step": "save_feedback"
+    },
+    {
+      "id": "partially_satisfied",
+      "type": "message",
+      "params": {
+        "text": "Понимаю, что ответ мог быть более полным. Рекомендую обратиться в поддержку для получения детальной консультации."
+      },
+      "next_step": "save_feedback"
+    },
+    {
+      "id": "not_satisfied",
+      "type": "message",
+      "params": {
+        "text": "Извините, что не смог полностью помочь. Ваш вопрос будет передан в службу поддержки для улучшения нашей базы знаний."
+      },
+      "next_step": "save_feedback"
+    },
+    {
+      "id": "save_feedback",
+      "type": "mongo_insert_one",
+      "params": {
+        "collection": "faq_interactions",
+        "document": {
+          "user_question": "{user_question}",
+          "search_results": "{search_results}",
+          "generated_answer": "{generated_answer}",
+          "satisfaction": "{satisfaction}",
+          "knowledge_base": "{knowledge_base}",
+          "timestamp": "{current_timestamp}",
+          "session_id": "{session_id}"
+        },
+        "output_var": "feedback_saved"
+      },
+      "next_step": "ask_new_question"
+    },
+    {
+      "id": "ask_new_question",
+      "type": "input",
+      "params": {
+        "prompt": "Есть ли у вас ещё вопросы? (да/нет)",
+        "input_type": "text",
+        "output_var": "continue_choice"
+      },
+      "next_step": "check_continue"
+    },
+    {
+      "id": "check_continue",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.get('continue_choice', '').lower().strip() in ['да', 'yes', 'есть', 'конечно', 'ещё']",
+            "next_step": "get_question"
+          }
+        ],
+        "default_next_step": "farewell"
+      }
+    },
+    {
+      "id": "farewell",
+      "type": "message",
+      "params": {
+        "text": "Спасибо за обращение! Если у вас возникнут новые вопросы, я всегда готов помочь.\n\n📞 **Не забывайте:**\n• Поддержка работает 24/7\n• FAQ доступен на сайте\n• Можете вернуться ко мне в любое время\n\nУдачного дня! 👋"
+      },
+      "next_step": "log_session_end"
+    },
+    {
+      "id": "log_session_end",
+      "type": "log",
+      "params": {
+        "message": "FAQ session ended. Total questions answered: {questions_count}",
+        "level": "INFO"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "params": {}
+    }
+  ]
+} 

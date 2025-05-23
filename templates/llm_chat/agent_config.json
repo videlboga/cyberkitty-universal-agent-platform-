@@ -1,0 +1,16 @@
+{
+  "name": "Умный чат-бот с LLM",
+  "scenario_id": "template_llm_chat",
+  "plugins": ["LLMPlugin", "MongoDBPlugin"],
+  "initial_context": {
+    "bot_name": "AI Ассистент",
+    "user_collection": "users",
+    "conversation_collection": "conversations",
+    "default_model": "deepseek/deepseek-chat",
+    "max_tokens": 200,
+    "temperature": 0.7,
+    "system_prompt": "Ты дружелюбный и полезный AI-ассистент. Отвечай на русском языке.",
+    "current_timestamp": "2024-12-01T00:00:00Z",
+    "session_id": "chat_session_001"
+  }
+} 

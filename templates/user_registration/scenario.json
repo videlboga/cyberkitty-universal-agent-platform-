@@ -1,0 +1,247 @@
+{
+  "scenario_id": "template_user_registration",
+  "name": "Шаблон: Регистрация пользователя",
+  "description": "Шаблон для сбора данных пользователя и сохранения в MongoDB с настраиваемым набором полей",
+  "version": "1.0",
+  "initial_context": {
+    "greeting": "Добро пожаловать! Давайте создадим ваш профиль.",
+    "collection_name": "users",
+    "required_fields": ["name", "email"],
+    "optional_fields": ["phone", "age", "city"]
+  },
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "params": {},
+      "next_step": "welcome_message"
+    },
+    {
+      "id": "welcome_message",
+      "type": "message",
+      "params": {
+        "text": "{greeting}"
+      },
+      "next_step": "get_name"
+    },
+    {
+      "id": "get_name",
+      "type": "input",
+      "params": {
+        "prompt": "Как вас зовут? (обязательное поле)",
+        "input_type": "text",
+        "output_var": "user_name"
+      },
+      "next_step": "validate_name"
+    },
+    {
+      "id": "validate_name",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "len(context.get('user_name', '').strip()) >= 2",
+            "next_step": "get_email"
+          }
+        ],
+        "default_next_step": "name_error"
+      }
+    },
+    {
+      "id": "name_error",
+      "type": "message",
+      "params": {
+        "text": "Имя должно содержать минимум 2 символа. Попробуйте ещё раз."
+      },
+      "next_step": "get_name"
+    },
+    {
+      "id": "get_email",
+      "type": "input",
+      "params": {
+        "prompt": "Укажите ваш email (обязательное поле)",
+        "input_type": "text",
+        "output_var": "user_email"
+      },
+      "next_step": "validate_email"
+    },
+    {
+      "id": "validate_email",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "'@' in context.get('user_email', '') and '.' in context.get('user_email', '')",
+            "next_step": "get_phone"
+          }
+        ],
+        "default_next_step": "email_error"
+      }
+    },
+    {
+      "id": "email_error",
+      "type": "message",
+      "params": {
+        "text": "Пожалуйста, укажите корректный email адрес."
+      },
+      "next_step": "get_email"
+    },
+    {
+      "id": "get_phone",
+      "type": "input",
+      "params": {
+        "prompt": "Укажите ваш номер телефона (необязательно, можете пропустить написав 'пропустить')",
+        "input_type": "text",
+        "output_var": "user_phone_raw"
+      },
+      "next_step": "process_phone"
+    },
+    {
+      "id": "process_phone",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.get('user_phone_raw', '').lower().strip() in ['пропустить', 'skip', '-', '']",
+            "next_step": "get_age"
+          }
+        ],
+        "default_next_step": "save_phone"
+      }
+    },
+    {
+      "id": "save_phone",
+      "type": "log",
+      "params": {
+        "message": "User provided phone: {user_phone_raw}",
+        "level": "INFO"
+      },
+      "next_step": "get_age"
+    },
+    {
+      "id": "get_age",
+      "type": "input",
+      "params": {
+        "prompt": "Сколько вам лет? (необязательно, можете пропустить)",
+        "input_type": "text",
+        "output_var": "user_age_raw"
+      },
+      "next_step": "process_age"
+    },
+    {
+      "id": "process_age",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.get('user_age_raw', '').lower().strip() in ['пропустить', 'skip', '-', '']",
+            "next_step": "get_city"
+          },
+          {
+            "condition": "context.get('user_age_raw', '').isdigit() and 1 <= int(context.get('user_age_raw', '0')) <= 120",
+            "next_step": "save_age"
+          }
+        ],
+        "default_next_step": "age_error"
+      }
+    },
+    {
+      "id": "age_error",
+      "type": "message",
+      "params": {
+        "text": "Пожалуйста, укажите корректный возраст (число от 1 до 120) или напишите 'пропустить'."
+      },
+      "next_step": "get_age"
+    },
+    {
+      "id": "save_age",
+      "type": "log",
+      "params": {
+        "message": "User age saved: {user_age_raw}",
+        "level": "INFO"
+      },
+      "next_step": "get_city"
+    },
+    {
+      "id": "get_city",
+      "type": "input",
+      "params": {
+        "prompt": "В каком городе вы живёте? (необязательно, можете пропустить)",
+        "input_type": "text",
+        "output_var": "user_city_raw"
+      },
+      "next_step": "process_city"
+    },
+    {
+      "id": "process_city",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.get('user_city_raw', '').lower().strip() in ['пропустить', 'skip', '-', '']",
+            "next_step": "prepare_user_data"
+          }
+        ],
+        "default_next_step": "save_city"
+      }
+    },
+    {
+      "id": "save_city",
+      "type": "log",
+      "params": {
+        "message": "User city saved: {user_city_raw}",
+        "level": "INFO"
+      },
+      "next_step": "prepare_user_data"
+    },
+    {
+      "id": "prepare_user_data",
+      "type": "log",
+      "params": {
+        "message": "Preparing to save user data for: {user_name} ({user_email})",
+        "level": "INFO"
+      },
+      "next_step": "save_user"
+    },
+    {
+      "id": "save_user",
+      "type": "mongo_insert_one",
+      "params": {
+        "collection": "{collection_name}",
+        "document": {
+          "name": "{user_name}",
+          "email": "{user_email}",
+          "phone": "{user_phone_raw}",
+          "age": "{user_age_raw}",
+          "city": "{user_city_raw}",
+          "registration_date": "{current_timestamp}",
+          "status": "active"
+        },
+        "output_var": "save_result"
+      },
+      "next_step": "confirm_registration"
+    },
+    {
+      "id": "confirm_registration",
+      "type": "message",
+      "params": {
+        "text": "Отлично, {user_name}! Ваша регистрация завершена.\n\n📧 Email: {user_email}\n📱 Телефон: {user_phone_raw}\n🎂 Возраст: {user_age_raw}\n🏙️ Город: {user_city_raw}\n\nДанные сохранены в системе."
+      },
+      "next_step": "log_success"
+    },
+    {
+      "id": "log_success",
+      "type": "log",
+      "params": {
+        "message": "User registration completed successfully. ID: {save_result}",
+        "level": "INFO"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "params": {}
+    }
+  ]
+} 

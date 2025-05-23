@@ -137,11 +137,11 @@ class ScenarioExecutor:
                 break
         return context
 
-    async def handle_message(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_message(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> None:
         message_text = step_data.get("params", {}).get("text", "(пустое сообщение)")
         resolved_message = _resolve_value_from_context(message_text, context)
         logger.info(f"Обработчик handle_message: {resolved_message}")
-        return context
+        return None  # Возвращаем None для завершенных шагов
     
     async def handle_input(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Any:
         step_params = step_data.get("params", {})

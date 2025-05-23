@@ -72,6 +72,50 @@ class InputStep(StepBase):
     type: Literal["input"]
     params: Dict[str, Any]
 
+# Универсальный тип message для простых сообщений
+class MessageStep(StepBase):
+    type: Literal["message"]
+    params: Dict[str, Any]
+
+# Новые типы шагов для планировщика
+class ScheduleDelayStep(StepBase):
+    type: Literal["schedule_delay"]
+    params: Dict[str, Any]
+
+class ScheduleAtStep(StepBase):
+    type: Literal["schedule_at"]
+    params: Dict[str, Any]
+
+class SchedulePeriodicStep(StepBase):
+    type: Literal["schedule_periodic"]
+    params: Dict[str, Any]
+
+class CancelScheduleStep(StepBase):
+    type: Literal["cancel_schedule"]
+    params: Dict[str, Any]
+
+# Новые типы шагов для оркестратора
+class ExecuteScenarioStep(StepBase):
+    type: Literal["execute_scenario"]
+    params: Dict[str, Any]
+
+class ExecuteScenariosParallelStep(StepBase):
+    type: Literal["execute_scenarios_parallel"]
+    params: Dict[str, Any]
+
+class ExecuteScenariosSequenceStep(StepBase):
+    type: Literal["execute_scenarios_sequence"]
+    params: Dict[str, Any]
+
+class ConditionalExecuteStep(StepBase):
+    type: Literal["conditional_execute"]
+    params: Dict[str, Any]
+
+# Совместимость с существующими шагами LLM
+class LLMRequestStep(StepBase):
+    type: Literal["llm_request"]
+    params: Dict[str, Any]
+
 ScenarioStep = Union[
     PluginActionStep,
     TelegramSendMessageStep,
@@ -87,7 +131,17 @@ ScenarioStep = Union[
     StartStep,
     EndStep,
     InputStep,
-    SwitchScenarioStep
+    SwitchScenarioStep,
+    MessageStep,
+    ScheduleDelayStep,
+    ScheduleAtStep,
+    SchedulePeriodicStep,
+    CancelScheduleStep,
+    ExecuteScenarioStep,
+    ExecuteScenariosParallelStep,
+    ExecuteScenariosSequenceStep,
+    ConditionalExecuteStep,
+    LLMRequestStep
 ]
 
 class Scenario(BaseModel):

@@ -19,6 +19,9 @@ from app.core.plugin_manager import PluginManager
 # Предполагаем, что LLM и RAG плагины находятся здесь (путь может отличаться)
 from app.plugins.llm_plugin import LLMPlugin
 from app.plugins.rag_plugin import RAGPlugin
+# Новые плагины
+from app.plugins.scheduler_plugin import SchedulerPlugin
+from app.plugins.orchestrator_plugin import OrchestratorPlugin
 
 # --- Конфигурация ---
 MONGO_URI = os.getenv("MONGO_URI", os.getenv("MONGO_URL", "mongodb://mongo:27017/"))
@@ -102,6 +105,11 @@ else:
 rag_plugin_instance = RAGPlugin()
 llm_plugin_instance = LLMPlugin()
 
+# --- Инициализация новых плагинов ---
+scheduler_plugin_instance = SchedulerPlugin()
+orchestrator_plugin_instance = OrchestratorPlugin()
+logger.info("Core Dependencies: SchedulerPlugin и OrchestratorPlugin инициализированы.")
+
 # --- Инициализация Repositories ---
 scenario_repo_instance = None
 agent_repo_instance = None
@@ -141,6 +149,10 @@ if scenario_repo_instance and agent_repo_instance:
             plugins_list.append(llm_plugin_instance)
         if rag_plugin_instance:
             plugins_list.append(rag_plugin_instance)
+        if scheduler_plugin_instance:
+            plugins_list.append(scheduler_plugin_instance)
+        if orchestrator_plugin_instance:
+            plugins_list.append(orchestrator_plugin_instance)
         
         scenario_executor_instance = ScenarioExecutor(plugins=plugins_list, scenario_repo=scenario_repo_instance)
         logger.info(f"ScenarioExecutor instance created successfully in dependencies: id(self)={id(scenario_executor_instance)}")

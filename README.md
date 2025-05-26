@@ -1,335 +1,210 @@
-# Universal Agent Platform
+# 🎯 Universal Agent Platform
 
-**Универсальная платформа для создания, управления и запуска ИИ-агентов с поддержкой различных интеграций и каналов взаимодействия.**
+**Универсальная платформа для создания ИИ-агентов**
 
-## 🚀 Быстрый старт
+**Принцип:** ПРОСТОТА ПРЕВЫШЕ ВСЕГО! 
 
-### 1. Клонирование репозитория
-   ```bash
-git clone https://github.com/yourusername/universal-agent-platform.git
-   cd universal_agent_system
-   ```
+> ✅ **Рефакторинг завершён!** Архитектура упрощена на 70%. Все устаревшие компоненты перемещены в `archive/`.
 
-### 2. Настройка переменных окружения
-   ```bash
-   cp .env.example .env
-# Отредактируйте .env файл с вашими настройками
-   ```
+## 🏗️ Упрощённая архитектура
 
-### 3. Запуск с Docker
-   ```bash
-   docker-compose up -d
-   ```
+```
+SimpleScenarioEngine (единственный движок)
+├── Базовые обработчики (start, end, action, input, conditional_execute)
+└── Плагин-специфичные обработчики:
+    ├── SimpleTelegramPlugin (telegram_send_message, telegram_send_buttons)
+    ├── MongoPlugin (mongo_save, mongo_get)
+    └── SimpleOrchestratorPlugin (switch_scenario)
 
-### 4. Проверка работоспособности
-   ```bash
-# API
-   curl http://localhost:8000/health
+SimpleTelegramIntegration (единый интеграционный слой)
+└── Обработка всех Telegram событий
 
-# Swagger документация
-open http://localhost:8000/docs
-   
-   # Проверка Telegram-бота
-curl http://localhost:8000/api/v1/integration/telegram/health
-   
-   # Проверка RAG-интеграции
-curl -X POST "http://localhost:8000/api/v1/integration/rag/query" \
-  -H "Content-Type: application/json" \
-  -d '{"query": "что такое искусственный интеллект", "top_k": 3}'
+Simple API (app/api/simple.py)
+└── POST /agents/{agent_id}/execute (единственный endpoint)
 ```
 
-## 📋 Доступные сервисы
+## 🎯 Принципы новой архитектуры
 
-После запуска доступны:
-- **API**: http://localhost:8000
-- **Swagger UI**: http://localhost:8000/docs  
-- **MongoDB**: localhost:27017
-- **Redis**: localhost:6380
-- **Telegram-бот**: автоматически запущен
-
-## 🏗️ Архитектура системы
-
-```mermaid
-graph TB
-    User[👤 Пользователь] -->|Telegram| TG[📱 Telegram Bot]
-    User -->|API| API[🌐 FastAPI]
-    
-    API --> Auth[🔐 Authentication]
-    API --> Agent[🤖 Agent Manager]
-    API --> Scenario[📋 Scenario Manager]
-    API --> Executor[⚙️ Scenario Executor]
-    
-    Executor --> Plugins[🔌 Plugin System]
-    
-    Plugins --> LLM[🧠 LLM Plugin<br/>OpenRouter/DeepSeek]
-    Plugins --> RAG[📚 RAG Plugin<br/>Semantic Search]
-    Plugins --> TGPlugin[📱 Telegram Plugin<br/>Messages & Callbacks]
-    Plugins --> Mongo[🗄️ MongoDB Plugin<br/>CRUD Operations]
-    
-    Agent --> DB[(🗄️ MongoDB)]
-    Scenario --> DB
-    TG --> Executor
-    
-    LLM -->|API| External1[🌍 OpenRouter]
-    RAG -->|API| External2[🌍 RAG Service]
-    TGPlugin -->|API| External3[🌍 Telegram API]
-```
-
-## 🧩 Компоненты системы
-
-### Core Components
-- **Agent Manager**: Создание и управление ИИ-агентами
-- **Scenario Manager**: Управление сценариями взаимодействия
-- **Scenario Executor**: Выполнение сценариев с поддержкой state machine
-- **Plugin System**: Расширяемая система плагинов
-
-### Plugins
-- **LLM Plugin**: Интеграция с языковыми моделями (OpenRouter, DeepSeek)
-- **RAG Plugin**: Семантический поиск по базе знаний
-- **Telegram Plugin**: Отправка сообщений, обработка callback'ов, inline кнопки
-- **MongoDB Plugin**: CRUD операции с базой данных
-
-### Databases
-- **MongoDB**: Основная база данных для агентов, сценариев, пользователей
-- **Redis**: Кэширование и временные данные
+1. ✅ **Один движок** вместо множества
+2. ✅ **Простая система плагинов** через BasePlugin
+3. ✅ **Один API endpoint** вместо множества
+4. ✅ **Минимум зависимостей** и абстракций
+5. ✅ **Явная передача контекста** между компонентами
+6. ✅ **Разделение ответственности** - движок универсален, плагины специализированы
 
 ## 📁 Структура проекта
 
+### Активные компоненты:
 ```
-universal_agent_system/
-├── app/                           # Основное приложение
-│   ├── api/                       # API endpoints
-│   │   ├── agent_actions.py       # Запуск агентов
-│   │   ├── agents.py              # CRUD агентов
-│   │   ├── integration.py         # Интеграционные endpoints
-│   │   ├── runner.py              # Выполнение сценариев
-│   │   ├── scenarios.py           # CRUD сценариев
-│   │   └── users.py               # CRUD пользователей
-│   ├── core/                      # Ядро системы
-│   │   ├── dependencies.py        # DI и инициализация
-│   │   ├── scenario_executor.py   # Исполнитель сценариев
-│   │   ├── state_machine.py       # State machine логика
-│   │   └── utils.py               # Утилиты
-│   ├── db/                        # База данных
-│   │   ├── mongodb.py             # MongoDB подключение
-│   │   └── repositories/          # Репозитории
-│   ├── models/                    # Pydantic модели
-│   ├── plugins/                   # Система плагинов
-│   │   ├── plugin_base.py         # Базовый класс плагина
-│   │   ├── llm_plugin.py          # LLM интеграция
-│   │   ├── rag_plugin.py          # RAG интеграция
-│   │   ├── telegram_plugin.py     # Telegram интеграция
-│   │   └── mongo_storage_plugin.py # MongoDB интеграция
-│   └── main.py                    # Точка входа
-├── docs/                          # Документация
-├── scenarios/                     # JSON сценарии
-│   └── unit_tests/                # Тестовые сценарии
-├── tests/                         # Unit тесты
-├── frontend/                      # React фронтенд (опционально)
-├── docker-compose.yml             # Docker конфигурация
-└── requirements.txt               # Python зависимости
+app/
+├── core/
+│   ├── simple_engine.py              # Единственный движок
+│   ├── base_plugin.py                # Базовый класс плагинов
+│   └── simple_telegram_integration.py # Telegram интеграция
+├── plugins/
+│   ├── simple_telegram_plugin.py     # Telegram плагин
+│   ├── mongo_plugin.py               # MongoDB плагин
+│   └── simple_orchestrator_plugin.py # Оркестратор сценариев
+├── api/
+│   └── simple.py                     # Единый API
+├── simple_dependencies.py            # Простые зависимости
+└── simple_main.py                    # Главный файл
 ```
 
-## 📊 API Endpoints
+### Демонстрационные материалы:
+- `telegram_scenario_refactored.js` - Демо-сценарий новой архитектуры
+- `test_refactored_architecture.py` - Тест рефакторинга
+- `REFACTORING_REPORT.md` - Подробный отчёт о рефакторинге
 
-### Основные ресурсы
+### Архив:
+- `archive/` - Все устаревшие компоненты (70% кода)
+
+## 🚀 Быстрый старт
+
+### 1. Установка зависимостей
+
 ```bash
-# Пользователи
-GET    /api/v1/users/              # Список пользователей
-POST   /api/v1/users/              # Создать пользователя
-GET    /api/v1/users/{id}          # Получить пользователя
-PATCH  /api/v1/users/{id}          # Обновить пользователя
-DELETE /api/v1/users/{id}          # Удалить пользователя
-
-# Агенты
-GET    /api/v1/agents/             # Список агентов
-POST   /api/v1/agents/             # Создать агента
-GET    /api/v1/agents/{id}         # Получить агента
-PATCH  /api/v1/agents/{id}         # Обновить агента
-DELETE /api/v1/agents/{id}         # Удалить агента
-
-# Сценарии
-GET    /api/v1/scenarios/          # Список сценариев
-POST   /api/v1/scenarios/          # Создать сценарий
-GET    /api/v1/scenarios/{id}      # Получить сценарий
-PATCH  /api/v1/scenarios/{id}      # Обновить сценарий
-DELETE /api/v1/scenarios/{id}      # Удалить сценарий
-
-# Выполнение агентов
-POST   /api/v1/agent-actions/{agent_id}/execute  # Запустить агента
+pip install -r requirements.txt
 ```
 
-### Интеграционные endpoints
+### 2. Настройка переменных окружения
+
 ```bash
-# LLM интеграция
-POST   /api/v1/integration/llm/query              # Запрос к LLM
-GET    /api/v1/integration/llm/models             # Список моделей
-
-# RAG интеграция  
-POST   /api/v1/integration/rag/query              # Поиск в RAG
-GET    /api/v1/integration/rag/health             # Healthcheck
-
-# Telegram интеграция
-POST   /api/v1/integration/telegram/send          # Отправить сообщение
-GET    /api/v1/integration/telegram/health        # Healthcheck
-
-# MongoDB интеграция
-POST   /api/v1/integration/mongo/insert           # Вставить документ
-POST   /api/v1/integration/mongo/find             # Найти документы
-POST   /api/v1/integration/mongo/update           # Обновить документ
-POST   /api/v1/integration/mongo/delete           # Удалить документ
+# Опционально - для полной функциональности
+export TELEGRAM_BOT_TOKEN="your_bot_token"
+export MONGODB_URI="mongodb://localhost:27017"
 ```
 
-## 🔌 Система плагинов
+### 3. Запуск системы
 
-### Типы шагов сценариев
-
-**Базовые шаги:**
-- `start`, `end` - начало и завершение
-- `message` - отправка сообщения
-- `input` - запрос ввода от пользователя
-- `branch` - условное ветвление
-- `log` - логирование
-
-**LLM Plugin:**
-- `llm_request` - запрос к языковой модели
-
-**RAG Plugin:**
-- `rag_search` - семантический поиск
-
-**Telegram Plugin:**
-- `telegram_send_message` - отправка сообщения
-- `telegram_edit_message` - редактирование сообщения
-
-**MongoDB Plugin:**
-- `mongo_insert_one` - вставка документа
-- `mongo_find_one` - поиск документа
-- `mongo_update_one` - обновление документа
-- `mongo_delete_one` - удаление документа
-
-## 🧪 Примеры использования
-
-### Создание простого агента
 ```bash
-curl -X POST "http://localhost:8000/api/v1/agents/" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Помощник",
-    "scenario_id": "greeting_scenario",
-    "plugins": ["LLMPlugin", "TelegramPlugin"],
-    "initial_context": {"greeting": "Привет!"}
-  }'
+# Запуск простого API
+python app/simple_main.py
+
+# Или запуск тестов
+python test_refactored_architecture.py
 ```
 
-### Запуск сценария
-```bash
-curl -X POST "http://localhost:8000/api/v1/agent-actions/{agent_id}/execute" \
-  -H "Content-Type: application/json" \
-  -d '{}'
+## 📋 API
+
+### Единственный endpoint:
+
+**POST /agents/{agent_id}/execute**
+
+```json
+{
+  "user_id": "123456789",
+  "chat_id": "987654321", 
+  "context": {
+    "user_name": "Пользователь",
+    "message_text": "/start"
+  }
+}
 ```
 
-### LLM запрос
-```bash
-curl -X POST "http://localhost:8000/api/v1/integration/llm/query" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "Объясни что такое ИИ",
-    "model": "deepseek/deepseek-chat",
-    "max_tokens": 100
-  }'
+**Response:**
+```json
+{
+  "success": true,
+  "scenario_id": "simple_telegram",
+  "final_context": {...},
+  "message": "Сценарий выполнен успешно"
+}
 ```
 
-### RAG поиск
-```bash
-curl -X POST "http://localhost:8000/api/v1/integration/rag/query" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "машинное обучение",
-    "top_k": 5
-  }'
+## 🎬 Типы шагов сценариев
+
+### Базовые (в движке):
+- `start` - Начало сценария
+- `end` - Завершение сценария  
+- `action` - Выполнение действий
+- `input` - Ожидание ввода
+- `conditional_execute` - Условная логика
+
+### Telegram (в плагине):
+- `telegram_send_message` - Отправка сообщений
+- `telegram_send_buttons` - Отправка кнопок
+- `telegram_edit_message` - Редактирование сообщений
+
+### MongoDB (в плагине):
+- `mongo_save` - Сохранение данных
+- `mongo_get` - Получение данных
+
+### Оркестрация (в плагине):
+- `switch_scenario` - Переключение сценариев
+
+## 📝 Пример сценария
+
+```javascript
+{
+  "scenario_id": "simple_demo",
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",                    // Базовый тип - в движке
+      "next_step": "welcome"
+    },
+    {
+      "id": "welcome", 
+      "type": "telegram_send_message",    // Плагин-специфичный тип
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "Привет, {user_name}!"
+      },
+      "next_step": "check_role"
+    },
+    {
+      "id": "check_role",
+      "type": "conditional_execute",      // Базовый тип - в движке
+      "params": {
+        "condition": "user_role == 'admin'",
+        "true_step": "admin_menu",
+        "false_step": "user_menu"
+      }
+    },
+    {
+      "id": "end",
+      "type": "end"                       // Базовый тип - в движке
+    }
+  ]
+}
 ```
-
-## ⚙️ Переменные окружения
-
-Основные переменные в `.env`:
-```bash
-# MongoDB
-MONGODB_URL=mongodb://localhost:27017
-MONGODB_DB_NAME=universal_agent_db
-
-# Redis
-REDIS_URL=redis://localhost:6380
-
-# Telegram
-TELEGRAM_BOT_TOKEN=your_bot_token
-
-# OpenRouter/LLM
-OPENROUTER_API_KEY=your_openrouter_key
-
-# RAG Service
-RAG_URL=https://rag.cyberkitty.tech
-
-# Логирование
-LOG_LEVEL=INFO
-```
-
-## 📖 Документация
-
-- [**Создание сценариев**](docs/scenario_development_guide.md) - Подробное руководство по созданию сценариев
-- [**Формат сценариев**](docs/scenario_format.md) - Справочник по структуре JSON сценариев
-- [**API документация**](docs/api_documentation.md) - Полная документация API
-- [**Примеры сценариев**](docs/examples/) - Готовые примеры для начала работы
 
 ## 🧪 Тестирование
 
 ```bash
-# Запуск unit тестов
-docker-compose exec app python -m pytest tests/
+# Тест новой архитектуры
+python test_refactored_architecture.py
 
-# Тестирование через scenarios/unit_tests/
-curl -X POST "http://localhost:8000/api/v1/scenarios/" \
-  -H "Content-Type: application/json" \
-  -d @scenarios/unit_tests/unit_test_llm_request.json
+# Проверка здоровья системы
+curl http://localhost:8080/simple/health
 ```
 
-## 🔧 Разработка
+## 📊 Результаты рефакторинга
 
-### Добавление нового плагина
-1. Создайте класс, наследующий от `PluginBase`
-2. Реализуйте методы `register_step_handlers()` и `healthcheck()`
-3. Добавьте плагин в `app/core/dependencies.py`
-4. Зарегистрируйте типы шагов в `app/models/scenario.py`
+| Метрика | До | После | Улучшение |
+|---------|----|----|-----------|
+| Файлов | 78 | 24 | -70% |
+| Движков | 5 | 1 | -80% |
+| API endpoints | 9 | 1 | -89% |
+| Плагинов | 14 | 3 | -79% |
 
-### Структура плагина
-```python
-from app.plugins.plugin_base import PluginBase
+## 🚫 Что НЕ нужно восстанавливать
 
-class MyPlugin(PluginBase):
-    def register_step_handlers(self, step_handlers):
-        step_handlers["my_step"] = self.handle_my_step
-    
-    async def handle_my_step(self, step_data, context):
-        # Логика обработки
-        return None  # Всегда возвращать None
-    
-    async def healthcheck(self):
-        return {"status": "healthy"}
-```
+- Множественные движки (atomic, extensible, hybrid, unified)
+- Сложные адаптеры и обёртки  
+- Дублирующиеся API endpoints
+- Избыточные сервисы
+- Сложные системы зависимостей
 
-## 🤝 Contributing
+**Все устаревшие компоненты находятся в `archive/` для справки.**
 
-1. Fork проекта
-2. Создайте feature ветку (`git checkout -b feature/amazing-feature`)
-3. Commit изменения (`git commit -m 'Add amazing feature'`)
-4. Push в ветку (`git push origin feature/amazing-feature`)
-5. Откройте Pull Request
+## 📚 Документация
 
-## 📄 Лицензия
+- `REFACTORING_REPORT.md` - Подробный отчёт о рефакторинге
+- `archive/README.md` - Описание архивированных компонентов
+- `telegram_scenario_refactored.js` - Демо-сценарий
 
-Этот проект распространяется под MIT лицензией. См. `LICENSE` для деталей.
+---
 
-## 📞 Поддержка
-
-- **Документация**: [docs/](docs/)
-- **Issues**: [GitHub Issues](https://github.com/yourusername/universal-agent-platform/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/universal-agent-platform/discussions) 
+**Помните: Простота превыше всего!** 🎯 

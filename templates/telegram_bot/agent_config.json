@@ -1,0 +1,16 @@
+{
+  "name": "🤖 Умный Telegram Ассистент",
+  "description": "Персональный ассистент в Telegram для общения с ИИ, поиска информации и планирования задач",
+  "scenario_id": "interactive_e2e_test",
+  "plugins": ["TelegramPlugin", "MongoDBPlugin", "LLMPlugin", "RAGPlugin", "SchedulerPlugin"],
+  "settings": {
+    "auto_start_scenario": true,
+    "telegram_commands": ["/start"],
+    "default_telegram_chat_id": null
+  },
+  "initial_context": {
+    "greeting": "Добро пожаловать в умного ассистента!",
+    "bot_personality": "дружелюбный и полезный",
+    "platform_name": "Умный Ассистент v1.0"
+  }
+} 

@@ -1,0 +1,203 @@
+# 🔄 АТОМАРНЫЙ БЛОК: Обработка данных
+# Универсальный блок для трансформации и валидации данных
+
+atomic_template: "data_processing"
+version: "1.0"
+description: "Обработка, валидация и трансформация данных"
+author: "Universal Agent System"
+
+# ===== ПАРАМЕТРЫ =====
+parameters:
+  input_data:
+    type: "any"
+    description: "Входные данные для обработки"
+    required: true
+  
+  operation:
+    type: "string"
+    description: "Тип операции: format, validate, transform, filter, aggregate"
+    required: true
+  
+  format_template:
+    type: "string"
+    description: "Шаблон форматирования (для operation=format)"
+    default: ""
+  
+  validation_rules:
+    type: "object"
+    description: "Правила валидации (для operation=validate)"
+    default: {}
+  
+  transform_function:
+    type: "string"
+    description: "Функция трансформации (для operation=transform)"
+    default: ""
+  
+  filter_condition:
+    type: "string"
+    description: "Условие фильтрации (для operation=filter)"
+    default: ""
+  
+  aggregate_function:
+    type: "string"
+    description: "Функция агрегации: sum, count, avg, min, max (для operation=aggregate)"
+    default: "count"
+  
+  output_var:
+    type: "string"
+    description: "Переменная для сохранения результата"
+    default: "processed_data"
+  
+  error_handling:
+    type: "string"
+    description: "Обработка ошибок: strict, lenient, ignore"
+    default: "strict"
+
+# ===== ШАГИ ВЫПОЛНЕНИЯ =====
+steps:
+  - id: "processing_start"
+    type: "log_message"
+    params:
+      message: "🔄 Начинаем обработку данных: {operation}"
+      level: "INFO"
+    next_step: "choose_operation"
+  
+  - id: "choose_operation"
+    type: "branch"
+    params:
+      variable: "operation"
+      branches:
+        "format": "format_data"
+        "validate": "validate_data"
+        "transform": "transform_data"
+        "filter": "filter_data"
+        "aggregate": "aggregate_data"
+      default: "unsupported_operation"
+  
+  # ===== ФОРМАТИРОВАНИЕ =====
+  - id: "format_data"
+    type: "action"
+    params:
+      action_type: "format_data"
+      input_data: "{input_data}"
+      template: "{format_template}"
+      output_var: "{output_var}"
+      error_handling: "{error_handling}"
+    next_step: "processing_end"
+  
+  # ===== ВАЛИДАЦИЯ =====
+  - id: "validate_data"
+    type: "action"
+    params:
+      action_type: "validate_data"
+      input_data: "{input_data}"
+      rules: "{validation_rules}"
+      output_var: "{output_var}"
+      error_handling: "{error_handling}"
+    next_step: "processing_end"
+  
+  # ===== ТРАНСФОРМАЦИЯ =====
+  - id: "transform_data"
+    type: "action"
+    params:
+      action_type: "transform_data"
+      input_data: "{input_data}"
+      function: "{transform_function}"
+      output_var: "{output_var}"
+      error_handling: "{error_handling}"
+    next_step: "processing_end"
+  
+  # ===== ФИЛЬТРАЦИЯ =====
+  - id: "filter_data"
+    type: "action"
+    params:
+      action_type: "filter_data"
+      input_data: "{input_data}"
+      condition: "{filter_condition}"
+      output_var: "{output_var}"
+      error_handling: "{error_handling}"
+    next_step: "processing_end"
+  
+  # ===== АГРЕГАЦИЯ =====
+  - id: "aggregate_data"
+    type: "action"
+    params:
+      action_type: "aggregate_data"
+      input_data: "{input_data}"
+      function: "{aggregate_function}"
+      output_var: "{output_var}"
+      error_handling: "{error_handling}"
+    next_step: "processing_end"
+  
+  # ===== ОШИБКИ =====
+  - id: "unsupported_operation"
+    type: "action"
+    params:
+      action_type: "update_context"
+      updates:
+        processing_error: "Неподдерживаемая операция: {operation}"
+        processing_failed: true
+    next_step: "processing_end"
+  
+  - id: "processing_end"
+    type: "log_message"
+    params:
+      message: "✅ Обработка данных завершена: {{{output_var}}}"
+      level: "INFO"
+
+# ===== ПРИМЕРЫ ИСПОЛЬЗОВАНИЯ =====
+examples:
+  - name: "Форматирование сообщения"
+    parameters:
+      input_data: 
+        name: "Иван"
+        age: 25
+        city: "Москва"
+      operation: "format"
+      format_template: "Пользователь {name}, {age} лет, из города {city}"
+      output_var: "formatted_message"
+
+  - name: "Валидация email"
+    parameters:
+      input_data: "user@example.com"
+      operation: "validate"
+      validation_rules:
+        type: "email"
+        required: true
+      output_var: "email_valid"
+
+  - name: "Трансформация в верхний регистр"
+    parameters:
+      input_data: "hello world"
+      operation: "transform"
+      transform_function: "upper"
+      output_var: "uppercase_text"
+
+  - name: "Фильтрация списка чисел"
+    parameters:
+      input_data: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      operation: "filter"
+      filter_condition: "x > 5"
+      output_var: "filtered_numbers"
+
+  - name: "Подсчет элементов"
+    parameters:
+      input_data: ["apple", "banana", "orange", "apple", "banana"]
+      operation: "aggregate"
+      aggregate_function: "count"
+      output_var: "items_count"
+
+# ===== ТРЕБОВАНИЯ =====
+requirements:
+  plugins: []  # Использует только базовые функции
+  
+  context_variables:
+    - "input_data"      # Данные для обработки
+
+# ===== РЕЗУЛЬТАТ =====
+output:
+  context_updates:
+    - "{output_var}": "Обработанные данные"
+    - "processing_completed": "true если успешно"
+    - "processing_failed": "true если ошибка"
+    - "processing_error": "Описание ошибки если есть" 

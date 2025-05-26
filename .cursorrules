@@ -1,55 +1,79 @@
-// Universal Agent Platform CursorRules
-// Специфические правила для платформы ИИ-агентов (FastAPI, MongoDB, Celery, React, BPMN.js)
+// Universal Agent Platform - УПРОЩЕННАЯ АРХИТЕКТУРА  
+// Принцип: ПРОСТОТА ПРЕВЫШЕ ВСЕГО!
 
-// Общие рекомендации
-- Всегда используй Markdown для документации и README
-- README.md должен содержать: название, краткое описание, структуру, примеры запуска, переменные окружения, curl-примеры для API
-- Документация API должна автогенерироваться через Swagger/OpenAPI
-- Все логи должны писаться в папку logs/ по типу событий (errors, audit, integration, events и т.д.)
-- Для Python-кода: black, isort, flake8, docstrings Google-style
-- Для JS/TS: eslint, prettier, jsdoc
-- Покрытие тестами >80% (pytest, coverage, e2e)
-- Все тестовые логи — в logs/unit_tests.log, logs/integration_tests.log
-- В корне должен быть DEVELOPMENT_PLAN.md с чек-листом задач и прогресса
+// === АРХИТЕКТУРНЫЕ ПРИНЦИПЫ ===
+// - Один SimpleScenarioEngine вместо множества движков
+// - Простая система плагинов через BasePlugin  
+// - Один API endpoint вместо множества
+// - Минимум зависимостей и абстракций
+// - Контекст передается явно между компонентами
 
-// Архитектура и структура
-- Backend: FastAPI, Pydantic, Celery, MongoDB (motor), Redis, loguru
-- Frontend: React (Next.js), TypeScript, Ant Design/MUI, BPMN.js
-- Контейнеризация: Docker, docker-compose, .env.example
-- Все сервисы должны иметь healthcheck endpoint
-- Все интеграции реализуются через плагины (plugin.py, PluginBase)
-- Логика сценариев — через state machine, поддержка триггеров (on_command, on_event, on_schedule)
-- Все сценарии и шаги должны быть сериализуемы в JSON/YAML/BPMN
+// === ОСНОВНЫЕ КОМПОНЕНТЫ ===
+// 1. SimpleScenarioEngine - единственный движок выполнения
+// 2. BasePlugin - базовый класс для всех плагинов
+// 3. Simple API - /simple/channels/{channel_id}/execute endpoint
+// 4. Simple Dependencies - минимальная инициализация
 
-// Логирование
-- Используй loguru для Python, JSON-формат логов
-- Все логи — только в папку logs/, с ротацией и сжатием
-- Логи интеграций: logs/llm_integration.log, logs/rag_integration.log, logs/crm_integration.log
-- Логи запусков агентов: logs/agent_launch.log
-- Логи ошибок: logs/errors.log
-- Логи аудита: logs/audit.log
+// === ЛОГИРОВАНИЕ ===
+// - Используй loguru для Python, JSON-формат логов
+// - Все логи — только в папку logs/, с ротацией и сжатием
+// - Логи движка: logs/engine.log
+// - Логи плагинов: logs/plugins.log  
+// - Логи ошибок: logs/errors.log
+// - Логи API: logs/api.log
 
-// Тестирование
-- Для каждого endpoint — unit- и интеграционные тесты
-- E2E-тесты для пользовательских сценариев (создание пользователя, запуск сценария)
-- Все тестовые логи — в logs/unit_tests.log, logs/integration_tests.log
+// === СТРУКТУРА ФАЙЛОВ ===
+// app/core/simple_engine.py - главный движок
+// app/core/base_plugin.py - базовый класс плагинов
+// app/plugins/ - все плагины наследуют BasePlugin
+// app/api/simple.py - упрощенный API
+// app/dependencies.py - минимальные зависимости
 
-// Документация
-- Документация хранится в docs/, автогенерация OpenAPI/Swagger
-- Примеры сценариев, плагинов, гайды — отдельными файлами
-- README.md должен содержать curl-примеры для всех API
+// === ПРАВИЛА КОДА ===
+// - Python: black, isort, flake8, docstrings Google-style
+// - JS/TS: eslint, prettier, jsdoc
+// - Покрытие тестами >80% (pytest)
+// - Все тестовые логи — в logs/tests.log
 
-// CI/CD
-- Используй pre-commit для black, isort, flake8, eslint, prettier
-- Автоматический запуск тестов и линтеров через GitHub Actions
-- Генерация отчёта о покрытии тестами
-- Проверка логов и healthcheck после деплоя
+// === ТЕСТИРОВАНИЕ ===
+// - Unit тесты для SimpleScenarioEngine
+// - Unit тесты для каждого плагина
+// - Интеграционные тесты движка + плагины
+// - E2E тесты реальных сценариев
 
-// Безопасность
-- Реализуй RBAC, аутентификацию (OAuth2/JWT), rate limiting
-- Все секреты — только в .env (не коммитить в git)
-- Логи подозрительных активностей — logs/security.log
+// === ЗАПРЕЩЕНО ===
+// - Создавать новые движки (только SimpleScenarioEngine)
+// - Усложнять систему зависимостей
+// - Создавать циклические зависимости  
+// - Смешивать ответственность компонентов
+// - Использовать старые движки (UnifiedEngine, ExtensibleEngine)
 
-// План разработки
-- DEVELOPMENT_PLAN.md обязателен, структура задач — чек-лист с прогрессом
-- Все новые задачи и изменения фиксировать в DEVELOPMENT_PLAN.md 
+// === ПЛАГИНЫ ===
+// - Все плагины наследуют BasePlugin
+// - Метод register_handlers() возвращает Dict[str, Callable]  
+// - Метод healthcheck() для проверки состояния
+// - Плагины НЕ зависят друг от друга
+// - TelegramPlugin - сообщения и callback_query
+// - MongoPlugin - работа с базой данных
+// - LLMPlugin - интеграция с ИИ
+// - OrchestratorPlugin - переключение сценариев
+
+// === СЦЕНАРИИ ===
+// - JSON формат с полями: scenario_id, steps, initial_context
+// - Шаги: {id, type, params, next_step}
+// - Типы шагов: start, end, action, input, telegram_send_message
+// - Переключение сценариев через switch_scenario шаг
+// - Контекст сохраняется между переключениями
+
+// === API ===
+// - Только один endpoint: POST /simple/channels/{channel_id}/execute
+// - Payload: {user_id?, chat_id?, scenario_id?, context?}
+// - Response: {success, scenario_id, final_context, message}
+// - Все ошибки возвращают 500 с описанием
+
+// === БЕЗОПАСНОСТЬ ===
+// - Все секреты только в .env
+// - Валидация входных данных через Pydantic
+// - Логирование подозрительной активности
+
+// Всегда следуй этим правилам для создания простой и надежной системы! 

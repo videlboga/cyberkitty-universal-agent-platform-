@@ -1,24 +1,49 @@
-python-dotenv
-fastapi
-uvicorn[standard]
-pydantic
-motor
+# Universal Agent Platform - Constructor Dependencies
+# Принцип: Конструктор агентов с простотой
+
+# Core Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+
+# Async & HTTP
+httpx==0.25.2
+aiohttp==3.9.1
+
+# MongoDB для хранения агентов и сценариев
+motor==3.3.2  # Async MongoDB driver
+pymongo==4.6.0  # MongoDB driver (required by motor)
+
+# Telegram Bot
+python-telegram-bot==20.7
+
+# Logging & Utils
+loguru==0.7.2
+python-multipart==0.0.6
+
+# Environment
+python-dotenv==1.0.0
+
+# Date & Time
+python-dateutil==2.8.2
+
+# JSON handling
+orjson==3.9.10
+
+# Development & Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+
 celery
 redis
 pytest
-pytest-cov
-black
-isort
 flake8
-loguru
-httpx
+isort
 email-validator
-pytest-asyncio
 asgi-lifespan
 requests
-python-telegram-bot[job-queue]
 pytz
-pymongo
 tenacity
 passlib[bcrypt]
 python-jose[cryptography]

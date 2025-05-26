@@ -1,4 +1,4 @@
-# Формат сценариев Universal Agent Platform
+# Формат сценариев Universal Agent Platform (KittyCore)
 
 ## 📋 Структура сценария
 
@@ -30,11 +30,11 @@
 ### Обязательные поля
 
 - **`scenario_id`** (string) - Уникальный идентификатор сценария
-- **`name`** (string) - Название сценария
 - **`steps`** (array) - Массив шагов сценария
 
 ### Опциональные поля
 
+- **`name`** (string) - Название сценария
 - **`description`** (string) - Описание сценария
 - **`version`** (string) - Версия сценария
 - **`initial_context`** (object) - Начальный контекст
@@ -59,14 +59,16 @@
 - **`params`** (object) - Параметры шага
 - **`next_step`** (string) - ID следующего шага
 
-## 🏗️ Базовые типы шагов
+## 🏗️ Базовые типы шагов (SimpleScenarioEngine)
 
 ### `start` - Начало сценария
 ```json
 {
   "id": "start",
   "type": "start",
-  "params": {},
+  "params": {
+    "message": "Начинаем сценарий"
+  },
   "next_step": "welcome_message"
 }
 ```
@@ -76,23 +78,26 @@
 {
   "id": "finish",
   "type": "end",
-  "params": {}
+  "params": {
+    "message": "Сценарий завершен"
+  }
 }
 ```
 
-### `message` - Отправка сообщения
+### `action` - Выполнение действий
 ```json
 {
-  "id": "welcome",
-  "type": "message",
+  "id": "process_data",
+  "type": "action",
   "params": {
-    "text": "Привет, {user_name}!"
+    "action": "process_user_data",
+    "data": "{user_input}"
   },
-  "next_step": "ask_question"
+  "next_step": "show_result"
 }
 ```
 
-### `input` - Запрос ввода
+### `input` - Ожидание ввода пользователя
 ```json
 {
   "id": "get_name",
@@ -110,46 +115,238 @@
 - `text` - Текстовый ввод
 - `callback_query` - Callback от inline-кнопок
 
-### `branch` - Условное ветвление
+### `conditional_execute` - Условная логика
 ```json
 {
-  "id": "check_age",
-  "type": "branch",
+  "id": "check_role",
+  "type": "conditional_execute",
   "params": {
-    "conditions": [
-      {
-        "condition": "context.user_age >= 18",
-        "next_step": "adult_content"
-      }
-    ],
-    "default_next_step": "minor_content"
+    "condition": "user_role == 'admin'",
+    "true_step": "admin_menu",
+    "false_step": "user_menu"
   }
 }
 ```
 
-### `log` - Логирование
+**Поддерживаемые условия:**
+- Сравнения: `==`, `!=`, `>`, `<`, `>=`, `<=`
+- Логические операторы: `and`, `or`, `not`
+- Проверка существования: `variable in context`
+
+## 📱 Telegram Plugin (SimpleTelegramPlugin)
+
+### `telegram_send_message` - Отправка сообщения
 ```json
 {
-  "id": "log_action",
-  "type": "log",
+  "id": "send_message",
+  "type": "telegram_send_message",
   "params": {
-    "message": "User {user_name} started scenario",
-    "level": "INFO"
+    "chat_id": "{chat_id}",
+    "text": "Привет, {user_name}!",
+    "parse_mode": "HTML"
   },
   "next_step": "next_step"
 }
 ```
 
-## 🧠 LLM Plugin - Шаги языковых моделей
+**Параметры:**
+- `chat_id` - ID чата (обязательно)
+- `text` - Текст сообщения (обязательно)
+- `parse_mode` - Режим парсинга: "HTML", "Markdown"
+- `disable_web_page_preview` - Отключить превью ссылок
+- `disable_notification` - Отправить без уведомления
 
-### `llm_request` - Запрос к LLM
+### `telegram_send_buttons` - Отправка inline кнопок
+```json
+{
+  "id": "send_buttons",
+  "type": "telegram_send_buttons",
+  "params": {
+    "chat_id": "{chat_id}",
+    "text": "Выберите действие:",
+    "buttons": [
+      [{"text": "🚀 Запустить", "callback_data": "run"}],
+      [{"text": "❓ Помощь", "callback_data": "help"}]
+    ]
+  },
+  "next_step": "handle_choice"
+}
+```
+
+**Параметры:**
+- `chat_id` - ID чата (обязательно)
+- `text` - Текст сообщения (обязательно)
+- `buttons` - Массив массивов кнопок (обязательно)
+
+### `telegram_edit_message` - Редактирование сообщения
+```json
+{
+  "id": "edit_message",
+  "type": "telegram_edit_message",
+  "params": {
+    "chat_id": "{chat_id}",
+    "message_id": "{message_id}",
+    "text": "Обновленный текст"
+  },
+  "next_step": "next_step"
+}
+```
+
+### `telegram_delete_message` - Удаление сообщения
+```json
+{
+  "id": "delete_message",
+  "type": "telegram_delete_message",
+  "params": {
+    "chat_id": "{chat_id}",
+    "message_id": "{message_id}"
+  },
+  "next_step": "next_step"
+}
+```
+
+### `telegram_send_photo` - Отправка фото
+```json
+{
+  "id": "send_photo",
+  "type": "telegram_send_photo",
+  "params": {
+    "chat_id": "{chat_id}",
+    "photo": "https://example.com/photo.jpg",
+    "caption": "Описание фото"
+  },
+  "next_step": "next_step"
+}
+```
+
+### `telegram_send_document` - Отправка документа
+```json
+{
+  "id": "send_document",
+  "type": "telegram_send_document",
+  "params": {
+    "chat_id": "{chat_id}",
+    "document": "path/to/file.pdf",
+    "caption": "Документ"
+  },
+  "next_step": "next_step"
+}
+```
+
+## 🗄️ MongoDB Plugin (MongoPlugin)
+
+### `mongo_save` - Сохранение данных
+```json
+{
+  "id": "save_user",
+  "type": "mongo_save",
+  "params": {
+    "collection": "users",
+    "document": {
+      "telegram_id": "{user_id}",
+      "name": "{user_name}",
+      "created_at": "{current_time}"
+    },
+    "output_var": "save_result"
+  },
+  "next_step": "confirm_save"
+}
+```
+
+### `mongo_get` - Получение данных
+```json
+{
+  "id": "get_user",
+  "type": "mongo_get",
+  "params": {
+    "collection": "users",
+    "filter": {
+      "telegram_id": "{user_id}"
+    },
+    "output_var": "user_data"
+  },
+  "next_step": "process_user"
+}
+```
+
+### `mongo_update` - Обновление данных
+```json
+{
+  "id": "update_user",
+  "type": "mongo_update",
+  "params": {
+    "collection": "users",
+    "filter": {
+      "telegram_id": "{user_id}"
+    },
+    "update": {
+      "$set": {
+        "last_seen": "{current_time}"
+      }
+    },
+    "output_var": "update_result"
+  },
+  "next_step": "next_step"
+}
+```
+
+### `mongo_delete` - Удаление данных
+```json
+{
+  "id": "delete_user",
+  "type": "mongo_delete",
+  "params": {
+    "collection": "users",
+    "filter": {
+      "telegram_id": "{user_id}"
+    },
+    "output_var": "delete_result"
+  },
+  "next_step": "confirm_delete"
+}
+```
+
+### `mongo_save_scenario` - Сохранение сценария
+```json
+{
+  "id": "save_scenario",
+  "type": "mongo_save_scenario",
+  "params": {
+    "scenario_id": "new_scenario",
+    "scenario_data": {
+      "scenario_id": "new_scenario",
+      "name": "Новый сценарий",
+      "steps": []
+    },
+    "output_var": "save_result"
+  },
+  "next_step": "confirm_save"
+}
+```
+
+### `mongo_get_scenario` - Получение сценария
+```json
+{
+  "id": "get_scenario",
+  "type": "mongo_get_scenario",
+  "params": {
+    "scenario_id": "target_scenario",
+    "output_var": "scenario_data"
+  },
+  "next_step": "process_scenario"
+}
+```
+
+## 🧠 LLM Plugin (SimpleLLMPlugin)
+
+### `llm_chat` - Чат с LLM
 ```json
 {
   "id": "ask_llm",
-  "type": "llm_request",
+  "type": "llm_chat",
   "params": {
     "prompt": "Объясни пользователю что такое {topic}",
-    "model": "deepseek/deepseek-chat",
+    "model": "openai/gpt-4",
     "max_tokens": 150,
     "temperature": 0.7,
     "output_var": "llm_response"
@@ -159,13 +356,41 @@
 ```
 
 **Параметры:**
-- `prompt` - Текст запроса (поддерживает переменные из контекста)
-- `model` - Модель LLM (по умолчанию: deepseek/deepseek-chat)
+- `prompt` - Текст запроса (поддерживает переменные)
+- `model` - Модель LLM (openai/gpt-4, anthropic/claude-3)
 - `max_tokens` - Максимум токенов в ответе
 - `temperature` - "Творческость" ответа (0.0-1.0)
 - `output_var` - Переменная для сохранения ответа
 
-## 📚 RAG Plugin - Семантический поиск
+### `llm_generate` - Генерация текста
+```json
+{
+  "id": "generate_text",
+  "type": "llm_generate",
+  "params": {
+    "prompt": "Напиши краткое резюме для {user_name}",
+    "model": "openai/gpt-3.5-turbo",
+    "output_var": "generated_text"
+  },
+  "next_step": "show_result"
+}
+```
+
+### `llm_analyze` - Анализ текста
+```json
+{
+  "id": "analyze_text",
+  "type": "llm_analyze",
+  "params": {
+    "text": "{user_message}",
+    "analysis_type": "sentiment",
+    "output_var": "analysis_result"
+  },
+  "next_step": "process_analysis"
+}
+```
+
+## 📚 RAG Plugin (SimpleRAGPlugin)
 
 ### `rag_search` - Поиск в базе знаний
 ```json
@@ -186,175 +411,135 @@
 - `top_k` - Количество результатов (по умолчанию: 3)
 - `output_var` - Переменная для сохранения результатов
 
-## 📱 Telegram Plugin - Мессенджер
-
-### `telegram_send_message` - Отправка сообщения
+### `rag_index` - Индексация документов
 ```json
 {
-  "id": "send_telegram",
-  "type": "telegram_send_message",
+  "id": "index_document",
+  "type": "rag_index",
   "params": {
-    "chat_id": "{chat_id}",
-    "text": "Ваш результат: {result}",
-    "reply_markup": {
-      "inline_keyboard": [
-        [
-          {
-            "text": "Да ✅",
-            "callback_data": "answer_yes"
-          },
-          {
-            "text": "Нет ❌", 
-            "callback_data": "answer_no"
-          }
-        ]
-      ]
+    "document": "{document_text}",
+    "metadata": {
+      "source": "user_upload",
+      "type": "manual"
     },
-    "output_var": "message_info"
+    "output_var": "index_result"
   },
-  "next_step": "wait_callback"
+  "next_step": "confirm_index"
 }
 ```
 
-### `telegram_edit_message` - Редактирование сообщения
+## ⏰ Scheduler Plugin (SimpleSchedulerPlugin)
+
+### `schedule_task` - Планирование задачи
 ```json
 {
-  "id": "edit_telegram",
-  "type": "telegram_edit_message",
+  "id": "schedule_reminder",
+  "type": "schedule_task",
   "params": {
-    "chat_id": "{chat_id}",
-    "message_id": "{message_id}",
-    "text": "Обновлённый текст",
-    "reply_markup": null
-  },
-  "next_step": "next_step"
-}
-```
-
-## 🗄️ MongoDB Plugin - База данных
-
-### `mongo_insert_one` - Вставка документа
-```json
-{
-  "id": "save_user",
-  "type": "mongo_insert_one",
-  "params": {
-    "collection": "users",
-    "document": {
-      "name": "{user_name}",
-      "created_at": "{current_timestamp}"
+    "task_id": "reminder_{user_id}",
+    "delay_seconds": 3600,
+    "task_data": {
+      "type": "reminder",
+      "message": "Напоминание для {user_name}"
     },
-    "output_var": "insert_result"
+    "output_var": "schedule_result"
   },
-  "next_step": "confirm_save"
+  "next_step": "confirm_schedule"
 }
 ```
 
-### `mongo_find_one` - Поиск документа
+### `cancel_task` - Отмена задачи
 ```json
 {
-  "id": "find_user",
-  "type": "mongo_find_one",
+  "id": "cancel_reminder",
+  "type": "cancel_task",
   "params": {
-    "collection": "users",
+    "task_id": "reminder_{user_id}",
+    "output_var": "cancel_result"
+  },
+  "next_step": "confirm_cancel"
+}
+```
+
+### `list_tasks` - Список задач
+```json
+{
+  "id": "list_user_tasks",
+  "type": "list_tasks",
+  "params": {
     "filter": {
-      "telegram_id": "{telegram_id}"
+      "user_id": "{user_id}"
     },
-    "output_var": "user_data"
+    "output_var": "tasks_list"
   },
-  "next_step": "process_user"
+  "next_step": "show_tasks"
 }
 ```
 
-### `mongo_update_one` - Обновление документа
+## 🔄 Переменные и контекст
+
+### Подстановка переменных
+
+В параметрах шагов можно использовать переменные из контекста:
+
 ```json
 {
-  "id": "update_user",
-  "type": "mongo_update_one",
-  "params": {
-    "collection": "users",
-    "filter": {
-      "telegram_id": "{telegram_id}"
-    },
-    "update": {
-      "$set": {
-        "last_seen": "{current_timestamp}",
-        "status": "active"
-      }
-    },
-    "output_var": "update_result"
-  },
-  "next_step": "confirm_update"
+  "text": "Привет, {user_name}! Ваш ID: {user_id}"
 }
 ```
 
-### `mongo_delete_one` - Удаление документа
+### Вложенные переменные
+
 ```json
 {
-  "id": "delete_user",
-  "type": "mongo_delete_one",
-  "params": {
-    "collection": "users",
-    "filter": {
-      "telegram_id": "{telegram_id}"
-    },
-    "output_var": "delete_result"
-  },
-  "next_step": "confirm_delete"
+  "text": "Ваш профиль: {user.profile.name}"
 }
 ```
 
-## 🔄 Работа с контекстом
+### Массивы
 
-### Переменные из контекста
-Используйте фигурные скобки для подстановки переменных:
 ```json
 {
-  "text": "Привет, {user_name}! Сегодня {current_date}"
+  "text": "Первый элемент: {items.0}"
 }
 ```
 
-### Сохранение результатов
-Используйте `output_var` для сохранения результатов шагов:
-```json
-{
-  "params": {
-    "output_var": "variable_name"
-  }
-}
-```
-
-### Доступ к результатам
-После сохранения, переменные доступны в последующих шагах:
-```json
-{
-  "text": "LLM ответил: {llm_response}"
-}
-```
-
-## ✅ Пример полного сценария
+## 📝 Полный пример сценария
 
 ```json
 {
   "scenario_id": "user_registration",
   "name": "Регистрация пользователя",
-  "description": "Сценарий для регистрации нового пользователя",
+  "description": "Сценарий регистрации нового пользователя",
   "version": "1.0",
   "initial_context": {
-    "greeting": "Добро пожаловать!"
+    "registration_step": "start"
   },
   "steps": [
     {
       "id": "start",
       "type": "start",
-      "params": {},
+      "params": {
+        "message": "Начинаем регистрацию"
+      },
       "next_step": "welcome"
     },
     {
       "id": "welcome",
-      "type": "message",
+      "type": "telegram_send_message",
       "params": {
-        "text": "{greeting} Давайте зарегистрируем вас в системе."
+        "chat_id": "{chat_id}",
+        "text": "🎯 Добро пожаловать в систему!\n\nДавайте зарегистрируем вас.",
+        "parse_mode": "HTML"
+      },
+      "next_step": "ask_name"
+    },
+    {
+      "id": "ask_name",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "Как вас зовут?"
       },
       "next_step": "get_name"
     },
@@ -362,19 +547,20 @@
       "id": "get_name",
       "type": "input",
       "params": {
-        "prompt": "Как вас зовут?",
+        "input_type": "text",
         "output_var": "user_name"
       },
       "next_step": "save_user"
     },
     {
       "id": "save_user",
-      "type": "mongo_insert_one",
+      "type": "mongo_save",
       "params": {
         "collection": "users",
         "document": {
+          "telegram_id": "{user_id}",
           "name": "{user_name}",
-          "registered_at": "{current_timestamp}"
+          "registered_at": "{current_time}"
         },
         "output_var": "save_result"
       },
@@ -382,16 +568,36 @@
     },
     {
       "id": "confirm",
-      "type": "message",
+      "type": "telegram_send_buttons",
       "params": {
-        "text": "Спасибо, {user_name}! Вы успешно зарегистрированы."
+        "chat_id": "{chat_id}",
+        "text": "✅ Регистрация завершена!\n\nПривет, {user_name}!",
+        "buttons": [
+          [{"text": "🚀 Начать работу", "callback_data": "start_work"}],
+          [{"text": "❓ Помощь", "callback_data": "help"}]
+        ]
       },
       "next_step": "end"
     },
     {
       "id": "end",
       "type": "end",
-      "params": {}
+      "params": {
+        "message": "Регистрация завершена успешно"
+      }
     }
   ]
-} 
+}
+```
+
+## 🚀 Лучшие практики
+
+1. **Уникальные ID шагов** - Используйте описательные и уникальные идентификаторы
+2. **Обработка ошибок** - Всегда предусматривайте альтернативные пути
+3. **Переменные контекста** - Используйте понятные имена переменных
+4. **Модульность** - Разбивайте сложные сценарии на простые шаги
+5. **Тестирование** - Тестируйте каждый путь выполнения сценария
+
+---
+
+**Принцип:** ПРОСТОТА ПРЕВЫШЕ ВСЕГО! 🎯

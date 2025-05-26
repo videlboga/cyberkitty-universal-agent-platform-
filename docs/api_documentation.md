@@ -1,237 +1,400 @@
-# API Документация Universal Agent Platform
+# API Документация Universal Agent Platform (KittyCore)
 
 ## 🌐 Базовая информация
 
 **Base URL**: `http://localhost:8000`  
-**API Version**: `v1`  
+**API Prefix**: `/simple`  
 **Content-Type**: `application/json`
 
 ## 📋 Содержание
 
-1. [Аутентификация](#аутентификация)
-2. [Пользователи (Users)](#пользователи-users)
-3. [Агенты (Agents)](#агенты-agents)
-4. [Сценарии (Scenarios)](#сценарии-scenarios)
-5. [Выполнение агентов (Agent Actions)](#выполнение-агентов-agent-actions)
-6. [Интеграции (Integrations)](#интеграции-integrations)
-7. [Коды ответов](#коды-ответов)
-8. [Примеры использования](#примеры-использования)
+1. [Основной API](#основной-api)
+2. [Служебные endpoints](#служебные-endpoints)
+3. [MongoDB операции](#mongodb-операции)
+4. [Выполнение шагов](#выполнение-шагов)
+5. [Коды ответов](#коды-ответов)
+6. [Примеры использования](#примеры-использования)
 
-## 🔐 Аутентификация
+## 🚀 Основной API
 
-В текущей версии аутентификация упрощена. В будущих версиях будет реализован JWT/OAuth2.
+### Выполнение сценария канала
 
-## 👥 Пользователи (Users)
+Основной endpoint для выполнения сценариев.
 
-### Получить список всех пользователей
 ```http
-GET /api/v1/users/
-```
-
-**Ответ:**
-```json
-[
-  {
-    "id": "user_id",
-    "username": "john_doe",
-    "telegram_id": "123456789",
-    "role": "user",
-    "created_at": "2024-01-01T00:00:00Z",
-    "is_active": true
-  }
-]
-```
-
-### Создать пользователя
-```http
-POST /api/v1/users/
+POST /simple/channels/{channel_id}/execute
 Content-Type: application/json
-
-{
-  "username": "new_user",
-  "telegram_id": "987654321",
-  "role": "user"
-}
 ```
 
-### Получить пользователя по ID
-```http
-GET /api/v1/users/{user_id}
-```
+**Параметры пути:**
+- `channel_id` (string) - ID канала для выполнения
 
-### Обновить пользователя
-```http
-PATCH /api/v1/users/{user_id}
-Content-Type: application/json
-
-{
-  "username": "updated_username",
-  "is_active": false
-}
-```
-
-### Удалить пользователя
-```http
-DELETE /api/v1/users/{user_id}
-```
-
-## 🤖 Агенты (Agents)
-
-### Получить список всех агентов
-```http
-GET /api/v1/agents/
-```
-
-**Ответ:**
-```json
-[
-  {
-    "id": "agent_id",
-    "name": "Помощник по продажам",
-    "scenario_id": "sales_scenario",
-    "plugins": ["LLMPlugin", "TelegramPlugin"],
-    "initial_context": {
-      "greeting": "Добро пожаловать!",
-      "department": "sales"
-    },
-    "created_at": "2024-01-01T00:00:00Z",
-    "is_active": true
-  }
-]
-```
-
-### Создать агента
-```http
-POST /api/v1/agents/
-Content-Type: application/json
-
-{
-  "name": "Новый агент",
-  "scenario_id": "greeting_scenario",
-  "plugins": ["LLMPlugin", "RAGPlugin"],
-  "initial_context": {
-    "role": "assistant",
-    "language": "ru"
-  }
-}
-```
-
-**Пример ответа:**
+**Тело запроса:**
 ```json
 {
-  "id": "507f1f77bcf86cd799439011",
-  "name": "Новый агент",
-  "scenario_id": "greeting_scenario",
-  "plugins": ["LLMPlugin", "RAGPlugin"],
-  "initial_context": {
-    "role": "assistant",
-    "language": "ru"
+  "user_id": "123456789",
+  "chat_id": "987654321",
+  "context": {
+    "user_name": "Пользователь",
+    "message_text": "/start",
+    "custom_field": "value"
   },
-  "created_at": "2024-01-01T10:30:00Z",
-  "is_active": true
+  "scenario_id": "specific_scenario"
 }
 ```
 
-### Получить агента по ID
-```http
-GET /api/v1/agents/{agent_id}
-```
+**Поля запроса:**
+- `user_id` (string, optional) - ID пользователя
+- `chat_id` (string, optional) - ID чата в Telegram
+- `context` (object, optional) - Дополнительный контекст
+- `scenario_id` (string, optional) - Конкретный сценарий для выполнения
 
-### Обновить агента
-```http
-PATCH /api/v1/agents/{agent_id}
-Content-Type: application/json
-
+**Ответ:**
+```json
 {
-  "name": "Обновлённое имя",
-  "plugins": ["LLMPlugin", "TelegramPlugin", "RAGPlugin"],
-  "is_active": false
+  "success": true,
+  "scenario_id": "simple_telegram",
+  "final_context": {
+    "user_id": "123456789",
+    "chat_id": "987654321",
+    "user_name": "Пользователь",
+    "execution_result": "completed"
+  },
+  "message": "Сценарий выполнен успешно"
 }
 ```
 
-### Удалить агента
-```http
-DELETE /api/v1/agents/{agent_id}
-```
+**Поля ответа:**
+- `success` (boolean) - Успешно ли выполнен сценарий
+- `scenario_id` (string) - ID выполненного сценария
+- `final_context` (object) - Финальный контекст после выполнения
+- `message` (string, optional) - Сообщение о результате
+- `error` (string, optional) - Ошибка, если произошла
 
-## 📋 Сценарии (Scenarios)
+## 🔧 Служебные endpoints
 
-### Получить список всех сценариев
+### Проверка здоровья системы
+
 ```http
-GET /api/v1/scenarios/
+GET /simple/health
 ```
 
 **Ответ:**
 ```json
-[
-  {
-    "scenario_id": "greeting_scenario",
-    "name": "Приветствие",
-    "description": "Простой сценарий приветствия пользователя",
-    "version": "1.0",
-    "initial_context": {
-      "greeting": "Привет!"
-    },
-    "steps": [
-      {
-        "id": "start",
-        "type": "start",
-        "params": {},
-        "next_step": "greet_user"
-      }
-    ]
-  }
-]
+{
+  "status": "healthy",
+  "engine": "SimpleScenarioEngine",
+  "plugins": {
+    "SimpleTelegramPlugin": "healthy",
+    "MongoPlugin": "healthy",
+    "SimpleLLMPlugin": "healthy",
+    "SimpleRAGPlugin": "healthy",
+    "SimpleSchedulerPlugin": "healthy"
+  },
+  "timestamp": "2024-01-01T12:00:00Z"
+}
 ```
 
-### Создать сценарий
-```http
-POST /api/v1/scenarios/
-Content-Type: application/json
+### Информация о системе
 
+```http
+GET /simple/info
+```
+
+**Ответ:**
+```json
 {
-  "scenario_id": "new_scenario",
-  "name": "Новый сценарий",
-  "description": "Описание нового сценария",
-  "version": "1.0",
-  "initial_context": {},
-  "steps": [
+  "engine": "SimpleScenarioEngine",
+  "version": "1.0.0",
+  "plugins": [
     {
-      "id": "start",
-      "type": "start",
-      "params": {},
-      "next_step": "end"
+      "name": "SimpleTelegramPlugin",
+      "handlers": [
+        "telegram_send_message",
+        "telegram_send_buttons",
+        "telegram_edit_message"
+      ]
     },
     {
-      "id": "end",
-      "type": "end",
-      "params": {}
+      "name": "MongoPlugin", 
+      "handlers": [
+        "mongo_save",
+        "mongo_get",
+        "mongo_update"
+      ]
+    }
+  ],
+  "total_handlers": 15
+}
+```
+
+## 🗄️ MongoDB операции
+
+### Поиск документов
+
+```http
+POST /simple/mongo/find
+Content-Type: application/json
+```
+
+**Тело запроса:**
+```json
+{
+  "collection": "users",
+  "filter": {
+    "telegram_id": "123456789"
+  }
+}
+```
+
+**Ответ:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "507f1f77bcf86cd799439011",
+      "telegram_id": "123456789",
+      "username": "user123",
+      "created_at": "2024-01-01T00:00:00Z"
     }
   ]
 }
 ```
 
-### Получить сценарий по ID
+### Вставка документа
+
 ```http
-GET /api/v1/scenarios/{scenario_id}
+POST /simple/mongo/insert
+Content-Type: application/json
 ```
 
-### Обновить сценарий
-```http
-PATCH /api/v1/scenarios/{scenario_id}
-Content-Type: application/json
-
+**Тело запроса:**
+```json
 {
-  "name": "Обновлённое название",
-  "description": "Новое описание"
+  "collection": "users",
+  "document": {
+    "telegram_id": "987654321",
+    "username": "newuser",
+    "role": "user"
+  }
 }
 ```
 
-### Удалить сценарий
-```http
-DELETE /api/v1/scenarios/{scenario_id}
+**Ответ:**
+```json
+{
+  "success": true,
+  "data": {
+    "inserted_id": "507f1f77bcf86cd799439012"
+  }
+}
 ```
+
+### Сохранение сценария
+
+```http
+POST /simple/mongo/save-scenario
+Content-Type: application/json
+```
+
+**Тело запроса:**
+```json
+{
+  "scenario_id": "new_scenario",
+  "document": {
+    "scenario_id": "new_scenario",
+    "name": "Новый сценарий",
+    "description": "Описание сценария",
+    "steps": [
+      {
+        "id": "start",
+        "type": "start",
+        "next_step": "end"
+      },
+      {
+        "id": "end",
+        "type": "end"
+      }
+    ]
+  }
+}
+```
+
+**Ответ:**
+```json
+{
+  "success": true,
+  "data": {
+    "scenario_id": "new_scenario",
+    "saved": true
+  }
+}
+```
+
+## ⚙️ Выполнение шагов
+
+### Выполнение отдельного шага
+
+```http
+POST /simple/execute
+Content-Type: application/json
+```
+
+**Тело запроса:**
+```json
+{
+  "step": {
+    "id": "send_message",
+    "type": "telegram_send_message",
+    "params": {
+      "chat_id": "123456789",
+      "text": "Привет, мир!"
+    }
+  },
+  "context": {
+    "user_id": "123456789",
+    "chat_id": "123456789"
+  }
+}
+```
+
+**Ответ:**
+```json
+{
+  "success": true,
+  "context": {
+    "user_id": "123456789",
+    "chat_id": "123456789",
+    "message_sent": true,
+    "message_id": 42
+  }
+}
+```
+
+## 📊 Коды ответов
+
+| Код | Описание |
+|-----|----------|
+| 200 | Успешное выполнение |
+| 400 | Неверный запрос |
+| 404 | Ресурс не найден |
+| 500 | Внутренняя ошибка сервера |
+
+### Примеры ошибок
+
+**404 - Сценарий не найден:**
+```json
+{
+  "detail": "Сценарий 'unknown_scenario' не найден в базе данных"
+}
+```
+
+**500 - Ошибка выполнения:**
+```json
+{
+  "success": false,
+  "scenario_id": "failed_scenario",
+  "final_context": {},
+  "error": "Ошибка выполнения шага: telegram_send_message"
+}
+```
+
+## 🔍 Примеры использования
+
+### Запуск простого Telegram сценария
+
+```bash
+curl -X POST "http://localhost:8000/simple/channels/telegram_main/execute" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "123456789",
+    "chat_id": "123456789",
+    "context": {
+      "user_name": "Иван",
+      "message_text": "/start"
+    }
+  }'
+```
+
+### Проверка здоровья системы
+
+```bash
+curl "http://localhost:8000/simple/health"
+```
+
+### Поиск пользователя в MongoDB
+
+```bash
+curl -X POST "http://localhost:8000/simple/mongo/find" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "collection": "users",
+    "filter": {
+      "telegram_id": "123456789"
+    }
+  }'
+```
+
+### Выполнение отдельного шага
+
+```bash
+curl -X POST "http://localhost:8000/simple/execute" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "step": {
+      "id": "test_step",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "123456789",
+        "text": "Тестовое сообщение"
+      }
+    },
+    "context": {
+      "user_id": "123456789"
+    }
+  }'
+```
+
+## 🔌 Поддерживаемые типы шагов
+
+### Базовые типы (SimpleScenarioEngine)
+- `start` - Начало сценария
+- `end` - Завершение сценария
+- `action` - Выполнение действий
+- `input` - Ожидание ввода
+- `conditional_execute` - Условная логика
+
+### Telegram (SimpleTelegramPlugin)
+- `telegram_send_message` - Отправка сообщений
+- `telegram_send_buttons` - Отправка inline кнопок
+- `telegram_edit_message` - Редактирование сообщений
+- `telegram_delete_message` - Удаление сообщений
+- `telegram_send_photo` - Отправка фото
+- `telegram_send_document` - Отправка документов
+
+### MongoDB (MongoPlugin)
+- `mongo_save` - Сохранение данных
+- `mongo_get` - Получение данных
+- `mongo_update` - Обновление данных
+- `mongo_delete` - Удаление данных
+- `mongo_save_scenario` - Сохранение сценария
+- `mongo_get_scenario` - Получение сценария
+
+### LLM (SimpleLLMPlugin)
+- `llm_chat` - Чат с LLM
+- `llm_generate` - Генерация текста
+- `llm_analyze` - Анализ текста
+
+### RAG (SimpleRAGPlugin)
+- `rag_search` - Поиск в базе знаний
+- `rag_index` - Индексация документов
+
+### Планировщик (SimpleSchedulerPlugin)
+- `schedule_task` - Планирование задачи
+- `cancel_task` - Отмена задачи
+- `list_tasks` - Список задач
 
 ---
 
-*Продолжение следует...* 
+**Принцип:** ПРОСТОТА ПРЕВЫШЕ ВСЕГО! 🎯 

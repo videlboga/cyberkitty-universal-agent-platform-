@@ -1,0 +1,125 @@
+{
+  "atomic_template": "mongo_find_data",
+  "version": "1.0",
+  "description": "Поиск данных в MongoDB",
+  "author": "KittyCore Universal Agent Platform",
+  
+  "parameters": {
+    "collection": {
+      "type": "string",
+      "description": "Название коллекции",
+      "required": true,
+      "example": "users"
+    },
+    "filter": {
+      "type": "object",
+      "description": "Фильтр для поиска",
+      "required": true,
+      "example": {"user_id": "{user_id}"}
+    },
+    "find_one": {
+      "type": "boolean",
+      "description": "Найти только один документ",
+      "default": true
+    },
+    "projection": {
+      "type": "object",
+      "description": "Поля для возврата",
+      "example": {"name": 1, "email": 1, "_id": 0}
+    },
+    "sort": {
+      "type": "object",
+      "description": "Сортировка результатов",
+      "example": {"created_at": -1}
+    },
+    "limit": {
+      "type": "integer",
+      "description": "Лимит результатов",
+      "default": 10
+    },
+    "output_var": {
+      "type": "string",
+      "description": "Переменная для сохранения результата",
+      "default": "mongo_result"
+    }
+  },
+  
+  "scenario_id": "atomic_mongo_find_data",
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "find_documents"
+    },
+    {
+      "id": "find_documents",
+      "type": "mongo_find_one_document",
+      "params": {
+        "collection": "{collection}",
+        "filter": "{filter}",
+        "projection": "{projection}",
+        "output_var": "{output_var}"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  
+  "examples": [
+    {
+      "name": "Поиск пользователя по ID",
+      "context": {
+        "collection": "users",
+        "filter": {"user_id": "123456789"},
+        "find_one": true
+      }
+    },
+    {
+      "name": "Поиск сообщений пользователя",
+      "context": {
+        "collection": "messages",
+        "filter": {"user_id": "{user_id}"},
+        "find_one": false,
+        "sort": {"timestamp": -1},
+        "limit": 5,
+        "user_id": "123456789"
+      }
+    },
+    {
+      "name": "Поиск с проекцией",
+      "context": {
+        "collection": "user_profiles",
+        "filter": {"user_id": "123456789"},
+        "projection": {"name": 1, "preferences": 1, "_id": 0},
+        "find_one": true
+      }
+    },
+    {
+      "name": "Поиск активных пользователей",
+      "context": {
+        "collection": "users",
+        "filter": {"status": "active", "last_seen": {"$gte": "2024-01-01"}},
+        "find_one": false,
+        "sort": {"last_seen": -1},
+        "limit": 20
+      }
+    }
+  ],
+  
+  "requirements": {
+    "plugins": ["MongoPlugin"],
+    "context_variables": ["collection", "filter"],
+    "environment": ["MONGODB_URL"]
+  },
+  
+  "output": {
+    "context_updates": {
+      "mongo_result": "Найденные документы или документ",
+      "mongo_found": "Флаг успешности поиска",
+      "mongo_count": "Количество найденных документов"
+    }
+  }
+} 

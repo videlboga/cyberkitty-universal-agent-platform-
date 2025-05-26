@@ -1,40 +1,110 @@
-# Шаблоны сценариев Universal Agent Platform
+# Шаблоны сценариев KittyCore Universal Agent Platform
 
 Коллекция готовых шаблонов сценариев для быстрого старта и обучения.
 
 ## 📁 Структура шаблонов
 
+### 🧩 Атомарные сценарии
+| Сценарий | Описание | Плагины | Сложность |
+|----------|----------|---------|-----------|
+| [atomic/](atomic/) | **10 атомарных блоков** для композиции | Различные | 🟢 Простые |
+| `telegram_send_message` | Отправка сообщения в Telegram | SimpleTelegramPlugin | 🟢 |
+| `telegram_send_buttons` | Отправка сообщения с кнопками | SimpleTelegramPlugin | 🟢 |
+| `llm_query` | Запрос к языковой модели | SimpleLLMPlugin | 🟡 |
+| `mongo_save_data` | Сохранение данных в MongoDB | MongoPlugin | 🟢 |
+| `mongo_find_data` | Поиск данных в MongoDB | MongoPlugin | 🟢 |
+| `rag_search` | Семантический поиск в базе знаний | SimpleRAGPlugin | 🟡 |
+| `conditional_branch` | Условное ветвление | Core Engine | 🟡 |
+| `switch_scenario` | Переключение сценариев | Core Engine | 🟡 |
+| `scheduler_create_task` | Создание отложенной задачи | SimpleSchedulerPlugin | 🟡 |
+| `log_message` | Логирование сообщений | Core Engine | 🟢 |
+
+### 🏗️ Композитные сценарии
 | Шаблон | Описание | Сложность | Плагины |
 |--------|----------|-----------|---------|
-| [user_registration](user_registration/) | Регистрация пользователя с настраиваемыми полями | 🟢 Простой | MongoDB |
-| [llm_chat](llm_chat/) | Умный чат-бот с контекстом пользователя | 🟡 Средний | LLM, MongoDB |
+| [user_registration](user_registration/) | Регистрация пользователя с настраиваемыми полями | 🟡 Средний | MongoDB, Telegram |
+| [llm_chat](llm_chat/) | Умный чат-бот с контекстом пользователя | 🟡 Средний | LLM, MongoDB, Telegram |
 | [llm_multi_step](llm_multi_step/) | LLM с разными моделями на каждом шаге | 🟡 Средний | LLM, MongoDB |
-| [faq_rag](faq_rag/) | FAQ бот с семантическим поиском | 🟡 Средний | RAG, LLM |
-| [orchestrator](orchestrator/) | Оркестратор других сценариев | 🔴 Сложный | Orchestrator, All |
-| [scheduler](scheduler/) | Планировщик отложенных запусков | 🔴 Сложный | Scheduler |
+| [faq_rag](faq_rag/) | FAQ бот с семантическим поиском | 🟡 Средний | RAG, LLM, Telegram |
+| [orchestrator](orchestrator/) | Оркестратор других сценариев | 🔴 Сложный | All Plugins |
+| [scheduler](scheduler/) | Планировщик отложенных запусков | 🔴 Сложный | Scheduler, Telegram |
 
 ## 🚀 Быстрый старт
 
-### 1. Скопируйте шаблон
+### 1. Атомарный сценарий (простой)
 ```bash
-cp -r templates/user_registration scenarios/my_registration
-```
-
-### 2. Настройте сценарий
-```bash
-nano scenarios/my_registration/scenario.json
-```
-
-### 3. Создайте агента
-```bash
-curl -X POST http://localhost:8000/agents \
+# Отправить сообщение в Telegram
+curl -X POST http://localhost:8000/simple/execute \
   -H "Content-Type: application/json" \
-  -d @templates/user_registration/agent_config.json
+  -d '{
+    "scenario_id": "atomic_telegram_send_message",
+    "context": {
+      "chat_id": "123456789",
+      "text": "Привет из KittyCore!"
+    }
+  }'
 ```
 
-### 4. Запустите сценарий
+### 2. Композитный сценарий (сложный)
 ```bash
-curl -X POST http://localhost:8000/agents/{agent_id}/execute
+# Скопировать и настроить шаблон
+cp -r templates/user_registration scenarios/my_registration
+nano scenarios/my_registration/scenario.json
+
+# Выполнить через API
+curl -X POST http://localhost:8000/simple/channels/telegram_bot/execute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scenario_id": "user_registration",
+    "context": {
+      "user_id": "123456789",
+      "chat_id": "123456789"
+    }
+  }'
+```
+
+### 3. Создание композиции из атомарных
+```bash
+# Создать новый сценарий из атомарных блоков
+cat > scenarios/my_composite.json << 'EOF'
+{
+  "scenario_id": "my_welcome_flow",
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "log_start"
+    },
+    {
+      "id": "log_start",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_log_message",
+        "context_updates": {
+          "message": "Начинаем приветствие пользователя {user_name}",
+          "level": "INFO"
+        }
+      },
+      "next_step": "send_welcome"
+    },
+    {
+      "id": "send_welcome",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_telegram_send_message",
+        "context_updates": {
+          "text": "Добро пожаловать, {user_name}!"
+        }
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ]
+}
+EOF
 ```
 
 ## 📚 Категории шаблонов

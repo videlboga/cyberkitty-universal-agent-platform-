@@ -1,0 +1,124 @@
+{
+  "atomic_template": "mongo_save_data",
+  "version": "1.0",
+  "description": "Сохранение данных в MongoDB",
+  "author": "KittyCore Universal Agent Platform",
+  
+  "parameters": {
+    "collection": {
+      "type": "string",
+      "description": "Название коллекции",
+      "required": true,
+      "example": "users"
+    },
+    "document": {
+      "type": "object",
+      "description": "Документ для сохранения",
+      "required": true,
+      "example": {
+        "user_id": "{user_id}",
+        "name": "{user_name}",
+        "created_at": "{timestamp}"
+      }
+    },
+    "upsert": {
+      "type": "boolean",
+      "description": "Обновить если существует",
+      "default": false
+    },
+    "filter": {
+      "type": "object",
+      "description": "Фильтр для upsert операции",
+      "example": {"user_id": "{user_id}"}
+    },
+    "output_var": {
+      "type": "string",
+      "description": "Переменная для сохранения результата",
+      "default": "mongo_result"
+    }
+  },
+  
+  "scenario_id": "atomic_mongo_save_data",
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "save_document"
+    },
+    {
+      "id": "save_document",
+      "type": "mongo_insert_document",
+      "params": {
+        "collection": "{collection}",
+        "document": "{document}",
+        "output_var": "{output_var}"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  
+  "examples": [
+    {
+      "name": "Сохранение пользователя",
+      "context": {
+        "collection": "users",
+        "document": {
+          "user_id": "123456789",
+          "name": "Иван Петров",
+          "telegram_id": "123456789",
+          "registered_at": "2024-01-15T10:30:00Z"
+        }
+      }
+    },
+    {
+      "name": "Сохранение сообщения",
+      "context": {
+        "collection": "messages",
+        "document": {
+          "user_id": "{user_id}",
+          "chat_id": "{chat_id}",
+          "message": "{user_message}",
+          "timestamp": "{current_time}"
+        },
+        "user_id": "123456789",
+        "chat_id": "123456789",
+        "user_message": "Привет!",
+        "current_time": "2024-01-15T10:30:00Z"
+      }
+    },
+    {
+      "name": "Обновление профиля (upsert)",
+      "context": {
+        "collection": "user_profiles",
+        "document": {
+          "user_id": "123456789",
+          "preferences": {
+            "language": "ru",
+            "notifications": true
+          },
+          "updated_at": "2024-01-15T10:30:00Z"
+        },
+        "upsert": true,
+        "filter": {"user_id": "123456789"}
+      }
+    }
+  ],
+  
+  "requirements": {
+    "plugins": ["MongoPlugin"],
+    "context_variables": ["collection", "document"],
+    "environment": ["MONGODB_URL"]
+  },
+  
+  "output": {
+    "context_updates": {
+      "mongo_result": "Результат операции сохранения",
+      "mongo_inserted_id": "ID вставленного документа",
+      "mongo_success": "Флаг успешности операции"
+    }
+  }
+} 

@@ -1,0 +1,86 @@
+{
+  "atomic_template": "telegram_send_message",
+  "version": "1.0",
+  "description": "Отправка простого сообщения в Telegram",
+  "author": "KittyCore Universal Agent Platform",
+  
+  "parameters": {
+    "text": {
+      "type": "string",
+      "description": "Текст сообщения",
+      "required": true,
+      "example": "Привет, {user_name}!"
+    },
+    "chat_id": {
+      "type": "string", 
+      "description": "ID чата для отправки",
+      "required": true,
+      "example": "{chat_id}"
+    },
+    "parse_mode": {
+      "type": "string",
+      "description": "Режим парсинга (HTML, Markdown)",
+      "default": "HTML"
+    },
+    "output_var": {
+      "type": "string",
+      "description": "Переменная для сохранения message_id",
+      "default": "message_id"
+    }
+  },
+  
+  "scenario_id": "atomic_telegram_send_message",
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "send_message"
+    },
+    {
+      "id": "send_message",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "{text}",
+        "parse_mode": "{parse_mode}"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  
+  "examples": [
+    {
+      "name": "Простое приветствие",
+      "context": {
+        "chat_id": "123456789",
+        "text": "Добро пожаловать в бота!",
+        "user_name": "Иван"
+      }
+    },
+    {
+      "name": "Персонализированное сообщение",
+      "context": {
+        "chat_id": "123456789", 
+        "text": "Привет, <b>{user_name}</b>! Как дела?",
+        "user_name": "Мария"
+      }
+    }
+  ],
+  
+  "requirements": {
+    "plugins": ["SimpleTelegramPlugin"],
+    "context_variables": ["chat_id", "text"]
+  },
+  
+  "output": {
+    "context_updates": {
+      "telegram_message_id": "ID отправленного сообщения",
+      "telegram_sent_text": "Отправленный текст",
+      "telegram_sent_to_chat": "ID чата получателя"
+    }
+  }
+} 

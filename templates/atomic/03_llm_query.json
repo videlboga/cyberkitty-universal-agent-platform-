@@ -1,0 +1,101 @@
+{
+  "atomic_template": "llm_query",
+  "version": "1.0",
+  "description": "Отправка запроса к языковой модели",
+  "author": "KittyCore Universal Agent Platform",
+  
+  "parameters": {
+    "prompt": {
+      "type": "string",
+      "description": "Текст запроса к LLM",
+      "required": true,
+      "example": "Ответь на вопрос пользователя: {user_question}"
+    },
+    "model": {
+      "type": "string", 
+      "description": "Модель для использования",
+      "default": "meta-llama/llama-3.2-3b-instruct:free"
+    },
+    "temperature": {
+      "type": "number",
+      "description": "Температура генерации (0.0-1.0)",
+      "default": 0.7
+    },
+    "max_tokens": {
+      "type": "integer",
+      "description": "Максимальное количество токенов",
+      "default": 1000
+    },
+    "output_var": {
+      "type": "string",
+      "description": "Переменная для сохранения ответа",
+      "default": "llm_response"
+    }
+  },
+  
+  "scenario_id": "atomic_llm_query",
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "llm_request"
+    },
+    {
+      "id": "llm_request",
+      "type": "llm_query",
+      "params": {
+        "prompt": "{prompt}",
+        "model": "{model}",
+        "temperature": "{temperature}",
+        "max_tokens": "{max_tokens}",
+        "output_var": "{output_var}"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  
+  "examples": [
+    {
+      "name": "Простой вопрос-ответ",
+      "context": {
+        "prompt": "Объясни простыми словами что такое искусственный интеллект",
+        "user_question": "Что такое ИИ?"
+      }
+    },
+    {
+      "name": "Персонализированный ответ",
+      "context": {
+        "prompt": "Пользователь {user_name} спрашивает: {user_question}. Ответь дружелюбно и персонализированно.",
+        "user_name": "Анна",
+        "user_question": "Как дела?"
+      }
+    },
+    {
+      "name": "Техническая консультация",
+      "context": {
+        "prompt": "Ты - технический эксперт. Ответь на вопрос: {user_question}",
+        "user_question": "Как работает блокчейн?",
+        "model": "meta-llama/llama-3.2-70b-instruct",
+        "temperature": 0.3
+      }
+    }
+  ],
+  
+  "requirements": {
+    "plugins": ["SimpleLLMPlugin"],
+    "context_variables": ["prompt"],
+    "environment": ["OPENROUTER_API_KEY"]
+  },
+  
+  "output": {
+    "context_updates": {
+      "llm_response": "Ответ от языковой модели",
+      "llm_model_used": "Использованная модель",
+      "llm_tokens_used": "Количество использованных токенов"
+    }
+  }
+} 

@@ -1,0 +1,139 @@
+{
+  "atomic_template": "log_message",
+  "version": "1.0",
+  "description": "Логирование сообщения в систему",
+  "author": "KittyCore Universal Agent Platform",
+  
+  "parameters": {
+    "message": {
+      "type": "string",
+      "description": "Сообщение для логирования",
+      "required": true,
+      "example": "Пользователь {user_name} выполнил действие {action}"
+    },
+    "level": {
+      "type": "string",
+      "description": "Уровень логирования (INFO, WARNING, ERROR, DEBUG)",
+      "default": "INFO"
+    },
+    "category": {
+      "type": "string",
+      "description": "Категория лога",
+      "default": "scenario"
+    },
+    "extra_data": {
+      "type": "object",
+      "description": "Дополнительные данные для лога",
+      "example": {
+        "user_id": "{user_id}",
+        "timestamp": "{current_time}"
+      }
+    }
+  },
+  
+  "scenario_id": "atomic_log_message",
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "log_message"
+    },
+    {
+      "id": "log_message",
+      "type": "log_message",
+      "params": {
+        "message": "{message}",
+        "level": "{level}",
+        "category": "{category}",
+        "extra_data": "{extra_data}"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  
+  "examples": [
+    {
+      "name": "Информационное сообщение",
+      "context": {
+        "message": "Пользователь начал сценарий регистрации",
+        "level": "INFO",
+        "category": "user_action",
+        "extra_data": {
+          "user_id": "123456789",
+          "scenario": "registration"
+        }
+      }
+    },
+    {
+      "name": "Предупреждение",
+      "context": {
+        "message": "Пользователь {user_name} попытался получить доступ без авторизации",
+        "level": "WARNING",
+        "category": "security",
+        "user_name": "Неизвестный",
+        "extra_data": {
+          "ip_address": "192.168.1.1",
+          "attempted_action": "admin_panel"
+        }
+      }
+    },
+    {
+      "name": "Ошибка",
+      "context": {
+        "message": "Ошибка подключения к базе данных: {error_details}",
+        "level": "ERROR",
+        "category": "database",
+        "error_details": "Connection timeout",
+        "extra_data": {
+          "database": "mongodb",
+          "retry_count": 3
+        }
+      }
+    },
+    {
+      "name": "Отладочная информация",
+      "context": {
+        "message": "Контекст выполнения: {context_data}",
+        "level": "DEBUG",
+        "category": "debug",
+        "context_data": "user_id=123, step=validation",
+        "extra_data": {
+          "debug_session": "session_001"
+        }
+      }
+    },
+    {
+      "name": "Бизнес-событие",
+      "context": {
+        "message": "Пользователь {user_name} завершил покупку на сумму {amount}",
+        "level": "INFO",
+        "category": "business",
+        "user_name": "Анна Петрова",
+        "amount": "1500 руб",
+        "extra_data": {
+          "order_id": "ORD-12345",
+          "payment_method": "card"
+        }
+      }
+    }
+  ],
+  
+  "requirements": {
+    "plugins": [],
+    "context_variables": ["message"],
+    "core_handlers": ["log_message"]
+  },
+  
+  "output": {
+    "context_updates": {
+      "log_written": "Флаг успешной записи лога",
+      "log_timestamp": "Время записи лога",
+      "log_level": "Уровень записанного лога",
+      "log_category": "Категория лога"
+    }
+  }
+} 

@@ -1,0 +1,144 @@
+{
+  "atomic_template": "scheduler_create_task",
+  "version": "1.0",
+  "description": "Создание отложенной задачи в планировщике",
+  "author": "KittyCore Universal Agent Platform",
+  
+  "parameters": {
+    "user_id": {
+      "type": "string",
+      "description": "ID пользователя",
+      "required": true,
+      "example": "{user_id}"
+    },
+    "chat_id": {
+      "type": "string",
+      "description": "ID чата",
+      "required": true,
+      "example": "{chat_id}"
+    },
+    "scenario_id": {
+      "type": "string",
+      "description": "ID сценария для выполнения",
+      "required": true,
+      "example": "reminder_scenario"
+    },
+    "delay_minutes": {
+      "type": "integer",
+      "description": "Задержка в минутах",
+      "default": 2
+    },
+    "task_context": {
+      "type": "object",
+      "description": "Дополнительный контекст для задачи",
+      "example": {
+        "reminder_text": "Не забудьте про встречу!",
+        "reminder_type": "meeting"
+      }
+    },
+    "output_var": {
+      "type": "string",
+      "description": "Переменная для сохранения ID задачи",
+      "default": "task_id"
+    }
+  },
+  
+  "scenario_id": "atomic_scheduler_create_task",
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "create_task"
+    },
+    {
+      "id": "create_task",
+      "type": "scheduler_create_task",
+      "params": {
+        "user_id": "{user_id}",
+        "chat_id": "{chat_id}",
+        "scenario_id": "{scenario_id}",
+        "delay_minutes": "{delay_minutes}",
+        "task_context": "{task_context}",
+        "output_var": "{output_var}"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  
+  "examples": [
+    {
+      "name": "Напоминание через 5 минут",
+      "context": {
+        "user_id": "123456789",
+        "chat_id": "123456789",
+        "scenario_id": "reminder_notification",
+        "delay_minutes": 5,
+        "task_context": {
+          "reminder_text": "Время принять лекарство!",
+          "reminder_type": "medication"
+        }
+      }
+    },
+    {
+      "name": "Отложенное приветствие",
+      "context": {
+        "user_id": "987654321",
+        "chat_id": "987654321",
+        "scenario_id": "welcome_message",
+        "delay_minutes": 1,
+        "task_context": {
+          "user_name": "Анна",
+          "welcome_type": "new_user"
+        }
+      }
+    },
+    {
+      "name": "Еженедельный отчет",
+      "context": {
+        "user_id": "555666777",
+        "chat_id": "555666777",
+        "scenario_id": "weekly_report",
+        "delay_minutes": 10080,
+        "task_context": {
+          "report_type": "activity",
+          "period": "week"
+        }
+      }
+    },
+    {
+      "name": "Проверка статуса",
+      "context": {
+        "user_id": "{user_id}",
+        "chat_id": "{chat_id}",
+        "scenario_id": "status_check",
+        "delay_minutes": 30,
+        "task_context": {
+          "check_type": "health",
+          "original_request": "{user_message}"
+        },
+        "user_id": "111222333",
+        "chat_id": "111222333",
+        "user_message": "Проверь мой статус через полчаса"
+      }
+    }
+  ],
+  
+  "requirements": {
+    "plugins": ["SimpleSchedulerPlugin"],
+    "context_variables": ["user_id", "chat_id", "scenario_id"],
+    "environment": []
+  },
+  
+  "output": {
+    "context_updates": {
+      "task_id": "ID созданной задачи",
+      "task_created": "Флаг успешного создания",
+      "scheduled_time": "Время запланированного выполнения",
+      "task_delay_minutes": "Задержка в минутах"
+    }
+  }
+} 

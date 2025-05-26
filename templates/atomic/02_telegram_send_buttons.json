@@ -1,0 +1,101 @@
+{
+  "atomic_template": "telegram_send_buttons",
+  "version": "1.0", 
+  "description": "Отправка сообщения с inline кнопками в Telegram",
+  "author": "KittyCore Universal Agent Platform",
+  
+  "parameters": {
+    "text": {
+      "type": "string",
+      "description": "Текст сообщения",
+      "required": true,
+      "example": "Выберите действие:"
+    },
+    "chat_id": {
+      "type": "string",
+      "description": "ID чата для отправки", 
+      "required": true,
+      "example": "{chat_id}"
+    },
+    "buttons": {
+      "type": "array",
+      "description": "Массив кнопок (массив строк кнопок)",
+      "required": true,
+      "example": [
+        [{"text": "Кнопка 1", "callback_data": "action1"}],
+        [{"text": "Кнопка 2", "callback_data": "action2"}]
+      ]
+    },
+    "parse_mode": {
+      "type": "string",
+      "description": "Режим парсинга (HTML, Markdown)",
+      "default": "HTML"
+    }
+  },
+  
+  "scenario_id": "atomic_telegram_send_buttons",
+  "steps": [
+    {
+      "id": "start",
+      "type": "start", 
+      "next_step": "send_buttons"
+    },
+    {
+      "id": "send_buttons",
+      "type": "telegram_send_buttons",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "{text}",
+        "buttons": "{buttons}",
+        "parse_mode": "{parse_mode}"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  
+  "examples": [
+    {
+      "name": "Главное меню",
+      "context": {
+        "chat_id": "123456789",
+        "text": "🤖 Главное меню",
+        "buttons": [
+          [{"text": "💬 Чат с ИИ", "callback_data": "start_chat"}],
+          [{"text": "🔍 Поиск", "callback_data": "start_search"}],
+          [{"text": "⚙️ Настройки", "callback_data": "settings"}]
+        ]
+      }
+    },
+    {
+      "name": "Да/Нет вопрос",
+      "context": {
+        "chat_id": "123456789",
+        "text": "Вы уверены что хотите продолжить?",
+        "buttons": [
+          [
+            {"text": "✅ Да", "callback_data": "confirm_yes"},
+            {"text": "❌ Нет", "callback_data": "confirm_no"}
+          ]
+        ]
+      }
+    }
+  ],
+  
+  "requirements": {
+    "plugins": ["SimpleTelegramPlugin"],
+    "context_variables": ["chat_id", "text", "buttons"]
+  },
+  
+  "output": {
+    "context_updates": {
+      "telegram_message_id": "ID отправленного сообщения",
+      "telegram_sent_text": "Отправленный текст", 
+      "telegram_sent_to_chat": "ID чата получателя",
+      "telegram_sent_buttons": "Отправленные кнопки"
+    }
+  }
+} 

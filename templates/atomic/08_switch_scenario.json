@@ -1,0 +1,139 @@
+{
+  "atomic_template": "switch_scenario",
+  "version": "1.0",
+  "description": "Переключение на другой сценарий",
+  "author": "KittyCore Universal Agent Platform",
+  
+  "parameters": {
+    "target_scenario": {
+      "type": "string",
+      "description": "ID целевого сценария",
+      "required": true,
+      "example": "user_registration_scenario"
+    },
+    "preserve_context": {
+      "type": "boolean",
+      "description": "Сохранить текущий контекст",
+      "default": true
+    },
+    "context_updates": {
+      "type": "object",
+      "description": "Дополнительные обновления контекста",
+      "example": {
+        "previous_scenario": "{scenario_id}",
+        "switch_reason": "user_choice"
+      }
+    },
+    "return_scenario": {
+      "type": "string",
+      "description": "Сценарий для возврата (опционально)",
+      "example": "main_menu_scenario"
+    }
+  },
+  
+  "scenario_id": "atomic_switch_scenario",
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "prepare_switch"
+    },
+    {
+      "id": "prepare_switch",
+      "type": "action",
+      "params": {
+        "action_type": "update_context",
+        "updates": "{context_updates}"
+      },
+      "next_step": "switch_scenario"
+    },
+    {
+      "id": "switch_scenario",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "{target_scenario}",
+        "preserve_context": "{preserve_context}"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  
+  "examples": [
+    {
+      "name": "Переход к регистрации",
+      "context": {
+        "target_scenario": "user_registration",
+        "preserve_context": true,
+        "context_updates": {
+          "previous_scenario": "main_menu",
+          "switch_reason": "new_user"
+        }
+      }
+    },
+    {
+      "name": "Переход к чату с ИИ",
+      "context": {
+        "target_scenario": "llm_chat_scenario",
+        "preserve_context": true,
+        "context_updates": {
+          "chat_mode": "assistant",
+          "user_name": "{user_name}"
+        },
+        "user_name": "Анна"
+      }
+    },
+    {
+      "name": "Переход к настройкам",
+      "context": {
+        "target_scenario": "settings_menu",
+        "preserve_context": true,
+        "return_scenario": "main_menu",
+        "context_updates": {
+          "settings_section": "general"
+        }
+      }
+    },
+    {
+      "name": "Экстренный переход",
+      "context": {
+        "target_scenario": "error_handler",
+        "preserve_context": false,
+        "context_updates": {
+          "error_type": "critical",
+          "original_scenario": "{scenario_id}"
+        }
+      }
+    },
+    {
+      "name": "Переход по роли пользователя",
+      "context": {
+        "target_scenario": "admin_panel",
+        "preserve_context": true,
+        "context_updates": {
+          "access_level": "{user_role}",
+          "entry_point": "role_based"
+        },
+        "user_role": "admin"
+      }
+    }
+  ],
+  
+  "requirements": {
+    "plugins": [],
+    "context_variables": ["target_scenario"],
+    "core_handlers": ["switch_scenario", "action"]
+  },
+  
+  "output": {
+    "context_updates": {
+      "scenario_switched": "Флаг успешного переключения",
+      "previous_scenario": "ID предыдущего сценария",
+      "target_scenario": "ID целевого сценария",
+      "switch_timestamp": "Время переключения"
+    }
+  }
+} 

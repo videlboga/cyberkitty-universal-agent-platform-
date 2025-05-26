@@ -1,0 +1,113 @@
+{
+  "atomic_template": "rag_search",
+  "version": "1.0",
+  "description": "Семантический поиск в базе знаний через RAG",
+  "author": "KittyCore Universal Agent Platform",
+  
+  "parameters": {
+    "query": {
+      "type": "string",
+      "description": "Поисковый запрос",
+      "required": true,
+      "example": "Как настроить Telegram бота?"
+    },
+    "collection": {
+      "type": "string",
+      "description": "Коллекция для поиска",
+      "default": "knowledge_base"
+    },
+    "limit": {
+      "type": "integer",
+      "description": "Количество результатов",
+      "default": 5
+    },
+    "threshold": {
+      "type": "number",
+      "description": "Порог релевантности (0.0-1.0)",
+      "default": 0.7
+    },
+    "output_var": {
+      "type": "string",
+      "description": "Переменная для сохранения результатов",
+      "default": "rag_results"
+    }
+  },
+  
+  "scenario_id": "atomic_rag_search",
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "search_knowledge"
+    },
+    {
+      "id": "search_knowledge",
+      "type": "rag_search",
+      "params": {
+        "query": "{query}",
+        "collection": "{collection}",
+        "limit": "{limit}",
+        "threshold": "{threshold}",
+        "output_var": "{output_var}"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  
+  "examples": [
+    {
+      "name": "Поиск по документации",
+      "context": {
+        "query": "Как создать новый сценарий?",
+        "collection": "documentation",
+        "limit": 3
+      }
+    },
+    {
+      "name": "Поиск FAQ",
+      "context": {
+        "query": "Проблемы с подключением к базе данных",
+        "collection": "faq",
+        "limit": 5,
+        "threshold": 0.6
+      }
+    },
+    {
+      "name": "Поиск примеров кода",
+      "context": {
+        "query": "Пример интеграции с Telegram API",
+        "collection": "code_examples",
+        "limit": 2,
+        "threshold": 0.8
+      }
+    },
+    {
+      "name": "Персонализированный поиск",
+      "context": {
+        "query": "Пользователь {user_name} спрашивает: {user_question}",
+        "user_name": "Анна",
+        "user_question": "Как добавить кнопки в сообщение?",
+        "collection": "tutorials"
+      }
+    }
+  ],
+  
+  "requirements": {
+    "plugins": ["SimpleRAGPlugin"],
+    "context_variables": ["query"],
+    "environment": ["RAG_URL"]
+  },
+  
+  "output": {
+    "context_updates": {
+      "rag_results": "Массив найденных документов",
+      "rag_found_count": "Количество найденных результатов",
+      "rag_best_match": "Лучший результат поиска",
+      "rag_search_successful": "Флаг успешности поиска"
+    }
+  }
+} 

@@ -1,0 +1,126 @@
+{
+  "atomic_template": "conditional_branch",
+  "version": "1.0",
+  "description": "Условное ветвление в сценарии",
+  "author": "KittyCore Universal Agent Platform",
+  
+  "parameters": {
+    "condition": {
+      "type": "string",
+      "description": "Условие для проверки",
+      "required": true,
+      "example": "{user_role} == 'admin'"
+    },
+    "if_true_scenario": {
+      "type": "string",
+      "description": "Сценарий для выполнения если условие истинно",
+      "example": "admin_menu_scenario"
+    },
+    "if_false_scenario": {
+      "type": "string",
+      "description": "Сценарий для выполнения если условие ложно",
+      "example": "user_menu_scenario"
+    },
+    "if_true_step": {
+      "type": "string",
+      "description": "Следующий шаг если условие истинно",
+      "example": "admin_actions"
+    },
+    "if_false_step": {
+      "type": "string",
+      "description": "Следующий шаг если условие ложно",
+      "example": "user_actions"
+    },
+    "context_var": {
+      "type": "string",
+      "description": "Переменная для сохранения результата условия",
+      "default": "condition_result"
+    }
+  },
+  
+  "scenario_id": "atomic_conditional_branch",
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "check_condition"
+    },
+    {
+      "id": "check_condition",
+      "type": "branch",
+      "params": {
+        "condition": "{condition}",
+        "if_true": "{if_true_step}",
+        "if_false": "{if_false_step}"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  
+  "examples": [
+    {
+      "name": "Проверка роли пользователя",
+      "context": {
+        "condition": "{user_role} == 'admin'",
+        "if_true_step": "admin_menu",
+        "if_false_step": "user_menu",
+        "user_role": "admin"
+      }
+    },
+    {
+      "name": "Проверка регистрации",
+      "context": {
+        "condition": "{user_registered} == true",
+        "if_true_scenario": "welcome_back_scenario",
+        "if_false_scenario": "registration_scenario",
+        "user_registered": false
+      }
+    },
+    {
+      "name": "Проверка времени",
+      "context": {
+        "condition": "{current_hour} >= 18",
+        "if_true_step": "evening_greeting",
+        "if_false_step": "day_greeting",
+        "current_hour": 20
+      }
+    },
+    {
+      "name": "Проверка существования данных",
+      "context": {
+        "condition": "exists({user_profile})",
+        "if_true_step": "show_profile",
+        "if_false_step": "create_profile",
+        "user_profile": null
+      }
+    },
+    {
+      "name": "Сложное условие",
+      "context": {
+        "condition": "{user_age} >= 18 && {user_verified} == true",
+        "if_true_step": "full_access",
+        "if_false_step": "limited_access",
+        "user_age": 25,
+        "user_verified": true
+      }
+    }
+  ],
+  
+  "requirements": {
+    "plugins": [],
+    "context_variables": ["condition"],
+    "core_handlers": ["branch"]
+  },
+  
+  "output": {
+    "context_updates": {
+      "condition_result": "Результат проверки условия (true/false)",
+      "next_step_override": "Переопределение следующего шага",
+      "branch_taken": "Какая ветка была выбрана (true/false)"
+    }
+  }
+} 

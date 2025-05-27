@@ -1,0 +1,140 @@
+{
+  "atomic_template": "user_profile_load",
+  "version": "1.0",
+  "description": "Загрузка профиля пользователя из MongoDB",
+  "author": "KittyCore Universal Agent Platform",
+  
+  "parameters": {
+    "user_id": {
+      "type": "string",
+      "description": "ID пользователя",
+      "required": true,
+      "example": "{user_id}"
+    },
+    "chat_id": {
+      "type": "string",
+      "description": "ID чата",
+      "required": true,
+      "example": "{chat_id}"
+    },
+    "create_if_not_exists": {
+      "type": "boolean",
+      "description": "Создать профиль если не существует",
+      "default": true
+    },
+    "output_var": {
+      "type": "string",
+      "description": "Переменная для сохранения профиля",
+      "default": "user_profile"
+    }
+  },
+  
+  "scenario_id": "atomic_user_profile_load",
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "find_user"
+    },
+    {
+      "id": "find_user",
+      "type": "mongo_find_one_document",
+      "params": {
+        "collection": "users",
+        "filter": {"user_id": "{user_id}"},
+        "output_var": "found_user"
+      },
+      "next_step": "check_exists"
+    },
+    {
+      "id": "check_exists",
+      "type": "conditional_branch",
+      "params": {
+        "condition": "exists({found_user})",
+        "if_true_step": "load_profile",
+        "if_false_step": "create_new_user"
+      }
+    },
+    {
+      "id": "create_new_user",
+      "type": "mongo_insert_document",
+      "params": {
+        "collection": "users",
+        "document": {
+          "user_id": "{user_id}",
+          "chat_id": "{chat_id}",
+          "created_at": "{current_time}",
+          "is_new": true,
+          "onboarding_completed": false,
+          "active_module": null,
+          "preferences": {},
+          "learning_plan": null
+        },
+        "output_var": "created_user"
+      },
+      "next_step": "set_new_user_context"
+    },
+    {
+      "id": "set_new_user_context",
+      "type": "action",
+      "params": {
+        "action_type": "update_context",
+        "updates": {
+          "user_profile": "{created_user}",
+          "is_new_user": true,
+          "needs_onboarding": true
+        }
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "load_profile",
+      "type": "action",
+      "params": {
+        "action_type": "update_context",
+        "updates": {
+          "user_profile": "{found_user}",
+          "is_new_user": false,
+          "needs_onboarding": false
+        }
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  
+  "examples": [
+    {
+      "name": "Загрузка существующего пользователя",
+      "context": {
+        "user_id": "123456789",
+        "chat_id": "123456789"
+      }
+    },
+    {
+      "name": "Создание нового пользователя",
+      "context": {
+        "user_id": "987654321",
+        "chat_id": "987654321",
+        "create_if_not_exists": true
+      }
+    }
+  ],
+  
+  "requirements": {
+    "plugins": ["MongoPlugin"],
+    "context_variables": ["user_id", "chat_id"],
+    "environment": ["MONGODB_URL"]
+  },
+  
+  "output": {
+    "context_updates": {
+      "user_profile": "Профиль пользователя из БД",
+      "is_new_user": "Флаг нового пользователя",
+      "needs_onboarding": "Нужен ли онбординг"
+    }
+  }
+} 

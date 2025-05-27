@@ -1,0 +1,150 @@
+{
+  "atomic_template": "http_request",
+  "version": "1.0",
+  "description": "Выполнение HTTP запроса к внешнему API",
+  "author": "KittyCore Universal Agent Platform",
+  
+  "parameters": {
+    "method": {
+      "type": "string",
+      "description": "HTTP метод",
+      "enum": ["GET", "POST", "PUT", "DELETE"],
+      "default": "GET"
+    },
+    "url": {
+      "type": "string",
+      "description": "URL для запроса",
+      "required": true,
+      "example": "https://api.example.com/data"
+    },
+    "headers": {
+      "type": "object",
+      "description": "HTTP заголовки",
+      "example": {
+        "Authorization": "Bearer {api_token}",
+        "Content-Type": "application/json"
+      }
+    },
+    "params": {
+      "type": "object",
+      "description": "Параметры запроса (для GET)",
+      "example": {
+        "limit": 10,
+        "offset": 0
+      }
+    },
+    "json": {
+      "type": "object",
+      "description": "JSON данные для отправки",
+      "example": {
+        "name": "Test",
+        "value": 123
+      }
+    },
+    "timeout": {
+      "type": "number",
+      "description": "Тайм-аут в секундах",
+      "default": 30
+    },
+    "output_var": {
+      "type": "string",
+      "description": "Переменная для сохранения ответа",
+      "default": "http_response"
+    }
+  },
+  
+  "scenario_id": "atomic_http_request",
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "make_request"
+    },
+    {
+      "id": "make_request",
+      "type": "http_request",
+      "params": {
+        "method": "{method}",
+        "url": "{url}",
+        "headers": "{headers}",
+        "params": "{params}",
+        "json": "{json}",
+        "timeout": "{timeout}",
+        "output_var": "{output_var}"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  
+  "examples": [
+    {
+      "name": "GET запрос к API",
+      "context": {
+        "method": "GET",
+        "url": "https://jsonplaceholder.typicode.com/posts/1",
+        "output_var": "post_data"
+      }
+    },
+    {
+      "name": "POST запрос с JSON",
+      "context": {
+        "method": "POST",
+        "url": "https://httpbin.org/post",
+        "json": {
+          "title": "Новый пост",
+          "body": "Содержимое поста",
+          "userId": 1
+        },
+        "output_var": "create_result"
+      }
+    },
+    {
+      "name": "Запрос с авторизацией",
+      "context": {
+        "method": "GET",
+        "url": "https://api.github.com/user",
+        "headers": {
+          "Authorization": "token {github_token}",
+          "Accept": "application/vnd.github.v3+json"
+        },
+        "github_token": "ghp_xxxxxxxxxxxx",
+        "output_var": "user_info"
+      }
+    },
+    {
+      "name": "Получение новостей ИИ",
+      "context": {
+        "method": "GET",
+        "url": "https://newsapi.org/v2/everything",
+        "params": {
+          "q": "artificial intelligence",
+          "sortBy": "publishedAt",
+          "pageSize": 10,
+          "apiKey": "{news_api_key}"
+        },
+        "news_api_key": "your_news_api_key",
+        "output_var": "ai_news"
+      }
+    }
+  ],
+  
+  "requirements": {
+    "plugins": ["SimpleHTTPPlugin"],
+    "context_variables": ["url"],
+    "environment": []
+  },
+  
+  "output": {
+    "context_updates": {
+      "http_response": "Ответ от HTTP API",
+      "http_response.success": "Флаг успешности запроса",
+      "http_response.status_code": "HTTP код ответа",
+      "http_response.data": "Данные ответа",
+      "http_response.headers": "Заголовки ответа"
+    }
+  }
+} 

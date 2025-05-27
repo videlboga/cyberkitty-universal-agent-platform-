@@ -1,0 +1,223 @@
+{
+  "scenario_id": "ai_mentor_flow",
+  "name": "AI-наставник",
+  "description": "Персонализированные ответы на вопросы на основе материалов курса и профиля пользователя",
+  "version": "1.0",
+  
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "load_user_context"
+    },
+    {
+      "id": "load_user_context",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_mongo_find_data",
+        "context_updates": {
+          "collection": "users",
+          "filter": {"user_id": "{user_id}"},
+          "find_one": true,
+          "output_var": "user_profile"
+        }
+      },
+      "next_step": "log_question"
+    },
+    {
+      "id": "log_question",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_log_message",
+        "context_updates": {
+          "message": "AI-наставник: пользователь {user_id} задал вопрос: {message_text}",
+          "level": "INFO",
+          "category": "ai_mentor"
+        }
+      },
+      "next_step": "search_knowledge"
+    },
+    {
+      "id": "search_knowledge",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_rag_search",
+        "context_updates": {
+          "query": "{message_text}",
+          "collection": "course_materials",
+          "limit": 3,
+          "threshold": 0.7,
+          "output_var": "relevant_materials"
+        }
+      },
+      "next_step": "check_materials_found"
+    },
+    {
+      "id": "check_materials_found",
+      "type": "conditional_branch",
+      "params": {
+        "condition": "{rag_found_count} > 0",
+        "if_true_step": "check_user_level",
+        "if_false_step": "no_materials_response"
+      }
+    },
+    {
+      "id": "check_user_level",
+      "type": "conditional_branch",
+      "params": {
+        "condition": "exists({user_profile})",
+        "if_true_step": "generate_personalized_answer",
+        "if_false_step": "generate_generic_answer"
+      }
+    },
+    {
+      "id": "generate_personalized_answer",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "context_updates": {
+          "prompt": "Ты - AI-наставник. Ответь на вопрос студента, учитывая его уровень и цели:\n\nВопрос: {message_text}\n\nПрофиль студента:\n- Опыт: {user_profile.experience_level}\n- Цели: {user_profile.learning_goals}\n- Интересы: {user_profile.interests}\n- Предпочитаемый формат: {user_profile.preferred_format}\n\nНайденные материалы:\n{rag_best_match}\n\nТребования к ответу:\n1. Адаптируй сложность под уровень студента\n2. Связывай с его целями и интересами\n3. Предлагай дополнительные ресурсы\n4. Используй предпочитаемый формат обучения\n5. Будь наставником, а не просто источником информации\n\nФормат: HTML с эмодзи, структурированный ответ.",
+          "model": "meta-llama/llama-3.2-70b-instruct",
+          "temperature": 0.3,
+          "max_tokens": 1500,
+          "output_var": "mentor_answer"
+        }
+      },
+      "next_step": "save_interaction"
+    },
+    {
+      "id": "generate_generic_answer",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "context_updates": {
+          "prompt": "Ты - AI-наставник. Ответь на вопрос студента на основе найденных материалов:\n\nВопрос: {message_text}\n\nМатериалы курса:\n{rag_best_match}\n\nДай подробный, понятный и структурированный ответ. Включи практические советы и рекомендации для дальнейшего изучения.\n\nФормат: HTML с эмодзи.",
+          "model": "meta-llama/llama-3.2-70b-instruct",
+          "temperature": 0.3,
+          "max_tokens": 1500,
+          "output_var": "mentor_answer"
+        }
+      },
+      "next_step": "save_interaction"
+    },
+    {
+      "id": "no_materials_response",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "context_updates": {
+          "prompt": "Пользователь задал вопрос: {message_text}\n\nВ базе знаний не найдено релевантных материалов. Дай общий ответ на основе знаний об ИИ и машинном обучении. Будь честным, что это не из курсовых материалов, но постарайся помочь.\n\nФормат: HTML с эмодзи.",
+          "model": "meta-llama/llama-3.2-70b-instruct",
+          "temperature": 0.4,
+          "max_tokens": 1000,
+          "output_var": "mentor_answer"
+        }
+      },
+      "next_step": "save_interaction"
+    },
+    {
+      "id": "save_interaction",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_mongo_save_data",
+        "context_updates": {
+          "collection": "mentor_interactions",
+          "document": {
+            "user_id": "{user_id}",
+            "chat_id": "{chat_id}",
+            "question": "{message_text}",
+            "answer": "{mentor_answer}",
+            "materials_found": "{rag_found_count}",
+            "personalized": "exists({user_profile})",
+            "created_at": "{current_time}"
+          }
+        }
+      },
+      "next_step": "send_answer"
+    },
+    {
+      "id": "send_answer",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_telegram_send_message",
+        "context_updates": {
+          "text": "👨‍🏫 <b>Ответ наставника:</b>\n\n{mentor_answer}",
+          "parse_mode": "HTML"
+        }
+      },
+      "next_step": "offer_additional_help"
+    },
+    {
+      "id": "offer_additional_help",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_telegram_send_buttons",
+        "context_updates": {
+          "text": "💡 <b>Нужна дополнительная помощь?</b>",
+          "buttons": [
+            [{"text": "📚 Показать материалы", "callback_data": "show_materials"}],
+            [{"text": "❓ Задать уточняющий вопрос", "callback_data": "ask_followup"}],
+            [{"text": "✅ Спасибо, понятно", "callback_data": "mentor_done"}]
+          ]
+        }
+      },
+      "next_step": "wait_user_choice"
+    },
+    {
+      "id": "wait_user_choice",
+      "type": "input",
+      "params": {
+        "input_type": "callback_query",
+        "timeout_seconds": 120,
+        "output_var": "user_choice"
+      },
+      "next_step": "handle_choice"
+    },
+    {
+      "id": "handle_choice",
+      "type": "conditional_branch",
+      "params": {
+        "condition": "{user_choice} == 'show_materials'",
+        "if_true_step": "show_materials",
+        "if_false_step": "check_followup"
+      }
+    },
+    {
+      "id": "check_followup",
+      "type": "conditional_branch",
+      "params": {
+        "condition": "{user_choice} == 'ask_followup'",
+        "if_true_step": "prompt_followup",
+        "if_false_step": "end"
+      }
+    },
+    {
+      "id": "show_materials",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_telegram_send_message",
+        "context_updates": {
+          "text": "📚 <b>Релевантные материалы:</b>\n\n{relevant_materials}\n\n<i>💡 Рекомендую изучить эти материалы для более глубокого понимания темы.</i>",
+          "parse_mode": "HTML"
+        }
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "prompt_followup",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_telegram_send_message",
+        "context_updates": {
+          "text": "❓ <b>Задай уточняющий вопрос</b>\n\nЯ готов объяснить подробнее любой аспект темы. Просто напиши свой вопрос.",
+          "parse_mode": "HTML"
+        }
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ]
+} 

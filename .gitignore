@@ -66,3 +66,10 @@ callback_data.log
 # Index and cache directories
 faiss_index/
 src/
+
+# ЛайкПроводник документация (удалена из проекта)
+docs/LIKEPROVODNIK_SYSTEM_DESIGN.md
+docs/likeprovodnik/
+scenarios/likeprovodnik/01_ai_path_onboarding.json
+app/core/likeprovodnik.py
+app/plugins/agent_memory_plugin.py

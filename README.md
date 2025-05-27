@@ -14,7 +14,8 @@ SimpleScenarioEngine (единственный движок)
     ├── MongoPlugin (mongo_save, mongo_get, mongo_get_scenario, mongo_save_scenario)
     ├── SimpleLLMPlugin (llm_chat, llm_generate)
     ├── SimpleRAGPlugin (rag_search, rag_index)
-    └── SimpleSchedulerPlugin (schedule_task, cancel_task)
+    ├── SimpleSchedulerPlugin (schedule_task, cancel_task)
+└── SimpleHTTPPlugin (http_get, http_post, http_request)
 
 Simple API (app/api/simple.py)
 ├── POST /simple/channels/{channel_id}/execute (основной endpoint)
@@ -185,6 +186,13 @@ docker-compose -f docker-compose.simple.yml up
 - `schedule_task` - Планирование задачи
 - `cancel_task` - Отмена задачи
 - `list_tasks` - Список задач
+
+### HTTP клиент (SimpleHTTPPlugin):
+- `http_get` - GET запрос к внешнему API
+- `http_post` - POST запрос с данными
+- `http_put` - PUT запрос для обновления
+- `http_delete` - DELETE запрос
+- `http_request` - Универсальный HTTP запрос
 
 ## 📝 Пример сценария
 

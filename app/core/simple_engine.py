@@ -1089,6 +1089,17 @@ async def create_engine() -> SimpleScenarioEngine:
     except Exception as e:
         logger.warning(f"⚠️ SimpleScheduler Plugin недоступен: {e}")
     
+    try:
+        # 6. HTTP Plugin - для внешних HTTP запросов
+        logger.info("📦 Инициализация SimpleHTTP Plugin...")
+        from app.plugins.simple_http_plugin import SimpleHTTPPlugin
+        http_plugin = SimpleHTTPPlugin()
+        await http_plugin.initialize()
+        engine.register_plugin(http_plugin)
+        logger.info("✅ SimpleHTTP Plugin зарегистрирован")
+    except Exception as e:
+        logger.warning(f"⚠️ SimpleHTTP Plugin недоступен: {e}")
+    
     # === ФИНАЛИЗАЦИЯ ===
     
     logger.info("🎯 SimpleScenarioEngine настроен")

@@ -476,6 +476,75 @@
 }
 ```
 
+## 🌐 HTTP Plugin (SimpleHTTPPlugin)
+
+### `http_get` - GET запрос
+```json
+{
+  "id": "get_data",
+  "type": "http_get",
+  "params": {
+    "url": "https://api.example.com/data",
+    "headers": {
+      "Authorization": "Bearer {api_token}"
+    },
+    "params": {
+      "limit": 10
+    },
+    "output_var": "api_data"
+  },
+  "next_step": "process_data"
+}
+```
+
+### `http_post` - POST запрос
+```json
+{
+  "id": "send_data",
+  "type": "http_post",
+  "params": {
+    "url": "https://api.example.com/create",
+    "json": {
+      "name": "{user_name}",
+      "email": "{user_email}"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "output_var": "create_result"
+  },
+  "next_step": "check_result"
+}
+```
+
+### `http_request` - Универсальный HTTP запрос
+```json
+{
+  "id": "api_call",
+  "type": "http_request",
+  "params": {
+    "method": "PUT",
+    "url": "https://api.example.com/update/{item_id}",
+    "json": {
+      "status": "updated"
+    },
+    "timeout": 15,
+    "output_var": "update_result"
+  },
+  "next_step": "handle_response"
+}
+```
+
+**Параметры HTTP запросов:**
+- `method` - HTTP метод (GET, POST, PUT, DELETE)
+- `url` - URL для запроса (поддерживает переменные)
+- `headers` - HTTP заголовки
+- `params` - Параметры запроса (для GET)
+- `json` - JSON данные для отправки
+- `data` - Данные для отправки (альтернатива json)
+- `timeout` - Тайм-аут в секундах
+- `output_var` - Переменная для сохранения ответа
+
 ## 🔄 Переменные и контекст
 
 ### Подстановка переменных

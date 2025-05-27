@@ -1,0 +1,354 @@
+{
+  "scenario_id": "ai_coach_flow",
+  "name": "AI-коуч",
+  "description": "Персональный коучинг, рефлексия и постановка целей в обучении",
+  "version": "1.0",
+  
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "load_user_context"
+    },
+    {
+      "id": "load_user_context",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_mongo_find_data",
+        "context_updates": {
+          "collection": "users",
+          "filter": {"user_id": "{user_id}"},
+          "find_one": true,
+          "output_var": "user_profile"
+        }
+      },
+      "next_step": "load_progress_history"
+    },
+    {
+      "id": "load_progress_history",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_mongo_find_data",
+        "context_updates": {
+          "collection": "coaching_sessions",
+          "filter": {"user_id": "{user_id}"},
+          "sort": {"created_at": -1},
+          "limit": 5,
+          "output_var": "coaching_history"
+        }
+      },
+      "next_step": "log_session"
+    },
+    {
+      "id": "log_session",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_log_message",
+        "context_updates": {
+          "message": "AI-коуч: начата сессия с пользователем {user_id}: {message_text}",
+          "level": "INFO",
+          "category": "ai_coach"
+        }
+      },
+      "next_step": "detect_coaching_intent"
+    },
+    {
+      "id": "detect_coaching_intent",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "context_updates": {
+          "prompt": "Определи тип коучинговой сессии на основе запроса пользователя:\n\nЗапрос: {message_text}\n\nВозможные типы:\n1. goal_setting - постановка целей\n2. reflection - рефлексия и анализ прогресса\n3. motivation - мотивация и поддержка\n4. planning - планирование обучения\n5. problem_solving - решение проблем в обучении\n\nОтветь одним словом типом сессии.",
+          "model": "meta-llama/llama-3.2-70b-instruct",
+          "temperature": 0.1,
+          "max_tokens": 50,
+          "output_var": "coaching_type"
+        }
+      },
+      "next_step": "route_by_type"
+    },
+    {
+      "id": "route_by_type",
+      "type": "conditional_branch",
+      "params": {
+        "condition": "{coaching_type} == 'goal_setting'",
+        "if_true_step": "goal_setting_session",
+        "if_false_step": "check_reflection"
+      }
+    },
+    {
+      "id": "check_reflection",
+      "type": "conditional_branch",
+      "params": {
+        "condition": "{coaching_type} == 'reflection'",
+        "if_true_step": "reflection_session",
+        "if_false_step": "check_motivation"
+      }
+    },
+    {
+      "id": "check_motivation",
+      "type": "conditional_branch",
+      "params": {
+        "condition": "{coaching_type} == 'motivation'",
+        "if_true_step": "motivation_session",
+        "if_false_step": "check_planning"
+      }
+    },
+    {
+      "id": "check_planning",
+      "type": "conditional_branch",
+      "params": {
+        "condition": "{coaching_type} == 'planning'",
+        "if_true_step": "planning_session",
+        "if_false_step": "problem_solving_session"
+      }
+    },
+    {
+      "id": "goal_setting_session",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "context_updates": {
+          "prompt": "Проведи коучинговую сессию по постановке целей:\n\nЗапрос пользователя: {message_text}\nПрофиль: {user_profile}\nИстория коучинга: {coaching_history}\n\nКак AI-коуч:\n1. Помоги сформулировать SMART-цели\n2. Разбей большие цели на подцели\n3. Определи временные рамки\n4. Предложи метрики успеха\n5. Создай план действий\n\nИспользуй коучинговые вопросы и техники. Формат: HTML с эмодзи.",
+          "model": "meta-llama/llama-3.2-70b-instruct",
+          "temperature": 0.4,
+          "max_tokens": 1500,
+          "output_var": "coaching_response"
+        }
+      },
+      "next_step": "save_session"
+    },
+    {
+      "id": "reflection_session",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "context_updates": {
+          "prompt": "Проведи рефлексивную коучинговую сессию:\n\nЗапрос: {message_text}\nПрофиль: {user_profile}\nИстория: {coaching_history}\n\nКак AI-коуч помоги пользователю:\n1. Проанализировать прогресс\n2. Выявить успехи и достижения\n3. Определить области для улучшения\n4. Извлечь уроки из опыта\n5. Скорректировать подход к обучению\n\nЗадавай открытые вопросы для глубокой рефлексии. Формат: HTML с эмодзи.",
+          "model": "meta-llama/llama-3.2-70b-instruct",
+          "temperature": 0.4,
+          "max_tokens": 1500,
+          "output_var": "coaching_response"
+        }
+      },
+      "next_step": "save_session"
+    },
+    {
+      "id": "motivation_session",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "context_updates": {
+          "prompt": "Проведи мотивационную коучинговую сессию:\n\nЗапрос: {message_text}\nПрофиль: {user_profile}\nИстория: {coaching_history}\n\nКак AI-коуч:\n1. Выяви источники демотивации\n2. Напомни о целях и мечтах\n3. Покажи уже достигнутый прогресс\n4. Предложи техники мотивации\n5. Создай план восстановления энтузиазма\n\nБудь поддерживающим и вдохновляющим. Формат: HTML с эмодзи.",
+          "model": "meta-llama/llama-3.2-70b-instruct",
+          "temperature": 0.5,
+          "max_tokens": 1500,
+          "output_var": "coaching_response"
+        }
+      },
+      "next_step": "save_session"
+    },
+    {
+      "id": "planning_session",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "context_updates": {
+          "prompt": "Проведи сессию планирования обучения:\n\nЗапрос: {message_text}\nПрофиль: {user_profile}\nИстория: {coaching_history}\n\nКак AI-коуч помоги:\n1. Оценить текущую ситуацию\n2. Определить приоритеты\n3. Создать реалистичный план\n4. Учесть ограничения времени\n5. Предложить инструменты планирования\n\nФокусируйся на практичности и выполнимости. Формат: HTML с эмодзи.",
+          "model": "meta-llama/llama-3.2-70b-instruct",
+          "temperature": 0.3,
+          "max_tokens": 1500,
+          "output_var": "coaching_response"
+        }
+      },
+      "next_step": "save_session"
+    },
+    {
+      "id": "problem_solving_session",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "context_updates": {
+          "prompt": "Проведи сессию решения проблем в обучении:\n\nПроблема: {message_text}\nПрофиль: {user_profile}\nИстория: {coaching_history}\n\nКак AI-коуч:\n1. Помоги четко сформулировать проблему\n2. Найди корневые причины\n3. Сгенерируй варианты решений\n4. Оцени плюсы и минусы каждого\n5. Создай план действий\n\nИспользуй коучинговые техники решения проблем. Формат: HTML с эмодзи.",
+          "model": "meta-llama/llama-3.2-70b-instruct",
+          "temperature": 0.4,
+          "max_tokens": 1500,
+          "output_var": "coaching_response"
+        }
+      },
+      "next_step": "save_session"
+    },
+    {
+      "id": "save_session",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_mongo_save_data",
+        "context_updates": {
+          "collection": "coaching_sessions",
+          "document": {
+            "user_id": "{user_id}",
+            "chat_id": "{chat_id}",
+            "session_type": "{coaching_type}",
+            "user_request": "{message_text}",
+            "coach_response": "{coaching_response}",
+            "created_at": "{current_time}"
+          }
+        }
+      },
+      "next_step": "send_response"
+    },
+    {
+      "id": "send_response",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_telegram_send_message",
+        "context_updates": {
+          "text": "🎯 <b>Сессия с AI-коучем:</b>\n\n{coaching_response}",
+          "parse_mode": "HTML"
+        }
+      },
+      "next_step": "offer_followup"
+    },
+    {
+      "id": "offer_followup",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_telegram_send_buttons",
+        "context_updates": {
+          "text": "💭 <b>Что дальше?</b>",
+          "buttons": [
+            [{"text": "📝 Создать план действий", "callback_data": "create_action_plan"}],
+            [{"text": "⏰ Напомнить через неделю", "callback_data": "schedule_reminder"}],
+            [{"text": "📊 Посмотреть прогресс", "callback_data": "show_progress"}],
+            [{"text": "✅ Завершить сессию", "callback_data": "end_session"}]
+          ]
+        }
+      },
+      "next_step": "wait_followup_choice"
+    },
+    {
+      "id": "wait_followup_choice",
+      "type": "input",
+      "params": {
+        "input_type": "callback_query",
+        "timeout_seconds": 120,
+        "output_var": "followup_choice"
+      },
+      "next_step": "handle_followup"
+    },
+    {
+      "id": "handle_followup",
+      "type": "conditional_branch",
+      "params": {
+        "condition": "{followup_choice} == 'create_action_plan'",
+        "if_true_step": "create_action_plan",
+        "if_false_step": "check_reminder"
+      }
+    },
+    {
+      "id": "check_reminder",
+      "type": "conditional_branch",
+      "params": {
+        "condition": "{followup_choice} == 'schedule_reminder'",
+        "if_true_step": "schedule_reminder",
+        "if_false_step": "check_progress"
+      }
+    },
+    {
+      "id": "check_progress",
+      "type": "conditional_branch",
+      "params": {
+        "condition": "{followup_choice} == 'show_progress'",
+        "if_true_step": "show_progress",
+        "if_false_step": "end"
+      }
+    },
+    {
+      "id": "create_action_plan",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "context_updates": {
+          "prompt": "Создай конкретный план действий на основе коучинговой сессии:\n\nТип сессии: {coaching_type}\nОтвет коуча: {coaching_response}\n\nСоздай:\n1. Список конкретных действий\n2. Временные рамки для каждого\n3. Критерии успеха\n4. Контрольные точки\n\nФормат: HTML с эмодзи, структурированный список.",
+          "model": "meta-llama/llama-3.2-70b-instruct",
+          "temperature": 0.2,
+          "max_tokens": 1000,
+          "output_var": "action_plan"
+        }
+      },
+      "next_step": "send_action_plan"
+    },
+    {
+      "id": "send_action_plan",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_telegram_send_message",
+        "context_updates": {
+          "text": "📋 <b>План действий:</b>\n\n{action_plan}",
+          "parse_mode": "HTML"
+        }
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "schedule_reminder",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_scheduler_create_task",
+        "context_updates": {
+          "scenario_id": "coaching_followup_reminder",
+          "delay_minutes": 10080,
+          "task_context": {
+            "reminder_type": "coaching_followup",
+            "session_type": "{coaching_type}",
+            "previous_response": "{coaching_response}"
+          }
+        }
+      },
+      "next_step": "confirm_reminder"
+    },
+    {
+      "id": "confirm_reminder",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_telegram_send_message",
+        "context_updates": {
+          "text": "⏰ <b>Напоминание установлено!</b>\n\nЯ напомню тебе через неделю о результатах нашей сессии и помогу оценить прогресс.",
+          "parse_mode": "HTML"
+        }
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "show_progress",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "context_updates": {
+          "prompt": "Проанализируй прогресс пользователя на основе истории коучинга:\n\nИстория сессий: {coaching_history}\nТекущая сессия: {coaching_response}\n\nПокажи:\n1. Динамику развития\n2. Достигнутые цели\n3. Области роста\n4. Рекомендации на будущее\n\nФормат: HTML с эмодзи, позитивный тон.",
+          "model": "meta-llama/llama-3.2-70b-instruct",
+          "temperature": 0.3,
+          "max_tokens": 1000,
+          "output_var": "progress_analysis"
+        }
+      },
+      "next_step": "send_progress"
+    },
+    {
+      "id": "send_progress",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_telegram_send_message",
+        "context_updates": {
+          "text": "📈 <b>Твой прогресс:</b>\n\n{progress_analysis}",
+          "parse_mode": "HTML"
+        }
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ]
+} 

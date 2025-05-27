@@ -10,11 +10,11 @@
 ### **✅ ТЕКУЩИЙ СТАНДАРТ (Обязательно для всех плагинов):**
 
 ```python
-from app.plugins.plugin_base import PluginBase
+from app.core.base_plugin import BasePlugin
 from typing import Dict, Any, Callable
 from loguru import logger
 
-class MyNewPlugin(PluginBase):
+class MyNewPlugin(BasePlugin):
     """
     Новый плагин для Universal Agent System
     
@@ -34,21 +34,21 @@ class MyNewPlugin(PluginBase):
         self.name = self.__class__.__name__
         logger.info(f"🔌 {self.name} инициализирован")
     
-    def register_step_handlers(self, step_handlers: Dict[str, Callable]):
+    def register_handlers(self) -> Dict[str, Callable]:
         """
         ОБЯЗАТЕЛЬНЫЙ МЕТОД: Регистрация обработчиков шагов
         
-        Args:
-            step_handlers: Словарь для регистрации обработчиков
-                          Ключ: название типа шага (string)
-                          Значение: async функция-обработчик
+        Returns:
+            Dict[str, Callable]: Словарь {step_type: handler_function}
         """
-        step_handlers["my_action"] = self.handle_my_action
-        step_handlers["my_request"] = self.handle_my_request
+        handlers = {
+            "my_action": self.handle_my_action,
+            "my_request": self.handle_my_request
+        }
         
         # Логируем зарегистрированные типы
-        registered_types = ["my_action", "my_request"]
-        logger.info(f"✅ {self.name} зарегистрировал: {registered_types}")
+        logger.info(f"✅ {self.name} зарегистрировал: {list(handlers.keys())}")
+        return handlers
     
     async def handle_my_action(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> None:
         """
@@ -291,8 +291,8 @@ async def test_healthcheck():
 
 ### **1. API Интеграция**
 ```python
-class APIPlugin(PluginBase):
-    def register_step_handlers(self, step_handlers):
+class APIPlugin(BasePlugin):
+    def register_handlers(self):
         step_handlers["api_call"] = self.handle_api_call
         step_handlers["api_upload"] = self.handle_api_upload
 ```

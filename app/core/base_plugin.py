@@ -23,6 +23,7 @@ class BasePlugin(ABC):
         self.name = name
         self.logger = logger.bind(plugin=name)
         self._initialized = False
+        self.engine = None  # Ссылка на движок, устанавливается при регистрации
         
     @abstractmethod
     def register_handlers(self) -> Dict[str, Callable]:
@@ -77,6 +78,13 @@ class BasePlugin(ABC):
         По умолчанию ничего не делает.
         """
         pass
+    
+    def set_engine(self, engine):
+        """
+        Устанавливает ссылку на движок.
+        Вызывается при регистрации плагина в движке.
+        """
+        self.engine = engine
         
     async def handle_step(self, step_type: str, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """

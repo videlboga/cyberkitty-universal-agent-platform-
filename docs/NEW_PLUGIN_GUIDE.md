@@ -1,13 +1,13 @@
-# 🔌 РУКОВОДСТВО ПО СОЗДАНИЮ НОВЫХ ПЛАГИНОВ
+# 🔌 РУКОВОДСТВО ПО СОЗДАНИЮ ПЛАГИНОВ
 
 ## 🎯 **ЦЕЛЬ:**
-Создание универсального и расширяемого интерфейса для новых плагинов, который будет работать со всеми типами движков
+Создание универсальных плагинов для современной Universal Agent Platform
 
 ---
 
-## 🏗️ **АРХИТЕКТУРА ПЛАГИНОВ:**
+## 🏗️ **СОВРЕМЕННАЯ АРХИТЕКТУРА ПЛАГИНОВ:**
 
-### **✅ ТЕКУЩИЙ СТАНДАРТ (Обязательно для всех плагинов):**
+### **✅ СТАНДАРТ (Обязательно для всех плагинов):**
 
 ```python
 from app.core.base_plugin import BasePlugin
@@ -16,10 +16,10 @@ from loguru import logger
 
 class MyNewPlugin(BasePlugin):
     """
-    Новый плагин для Universal Agent System
+    Современный плагин для Universal Agent System
     
     ОБЯЗАТЕЛЬНЫЕ МЕТОДЫ:
-    - register_step_handlers() - регистрация типов шагов
+    - register_handlers() - регистрация типов шагов
     - healthcheck() - проверка работоспособности
     
     ОПЦИОНАЛЬНЫЕ МЕТОДЫ:
@@ -46,7 +46,6 @@ class MyNewPlugin(BasePlugin):
             "my_request": self.handle_my_request
         }
         
-        # Логируем зарегистрированные типы
         logger.info(f"✅ {self.name} зарегистрировал: {list(handlers.keys())}")
         return handlers
     
@@ -56,20 +55,10 @@ class MyNewPlugin(BasePlugin):
         
         Args:
             step_data: Данные шага из сценария
-                {
-                    "id": "step_id",
-                    "type": "my_action", 
-                    "params": {...}
-                }
             context: Контекст сценария (изменяется in-place)
         
         Returns:
             None - ВСЕГДА возвращать None
-            
-        ВАЖНО:
-        - Результаты сохранять в context, НЕ возвращать
-        - Ошибки сохранять в context["__step_error__"]
-        - Логировать все важные события
         """
         params = step_data.get("params", {})
         
@@ -88,11 +77,6 @@ class MyNewPlugin(BasePlugin):
             context["__step_error__"] = f"{self.name}: {str(e)}"
         
         return None  # ОБЯЗАТЕЛЬНО!
-    
-    async def handle_my_request(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> None:
-        """Другой тип шага"""
-        # Аналогичная логика...
-        return None
         
     async def healthcheck(self) -> bool:
         """
@@ -103,106 +87,94 @@ class MyNewPlugin(BasePlugin):
         """
         try:
             # Проверьте доступность внешних сервисов, API ключи и т.д.
-            # Например:
-            # await self._test_api_connection()
-            
             logger.info(f"✅ {self.name} healthcheck: OK")
             return True
             
         except Exception as e:
             logger.error(f"❌ {self.name} healthcheck: FAIL - {e}")
             return False
-    
-    # ===== ДОПОЛНИТЕЛЬНЫЕ МЕТОДЫ (РЕКОМЕНДУЕМЫЕ) =====
-    
-    async def initialize(self, app: Any = None):
-        """
-        ОПЦИОНАЛЬНЫЙ: Асинхронная инициализация
-        Вызывается автоматически при запуске системы
-        """
-        logger.info(f"🚀 {self.name} инициализация...")
-        # Ваша логика инициализации
-        
-    def get_default_config(self) -> Dict[str, Any]:
-        """ОПЦИОНАЛЬНЫЙ: Конфигурация по умолчанию"""
-        return {
-            "api_key": "YOUR_API_KEY",
-            "base_url": "https://api.example.com",
-            "timeout": 30
-        }
-    
-    def get_config_description(self) -> Dict[str, str]:
-        """ОПЦИОНАЛЬНЫЙ: Описание параметров конфигурации"""
-        return {
-            "api_key": "API ключ для внешнего сервиса",
-            "base_url": "Базовый URL API",
-            "timeout": "Тайм-аут запросов в секундах"
-        }
-    
-    def _execute_my_logic(self, params: Dict[str, Any]) -> Any:
-        """Приватные методы для внутренней логики"""
-        # Ваша основная логика
-        return {"status": "success", "data": "example"}
 ```
 
 ---
 
-## 🔧 **СОВМЕСТИМОСТЬ С НОВЫМИ ДВИЖКАМИ:**
+## 🔧 **СОВРЕМЕННЫЕ ТИПЫ ШАГОВ:**
 
-### **🔀 ГИБРИДНЫЙ ДВИЖОК (HybridScenarioEngine)**
-✅ **Автоматическая совместимость** - никаких изменений не нужно
+### **📋 БАЗОВЫЕ ОБРАБОТЧИКИ (13 штук):**
 
-### **🔌 АДАПТЕР ПЛАГИНОВ (PluginCompatibilityEngine)**  
-✅ **Автоматическая совместимость** - создает адаптеры автоматически
+```python
+# === ЖИЗНЕННЫЙ ЦИКЛ ===
+"start"              # Начало сценария
+"end"                # Завершение сценария
 
-### **⚡ ПРОСТОЙ ДВИЖОК (SimpleScenarioEngine)**
-⚠️ **Требует расширение** - добавим поддержку в следующем этапе
+# === ЛОГИКА ===
+"action"             # Универсальные действия через плагины
+"input"              # Ожидание ввода пользователя
+"branch"             # Современные условные переходы
+"switch_scenario"    # Переключение сценариев
+"log_message"        # Логирование сообщений
+
+# === УНИВЕРСАЛЬНЫЕ КАНАЛЫ ===
+"channel_send_message"    # Отправка сообщения
+"channel_send_buttons"    # Отправка кнопок
+"channel_edit_message"    # Редактирование сообщения
+"channel_start_polling"   # Запуск polling
+"channel_update_token"    # Обновление токена
+"channel_load_token"      # Загрузка токена
+```
 
 ---
 
-## 📋 **ШАБЛОН СЦЕНАРИЯ ДЛЯ НОВОГО ПЛАГИНА:**
+## 📋 **ШАБЛОН СОВРЕМЕННОГО СЦЕНАРИЯ:**
 
 ```json
 {
-  "scenario_id": "test_my_new_plugin",
-  "name": "Тест нового плагина", 
-  "description": "Демонстрация возможностей MyNewPlugin",
+  "scenario_id": "modern_example",
+  "name": "Современный пример", 
+  "description": "Демонстрация современной архитектуры",
+  "version": "3.0.0",
   "steps": [
     {
-      "id": "start_step",
-      "type": "log_message",
-      "params": {
-        "message": "Начинаем тест нового плагина",
-        "level": "INFO"
-      },
-      "next_step": "my_action_step"
+      "id": "start",
+      "type": "start",
+      "next_step": "welcome"
     },
     {
-      "id": "my_action_step",
-      "type": "my_action",
+      "id": "welcome",
+      "type": "channel_send_message",
       "params": {
-        "input_data": "Тестовые данные",
-        "mode": "demo",
-        "output_var": "action_result"
+        "channel_id": "{channel_id}",
+        "chat_id": "{chat_id}",
+        "text": "Добро пожаловать!",
+        "output_var": "welcome_result"
       },
-      "next_step": "my_request_step"
+      "next_step": "llm_request"
     },
     {
-      "id": "my_request_step", 
-      "type": "my_request",
+      "id": "llm_request",
+      "type": "action",
       "params": {
-        "query": "Получить данные для {action_result}",
-        "format": "json",
-        "output_var": "request_result"
+        "action": "llm_chat",
+        "prompt": "Ответь пользователю: {user_message}",
+        "output_var": "llm_response"
       },
-      "next_step": "final_step"
+      "next_step": "send_response"
     },
     {
-      "id": "final_step",
-      "type": "log_message",
+      "id": "send_response",
+      "type": "channel_send_message",
       "params": {
-        "message": "Результат: {request_result}",
-        "level": "INFO"
+        "channel_id": "{channel_id}",
+        "chat_id": "{chat_id}",
+        "text": "{llm_response}",
+        "output_var": "response_result"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "params": {
+        "message": "Сценарий завершен"
       }
     }
   ]
@@ -216,131 +188,70 @@ class MyNewPlugin(BasePlugin):
 ### **Шаг 1: Создайте плагин**
 ```python
 # app/plugins/my_new_plugin.py
-from app.plugins.plugin_base import PluginBase
+from app.core.base_plugin import BasePlugin
 # ... код плагина из шаблона выше
 ```
 
-### **Шаг 2: Добавьте в dependencies.py**
+### **Шаг 2: Добавьте в create_engine()**
 ```python
-# app/core/dependencies.py
-
-# Импорт
-from app.plugins.my_new_plugin import MyNewPlugin
-
-# Инициализация
-my_new_plugin_instance = MyNewPlugin({
-    "api_key": os.getenv("MY_API_KEY"),
-    "base_url": "https://api.example.com"
-})
-
-# Добавьте в список плагинов для ScenarioExecutor
-plugins_list = [
-    # ... существующие плагины
-    my_new_plugin_instance
-]
+# В app/core/simple_engine.py функция create_engine()
+try:
+    from app.plugins.my_new_plugin import MyNewPlugin
+    my_plugin = MyNewPlugin()
+    engine.register_plugin(my_plugin)
+    plugins_to_initialize.append(my_plugin)
+    logger.info("✅ MyNewPlugin зарегистрирован")
+except Exception as e:
+    logger.warning(f"⚠️ MyNewPlugin недоступен: {e}")
 ```
 
-### **Шаг 3: Протестируйте совместимость**
+### **Шаг 3: Протестируйте**
 ```python
-# test_my_plugin_compatibility.py
-
 import asyncio
-from app.core.plugin_adapter import test_plugin_compatibility
-from app.plugins.my_new_plugin import MyNewPlugin
+from app.core.simple_engine import create_engine
 
 async def test():
-    plugin = MyNewPlugin()
-    await test_plugin_compatibility([plugin])
+    engine = await create_engine()
+    handlers = engine.get_registered_handlers()
+    print(f"Обработчиков: {len(handlers)}")
+    print(f"Ваши обработчики: {[h for h in handlers if h.startswith('my_')]}")
 
 asyncio.run(test())
 ```
 
-### **Шаг 4: Создайте unit-тесты**
-```python
-# tests/test_my_new_plugin.py
-
-import pytest
-from app.plugins.my_new_plugin import MyNewPlugin
-
-@pytest.mark.asyncio
-async def test_my_action():
-    plugin = MyNewPlugin()
-    
-    step_data = {
-        "id": "test_step",
-        "type": "my_action",
-        "params": {"input_data": "test"}
-    }
-    context = {}
-    
-    await plugin.handle_my_action(step_data, context)
-    
-    assert "my_result" in context
-    assert context.get("__step_error__") is None
-
-@pytest.mark.asyncio  
-async def test_healthcheck():
-    plugin = MyNewPlugin()
-    result = await plugin.healthcheck()
-    assert result is True
-```
-
 ---
 
-## 🚀 **ПРИМЕРЫ ПОПУЛЯРНЫХ ТИПОВ ПЛАГИНОВ:**
+## 🚀 **ПРИМЕРЫ ПОПУЛЯРНЫХ ПЛАГИНОВ:**
 
-### **1. API Интеграция**
+### **1. LLM Plugin**
 ```python
-class APIPlugin(BasePlugin):
+class SimpleLLMPlugin(BasePlugin):
     def register_handlers(self):
-        step_handlers["api_call"] = self.handle_api_call
-        step_handlers["api_upload"] = self.handle_api_upload
+        return {
+            "llm_chat": self.handle_llm_chat,
+            "llm_generate": self.handle_llm_generate
+        }
 ```
 
-### **2. База данных**  
+### **2. Database Plugin**  
 ```python
-class DatabasePlugin(PluginBase):
-    def register_step_handlers(self, step_handlers):
-        step_handlers["db_query"] = self.handle_db_query
-        step_handlers["db_insert"] = self.handle_db_insert
-        step_handlers["db_update"] = self.handle_db_update
+class MongoPlugin(BasePlugin):
+    def register_handlers(self):
+        return {
+            "mongo_find": self.handle_mongo_find,
+            "mongo_insert": self.handle_mongo_insert,
+            "mongo_update": self.handle_mongo_update
+        }
 ```
 
-### **3. Обработка файлов**
+### **3. HTTP Plugin**
 ```python
-class FilePlugin(PluginBase):
-    def register_step_handlers(self, step_handlers):
-        step_handlers["file_read"] = self.handle_file_read
-        step_handlers["file_process"] = self.handle_file_process
-        step_handlers["file_convert"] = self.handle_file_convert
-```
-
-### **4. Уведомления**
-```python
-class NotificationPlugin(PluginBase):
-    def register_step_handlers(self, step_handlers):
-        step_handlers["send_email"] = self.handle_send_email
-        step_handlers["send_sms"] = self.handle_send_sms
-        step_handlers["push_notification"] = self.handle_push_notification
-```
-
----
-
-## 📊 **МЕТРИКИ И МОНИТОРИНГ:**
-
-### **Автоматический мониторинг:**
-- ✅ Количество вызовов каждого типа шага
-- ✅ Время выполнения
-- ✅ Частота ошибок
-- ✅ Результаты healthcheck
-
-### **Логирование:**
-```python
-# В каждом обработчике
-logger.info(f"🔄 {self.name}.{step_type}: Начало выполнения")
-logger.debug(f"📝 {self.name}: Параметры: {params}")
-logger.info(f"✅ {self.name}.{step_type}: Успешно завершен")
-logger.error(f"❌ {self.name}.{step_type}: Ошибка: {error}")
+class SimpleHTTPPlugin(BasePlugin):
+    def register_handlers(self):
+        return {
+            "http_get": self.handle_http_get,
+            "http_post": self.handle_http_post
+        }
 ```
 
 ---
@@ -364,39 +275,15 @@ logger.error(f"❌ {self.name}.{step_type}: Ошибка: {error}")
 
 ---
 
-## 🎯 **ROADMAP ПОДДЕРЖКИ НОВЫХ ПЛАГИНОВ:**
-
-### **Этап 1: ✅ Текущий**
-- Полная совместимость с HybridScenarioEngine
-- Автоматические адаптеры через PluginCompatibilityEngine
-- Руководство по созданию плагинов
-
-### **Этап 2: 🔄 В разработке** 
-- Автоматическая регистрация плагинов (plugin discovery)
-- Валидация схемы параметров шагов  
-- Автогенерация документации для типов шагов
-
-### **Этап 3: 📋 Планируется**
-- Web UI для создания плагинов
-- Marketplace плагинов
-- Версионирование и зависимости плагинов
-
----
-
-## 📞 **ПОДДЕРЖКА РАЗРАБОТЧИКОВ:**
+## 📞 **ПОДДЕРЖКА:**
 
 ### **Документация:**
 - 📖 `docs/NEW_PLUGIN_GUIDE.md` - это руководство
-- 📋 `docs/scenario_format.md` - форматы сценариев
-- 🏗️ `docs/MIGRATION_STRATEGY.md` - архитектурные изменения
+- 🏗️ `app/core/simple_engine.py` - современная архитектура
 
 ### **Примеры:**
-- 💡 `app/plugins/llm_plugin.py` - сложный плагин с конфигурацией
-- 🔗 `app/plugins/telegram_plugin.py` - интеграция с внешним API
-- 💾 `app/plugins/mongo_storage_plugin.py` - работа с базой данных
+- 💡 `app/plugins/simple_llm_plugin.py` - LLM интеграция
+- 🔗 `app/plugins/simple_telegram_plugin.py` - Telegram API
+- 💾 `app/plugins/mongo_plugin.py` - работа с базой данных
 
-### **Тестирование:**
-- 🧪 `test_simple_compatibility.py` - тест совместимости
-- ✅ `tests/` - unit-тесты существующих плагинов
-
-**Создавайте плагины, расширяйте систему! 🚀** 
+**Создавайте современные плагины! 🚀** 

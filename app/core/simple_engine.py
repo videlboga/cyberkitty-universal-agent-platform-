@@ -163,16 +163,24 @@ class SimpleScenarioEngine:
     def _register_core_handlers(self):
         """Регистрирует базовые обработчики шагов."""
         self.step_handlers.update({
+            # === БАЗОВЫЕ ОБРАБОТЧИКИ ===
             "start": self._handle_start,
             "end": self._handle_end,
             "action": self._handle_action,
             "input": self._handle_input,
-            "conditional_execute": self._handle_conditional_execute,
+            "branch": self._handle_branch,  # Современные условные переходы
             "switch_scenario": self._handle_switch_scenario,  # Переключение сценариев
             "log_message": self._handle_log_message,  # Логирование сообщений
-            "branch": self._handle_branch,  # Условные переходы
+            
+            # === УНИВЕРСАЛЬНЫЕ ОБРАБОТЧИКИ КАНАЛОВ ===
+            "channel_send_message": self._handle_channel_send_message,
+            "channel_send_buttons": self._handle_channel_send_buttons,
+            "channel_edit_message": self._handle_channel_edit_message,
+            "channel_start_polling": self._handle_channel_start_polling,
+            "channel_update_token": self._handle_channel_update_token,
+            "channel_load_token": self._handle_channel_load_token,
         })
-        self.logger.info("Зарегистрированы базовые обработчики", handlers=list(self.step_handlers.keys()))
+        self.logger.info("Зарегистрированы современные обработчики", handlers=list(self.step_handlers.keys()))
         
     def register_plugin(self, plugin: BasePlugin):
         """
@@ -181,10 +189,10 @@ class SimpleScenarioEngine:
         Args:
             plugin: Экземпляр плагина наследующего BasePlugin
         """
-        self.plugins[plugin.name] = plugin
+        # ВАЖНО: Передаем ссылку на движок плагину ПЕРЕД регистрацией
+        plugin.set_engine(self)
         
-        # ВАЖНО: Передаем ссылку на движок плагину
-        plugin.engine = self
+        self.plugins[plugin.name] = plugin
         
         # Регистрируем обработчики плагина
         plugin_handlers = plugin.register_handlers()
@@ -509,136 +517,83 @@ class SimpleScenarioEngine:
         # Останавливаем выполнение - следующий шаг будет выполнен при получении ввода
         raise StopExecution(f"Ожидание ввода на шаге {step.get('id')}")
         
-    async def _handle_conditional_execute(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_branch(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Универсальный обработчик условного выполнения.
+        Обработчик условных переходов.
         
-        Поддерживает:
-        1. Простые условия: "exists:user_data.documents"
-        2. Сравнения: "equals:user_role:admin"
-        3. Python выражения: "len(user_data.get('documents', [])) > 0"
-        
-        Примеры:
-        {
-            "type": "conditional_execute",
-            "params": {
-                "condition": "exists:user_data.documents",
-                "true_step": "user_exists",
-                "false_step": "create_user"
-            }
-        }
-        
-        {
-            "type": "conditional_execute", 
-            "params": {
-                "condition": "equals:telegram_bot_token_available:true",
-                "true_step": "start_polling",
-                "false_step": "no_token"
-            }
-        }
-        """
-        self.logger.info("Обрабатываю шаг conditional_execute", step_id=step.get("id"))
-        
-        params = step.get("params", {})
-        condition = params.get("condition")
-        true_step = params.get("true_step")
-        false_step = params.get("false_step")
-        
-        result = False
-        
-        try:
-            result = self._evaluate_condition(condition, context)
+        Args:
+            step: Данные шага
+            context: Контекст выполнения
             
-            if result:
-                context["next_step_override"] = true_step
-                self.logger.info(f"Условие '{condition}' истинно, переход к {true_step}")
-            else:
-                context["next_step_override"] = false_step
-                self.logger.info(f"Условие '{condition}' ложно, переход к {false_step}")
-                
-        except Exception as e:
-            self.logger.error(f"Ошибка оценки условия '{condition}': {e}")
-            context["next_step_override"] = false_step
-            context["condition_error"] = str(e)
-                
-        context["condition_result"] = result
-        return context
-        
-    def _evaluate_condition(self, condition: str, context: Dict[str, Any]) -> bool:
+        Returns:
+            Dict[str, Any]: Обновленный контекст
         """
-        Универсальная оценка условий.
+        params = step.get("params", {})
+        conditions = params.get("conditions", [])
+        default_next_step_id = params.get("default_next_step_id")
         
-        Поддерживаемые форматы:
-        1. exists:path.to.field - проверяет существование поля
-        2. equals:field:value - проверяет равенство
-        3. not_empty:field - проверяет что поле не пустое
-        4. Python выражение - eval() для сложных условий
+        # Проверяем условия по порядку
+        for condition_data in conditions:
+            condition = condition_data.get("condition", "")
+            next_step_id = condition_data.get("next_step_id")
+            
+            try:
+                # Простая оценка условия
+                if self._evaluate_branch_condition(condition, context):
+                    context["next_step_override"] = next_step_id
+                    self.logger.info(f"Условие '{condition}' истинно, переход к {next_step_id}")
+                    return context
+            except Exception as e:
+                self.logger.error(f"Ошибка оценки условия '{condition}': {e}")
+                continue
+        
+        # Если ни одно условие не сработало, используем default
+        if default_next_step_id:
+            context["next_step_override"] = default_next_step_id
+            self.logger.info(f"Все условия ложны, переход к default: {default_next_step_id}")
+        
+        return context
+    
+    def _evaluate_branch_condition(self, condition: str, context: Dict[str, Any]) -> bool:
+        """
+        Оценивает условие для branch шага.
+        
+        Args:
+            condition: Условие для оценки (например: "context.counter > 10")
+            context: Контекст выполнения
+            
+        Returns:
+            bool: Результат оценки условия
         """
         if not condition:
             return False
-            
-        # Простые условия
-        if ":" in condition:
-            parts = condition.split(":", 2)
-            condition_type = parts[0]
-            
-            if condition_type == "exists":
-                # exists:user_data.documents
-                field_path = parts[1]
-                return self._check_field_exists(field_path, context)
-                
-            elif condition_type == "equals":
-                # equals:telegram_bot_token_available:true
-                field_name = parts[1]
-                expected_value = parts[2]
-                actual_value = context.get(field_name)
-                
-                # Преобразуем строковые значения
-                if expected_value.lower() == "true":
-                    expected_value = True
-                elif expected_value.lower() == "false":
-                    expected_value = False
-                elif expected_value.isdigit():
-                    expected_value = int(expected_value)
-                    
-                return actual_value == expected_value
-                
-            elif condition_type == "not_empty":
-                # not_empty:user_data.documents
-                field_path = parts[1]
-                value = self._get_field_value(field_path, context)
-                if isinstance(value, (list, dict, str)):
-                    return len(value) > 0
-                return value is not None
-                
-        # Fallback: Python выражение
-        try:
-            resolved_condition = self._resolve_condition(condition, context)
-            return bool(eval(resolved_condition))
-        except Exception as e:
-            self.logger.warning(f"Не удалось оценить условие '{condition}': {e}")
-            return False
-            
-    def _check_field_exists(self, field_path: str, context: Dict[str, Any]) -> bool:
-        """Проверяет существование поля по пути (например: user_data.documents)"""
-        try:
-            value = self._get_field_value(field_path, context)
-            return value is not None
-        except:
-            return False
-            
-    def _get_field_value(self, field_path: str, context: Dict[str, Any]) -> Any:
-        """Получает значение поля по пути (например: user_data.documents)"""
-        parts = field_path.split(".")
-        current = context
         
-        for part in parts:
-            if isinstance(current, dict) and part in current:
-                current = current[part]
-            else:
-                return None
-                
-        return current
+        try:
+            # Заменяем context.field на значения из контекста
+            resolved_condition = condition
+            
+            # Простая замена context.field на значения
+            import re
+            context_refs = re.findall(r'context\.(\w+)', condition)
+            for field in context_refs:
+                if field in context:
+                    value = context[field]
+                    if isinstance(value, str):
+                        resolved_condition = resolved_condition.replace(f"context.{field}", f"'{value}'")
+                    else:
+                        resolved_condition = resolved_condition.replace(f"context.{field}", str(value))
+                else:
+                    # Если поле не найдено, заменяем на None
+                    resolved_condition = resolved_condition.replace(f"context.{field}", "None")
+            
+            # Выполняем условие
+            result = eval(resolved_condition)
+            self.logger.debug(f"Условие '{condition}' -> '{resolved_condition}' -> {result}")
+            return bool(result)
+            
+        except Exception as e:
+            self.logger.error(f"Ошибка оценки условия '{condition}': {e}")
+            return False
         
     async def _handle_switch_scenario(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -719,8 +674,6 @@ class SimpleScenarioEngine:
             })
             return context
     
-
-    
     def _resolve_template(self, template: str, context: Dict[str, Any]) -> str:
         """Простая подстановка переменных {var} в строке."""
         if not isinstance(template, str):
@@ -794,84 +747,6 @@ class SimpleScenarioEngine:
             
         return context
     
-    async def _handle_branch(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Обработчик условных переходов.
-        
-        Args:
-            step: Данные шага
-            context: Контекст выполнения
-            
-        Returns:
-            Dict[str, Any]: Обновленный контекст
-        """
-        params = step.get("params", {})
-        conditions = params.get("conditions", [])
-        default_next_step_id = params.get("default_next_step_id")
-        
-        # Проверяем условия по порядку
-        for condition_data in conditions:
-            condition = condition_data.get("condition", "")
-            next_step_id = condition_data.get("next_step_id")
-            
-            try:
-                # Простая оценка условия
-                if self._evaluate_branch_condition(condition, context):
-                    context["next_step_override"] = next_step_id
-                    self.logger.info(f"Условие '{condition}' истинно, переход к {next_step_id}")
-                    return context
-            except Exception as e:
-                self.logger.error(f"Ошибка оценки условия '{condition}': {e}")
-                continue
-        
-        # Если ни одно условие не сработало, используем default
-        if default_next_step_id:
-            context["next_step_override"] = default_next_step_id
-            self.logger.info(f"Все условия ложны, переход к default: {default_next_step_id}")
-        
-        return context
-    
-    def _evaluate_branch_condition(self, condition: str, context: Dict[str, Any]) -> bool:
-        """
-        Оценивает условие для branch шага.
-        
-        Args:
-            condition: Условие для оценки (например: "context.counter > 10")
-            context: Контекст выполнения
-            
-        Returns:
-            bool: Результат оценки условия
-        """
-        if not condition:
-            return False
-        
-        try:
-            # Заменяем context.field на значения из контекста
-            resolved_condition = condition
-            
-            # Простая замена context.field на значения
-            import re
-            context_refs = re.findall(r'context\.(\w+)', condition)
-            for field in context_refs:
-                if field in context:
-                    value = context[field]
-                    if isinstance(value, str):
-                        resolved_condition = resolved_condition.replace(f"context.{field}", f"'{value}'")
-                    else:
-                        resolved_condition = resolved_condition.replace(f"context.{field}", str(value))
-                else:
-                    # Если поле не найдено, заменяем на None
-                    resolved_condition = resolved_condition.replace(f"context.{field}", "None")
-            
-            # Выполняем условие
-            result = eval(resolved_condition)
-            self.logger.debug(f"Условие '{condition}' -> '{resolved_condition}' -> {result}")
-            return bool(result)
-            
-        except Exception as e:
-            self.logger.error(f"Ошибка оценки условия '{condition}': {e}")
-            return False
-        
     def get_registered_handlers(self) -> List[str]:
         """Возвращает список всех зарегистрированных обработчиков."""
         return list(self.step_handlers.keys())
@@ -886,28 +761,294 @@ class SimpleScenarioEngine:
         
         Args:
             handler_name: Имя обработчика
-            context: Контекст для передачи обработчику
+            context: Контекст выполнения
             
         Returns:
             Dict[str, Any]: Результат выполнения обработчика
         """
         if handler_name not in self.step_handlers:
-            self.logger.error(f"Обработчик '{handler_name}' не найден", available=list(self.step_handlers.keys()))
-            return {"success": False, "error": f"Handler '{handler_name}' not found"}
+            raise ValueError(f"Обработчик {handler_name} не найден")
+            
+        handler = self.step_handlers[handler_name]
+        
+        # Создаем фиктивный шаг для вызова обработчика
+        fake_step = {
+            "id": f"call_{handler_name}",
+            "type": handler_name,
+            "params": context.get("handler_params", {})
+        }
+        
+        return await handler(fake_step, context)
+    
+    # ===== НОВЫЕ УНИВЕРСАЛЬНЫЕ ОБРАБОТЧИКИ КАНАЛОВ =====
+    
+    async def _handle_channel_send_message(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Универсальный обработчик отправки сообщения через канал
+        
+        Параметры шага:
+        - channel_id: ID канала (обязательно)
+        - chat_id: ID чата (обязательно)
+        - text: Текст сообщения (обязательно)
+        - parse_mode: Режим парсинга (опционально)
+        - output_var: Переменная для сохранения результата (опционально)
+        """
+        params = step.get("params", {})
         
         try:
-            handler = self.step_handlers[handler_name]
-            result = await handler(context)
+            channel_id = self._resolve_template(str(params.get("channel_id", "")), context)
+            chat_id = self._resolve_template(str(params.get("chat_id", "")), context)
+            text = self._resolve_template(str(params.get("text", "")), context)
             
-            # Если результат не содержит success, добавляем его
-            if isinstance(result, dict) and "success" not in result:
-                result["success"] = True
-                
-            return result
+            if not channel_id:
+                raise ValueError("channel_id обязателен для channel_send_message")
+            if not chat_id:
+                raise ValueError("chat_id обязателен для channel_send_message")
+            if not text:
+                raise ValueError("text обязателен для channel_send_message")
+            
+            # Получаем ChannelManager из движка
+            channel_manager = getattr(self, 'channel_manager', None)
+            if not channel_manager:
+                raise ValueError("ChannelManager не инициализирован в движке")
+            
+            # Подготавливаем дополнительные параметры
+            kwargs = {}
+            if "parse_mode" in params:
+                kwargs["parse_mode"] = params["parse_mode"]
+            
+            # Отправляем сообщение через ChannelManager
+            result = await channel_manager.send_message(channel_id, chat_id, text, **kwargs)
+            
+            # Сохраняем результат в контекст
+            output_var = params.get("output_var", "channel_send_result")
+            context[output_var] = result
+            
+            self.logger.info(f"✅ Сообщение отправлено через канал {channel_id}")
+            return context
             
         except Exception as e:
-            self.logger.error(f"Ошибка выполнения обработчика '{handler_name}': {e}")
-            return {"success": False, "error": str(e)}
+            self.logger.error(f"❌ Ошибка channel_send_message: {e}")
+            context["__step_error__"] = str(e)
+            return context
+    
+    async def _handle_channel_send_buttons(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Универсальный обработчик отправки сообщения с кнопками через канал
+        
+        Параметры шага:
+        - channel_id: ID канала (обязательно)
+        - chat_id: ID чата (обязательно)
+        - text: Текст сообщения (обязательно)
+        - buttons: Массив кнопок (обязательно)
+        - output_var: Переменная для сохранения результата (опционально)
+        """
+        params = step.get("params", {})
+        
+        try:
+            channel_id = self._resolve_template(str(params.get("channel_id", "")), context)
+            chat_id = self._resolve_template(str(params.get("chat_id", "")), context)
+            text = self._resolve_template(str(params.get("text", "")), context)
+            buttons = params.get("buttons", [])
+            
+            if not channel_id:
+                raise ValueError("channel_id обязателен для channel_send_buttons")
+            if not chat_id:
+                raise ValueError("chat_id обязателен для channel_send_buttons")
+            if not text:
+                raise ValueError("text обязателен для channel_send_buttons")
+            if not buttons:
+                raise ValueError("buttons обязательны для channel_send_buttons")
+            
+            # Получаем ChannelManager из движка
+            channel_manager = getattr(self, 'channel_manager', None)
+            if not channel_manager:
+                raise ValueError("ChannelManager не инициализирован в движке")
+            
+            # Отправляем сообщение с кнопками через ChannelManager
+            result = await channel_manager.send_buttons(channel_id, chat_id, text, buttons)
+            
+            # Сохраняем результат в контекст
+            output_var = params.get("output_var", "channel_send_buttons_result")
+            context[output_var] = result
+            
+            self.logger.info(f"✅ Сообщение с кнопками отправлено через канал {channel_id}")
+            return context
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка channel_send_buttons: {e}")
+            context["__step_error__"] = str(e)
+            return context
+    
+    async def _handle_channel_edit_message(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Универсальный обработчик редактирования сообщения через канал
+        
+        Параметры шага:
+        - channel_id: ID канала (обязательно)
+        - chat_id: ID чата (обязательно)
+        - message_id: ID сообщения (обязательно)
+        - text: Новый текст (обязательно)
+        - output_var: Переменная для сохранения результата (опционально)
+        """
+        params = step.get("params", {})
+        
+        try:
+            channel_id = self._resolve_template(str(params.get("channel_id", "")), context)
+            chat_id = self._resolve_template(str(params.get("chat_id", "")), context)
+            message_id = params.get("message_id")
+            text = self._resolve_template(str(params.get("text", "")), context)
+            
+            if not channel_id:
+                raise ValueError("channel_id обязателен для channel_edit_message")
+            if not chat_id:
+                raise ValueError("chat_id обязателен для channel_edit_message")
+            if not message_id:
+                raise ValueError("message_id обязателен для channel_edit_message")
+            if not text:
+                raise ValueError("text обязателен для channel_edit_message")
+            
+            # Получаем ChannelManager из движка
+            channel_manager = getattr(self, 'channel_manager', None)
+            if not channel_manager:
+                raise ValueError("ChannelManager не инициализирован в движке")
+            
+            # Редактируем сообщение через ChannelManager
+            result = await channel_manager.edit_message(channel_id, chat_id, int(message_id), text)
+            
+            # Сохраняем результат в контекст
+            output_var = params.get("output_var", "channel_edit_result")
+            context[output_var] = result
+            
+            self.logger.info(f"✅ Сообщение отредактировано через канал {channel_id}")
+            return context
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка channel_edit_message: {e}")
+            context["__step_error__"] = str(e)
+            return context
+    
+    async def _handle_channel_start_polling(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Обработчик запуска polling для канала
+        
+        Параметры шага:
+        - channel_id: ID канала (обязательно)
+        - output_var: Переменная для сохранения результата (опционально)
+        """
+        params = step.get("params", {})
+        
+        try:
+            channel_id = self._resolve_template(str(params.get("channel_id", "")), context)
+            
+            if not channel_id:
+                raise ValueError("channel_id обязателен для channel_start_polling")
+            
+            # Получаем ChannelManager из движка
+            channel_manager = getattr(self, 'channel_manager', None)
+            if not channel_manager:
+                raise ValueError("ChannelManager не инициализирован в движке")
+            
+            # Запускаем polling через ChannelManager
+            # Примечание: polling обычно уже запущен при инициализации
+            result = {"success": True, "message": f"Polling для канала {channel_id} активен"}
+            
+            # Сохраняем результат в контекст
+            output_var = params.get("output_var", "channel_polling_result")
+            context[output_var] = result
+            
+            self.logger.info(f"✅ Polling активен для канала {channel_id}")
+            return context
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка channel_start_polling: {e}")
+            context["__step_error__"] = str(e)
+            return context
+    
+    async def _handle_channel_update_token(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Обработчик обновления токена канала
+        
+        Параметры шага:
+        - channel_id: ID канала (обязательно)
+        - new_token: Новый токен (обязательно)
+        - output_var: Переменная для сохранения результата (опционально)
+        """
+        params = step.get("params", {})
+        
+        try:
+            channel_id = self._resolve_template(str(params.get("channel_id", "")), context)
+            new_token = self._resolve_template(str(params.get("new_token", "")), context)
+            
+            if not channel_id:
+                raise ValueError("channel_id обязателен для channel_update_token")
+            if not new_token:
+                raise ValueError("new_token обязателен для channel_update_token")
+            
+            # Получаем ChannelManager из движка
+            channel_manager = getattr(self, 'channel_manager', None)
+            if not channel_manager:
+                raise ValueError("ChannelManager не инициализирован в движке")
+            
+            # Обновляем токен через ChannelManager
+            result = await channel_manager.update_channel_token(channel_id, new_token)
+            
+            # Сохраняем результат в контекст
+            output_var = params.get("output_var", "channel_update_token_result")
+            context[output_var] = result
+            
+            self.logger.info(f"✅ Токен обновлен для канала {channel_id}")
+            return context
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка channel_update_token: {e}")
+            context["__step_error__"] = str(e)
+            return context
+    
+    async def _handle_channel_load_token(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Обработчик загрузки токена канала из БД
+        
+        Параметры шага:
+        - channel_id: ID канала (обязательно)
+        - output_var: Переменная для сохранения токена (опционально)
+        """
+        params = step.get("params", {})
+        
+        try:
+            channel_id = self._resolve_template(str(params.get("channel_id", "")), context)
+            
+            if not channel_id:
+                raise ValueError("channel_id обязателен для channel_load_token")
+            
+            # Получаем ChannelManager из движка
+            channel_manager = getattr(self, 'channel_manager', None)
+            if not channel_manager:
+                raise ValueError("ChannelManager не инициализирован в движке")
+            
+            # Получаем информацию о канале
+            channel_info = channel_manager.get_channel_info(channel_id)
+            if not channel_info:
+                raise ValueError(f"Канал {channel_id} не найден")
+            
+            # Извлекаем токен
+            token = channel_info.get("channel_config", {}).get("telegram_bot_token")
+            if not token:
+                raise ValueError(f"Токен не найден для канала {channel_id}")
+            
+            result = {"success": True, "token": token}
+            
+            # Сохраняем результат в контекст
+            output_var = params.get("output_var", "channel_token")
+            context[output_var] = result
+            
+            self.logger.info(f"✅ Токен загружен для канала {channel_id}")
+            return context
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка channel_load_token: {e}")
+            context["__step_error__"] = str(e)
+            return context
 
 
 class StopExecution(Exception):
@@ -1034,71 +1175,142 @@ async def create_engine() -> SimpleScenarioEngine:
     
     # === ИНИЦИАЛИЗАЦИЯ ПЛАГИНОВ ===
     
+    # === РЕГИСТРАЦИЯ ПЛАГИНОВ (БЕЗ ИНИЦИАЛИЗАЦИИ) ===
+    
+    plugins_to_initialize = []
+    
     try:
         # 1. MongoDB Plugin - для хранения агентов и сценариев
-        logger.info("📦 Инициализация MongoDB Plugin...")
+        logger.info("📦 Регистрация MongoDB Plugin...")
         from app.plugins.mongo_plugin import MongoPlugin
         mongo_plugin = MongoPlugin()
-        await mongo_plugin.initialize()
         engine.register_plugin(mongo_plugin)
+        plugins_to_initialize.append(mongo_plugin)
         logger.info("✅ MongoDB Plugin зарегистрирован")
     except Exception as e:
         logger.warning(f"⚠️ MongoDB Plugin недоступен: {e}")
     
     try:
         # 2. Telegram Plugin - для работы с Telegram
-        logger.info("📦 Инициализация SimpleTelegram Plugin...")
+        logger.info("📦 Регистрация SimpleTelegram Plugin...")
         from app.plugins.simple_telegram_plugin import SimpleTelegramPlugin
         telegram_plugin = SimpleTelegramPlugin()
-        await telegram_plugin.initialize()
         engine.register_plugin(telegram_plugin)
+        plugins_to_initialize.append(telegram_plugin)
         logger.info("✅ SimpleTelegram Plugin зарегистрирован")
     except Exception as e:
         logger.warning(f"⚠️ SimpleTelegram Plugin недоступен: {e}")
     
     try:
         # 3. LLM Plugin - для работы с языковыми моделями
-        logger.info("📦 Инициализация SimpleLLM Plugin...")
+        logger.info("📦 Регистрация SimpleLLM Plugin...")
         from app.plugins.simple_llm_plugin import SimpleLLMPlugin
         llm_plugin = SimpleLLMPlugin()
-        await llm_plugin.initialize()
         engine.register_plugin(llm_plugin)
+        plugins_to_initialize.append(llm_plugin)
         logger.info("✅ SimpleLLM Plugin зарегистрирован")
     except Exception as e:
         logger.warning(f"⚠️ SimpleLLM Plugin недоступен: {e}")
     
     try:
         # 4. RAG Plugin - для работы с базой знаний
-        logger.info("📦 Инициализация SimpleRAG Plugin...")
+        logger.info("📦 Регистрация SimpleRAG Plugin...")
         from app.plugins.simple_rag_plugin import SimpleRAGPlugin
         rag_plugin = SimpleRAGPlugin()
-        await rag_plugin.initialize()
         engine.register_plugin(rag_plugin)
+        plugins_to_initialize.append(rag_plugin)
         logger.info("✅ SimpleRAG Plugin зарегистрирован")
     except Exception as e:
         logger.warning(f"⚠️ SimpleRAG Plugin недоступен: {e}")
     
     try:
         # 5. Scheduler Plugin - для отложенного выполнения задач
-        logger.info("📦 Инициализация SimpleScheduler Plugin...")
+        logger.info("📦 Регистрация SimpleScheduler Plugin...")
         from app.plugins.simple_scheduler_plugin import SimpleSchedulerPlugin
         scheduler_plugin = SimpleSchedulerPlugin()
-        await scheduler_plugin.initialize()
         engine.register_plugin(scheduler_plugin)
+        plugins_to_initialize.append(scheduler_plugin)
         logger.info("✅ SimpleScheduler Plugin зарегистрирован")
     except Exception as e:
         logger.warning(f"⚠️ SimpleScheduler Plugin недоступен: {e}")
     
     try:
         # 6. HTTP Plugin - для внешних HTTP запросов
-        logger.info("📦 Инициализация SimpleHTTP Plugin...")
+        logger.info("📦 Регистрация SimpleHTTP Plugin...")
         from app.plugins.simple_http_plugin import SimpleHTTPPlugin
         http_plugin = SimpleHTTPPlugin()
-        await http_plugin.initialize()
         engine.register_plugin(http_plugin)
+        plugins_to_initialize.append(http_plugin)
         logger.info("✅ SimpleHTTP Plugin зарегистрирован")
     except Exception as e:
         logger.warning(f"⚠️ SimpleHTTP Plugin недоступен: {e}")
+    
+    try:
+        # 7. AmoCRM Plugin - для интеграции с AmoCRM
+        logger.info("📦 Регистрация SimpleAmoCRM Plugin...")
+        from app.plugins.simple_amocrm_plugin import SimpleAmoCRMPlugin
+        amocrm_plugin = SimpleAmoCRMPlugin()
+        engine.register_plugin(amocrm_plugin)
+        plugins_to_initialize.append(amocrm_plugin)
+        logger.info("✅ SimpleAmoCRM Plugin зарегистрирован")
+    except Exception as e:
+        logger.warning(f"⚠️ SimpleAmoCRM Plugin недоступен: {e}")
+    
+    try:
+        # 8. AmoCRM Companies Plugin - для работы с компаниями
+        logger.info("📦 Регистрация SimpleAmoCRM Companies Plugin...")
+        from app.plugins.simple_amocrm_companies import SimpleAmoCRMCompaniesPlugin
+        amocrm_companies_plugin = SimpleAmoCRMCompaniesPlugin()
+        engine.register_plugin(amocrm_companies_plugin)
+        plugins_to_initialize.append(amocrm_companies_plugin)
+        logger.info("✅ SimpleAmoCRM Companies Plugin зарегистрирован")
+    except Exception as e:
+        logger.warning(f"⚠️ SimpleAmoCRM Companies Plugin недоступен: {e}")
+    
+    try:
+        # 9. AmoCRM Tasks Plugin - для работы с задачами и событиями
+        logger.info("📦 Регистрация SimpleAmoCRM Tasks Plugin...")
+        from app.plugins.simple_amocrm_tasks import SimpleAmoCRMTasksPlugin
+        amocrm_tasks_plugin = SimpleAmoCRMTasksPlugin()
+        engine.register_plugin(amocrm_tasks_plugin)
+        plugins_to_initialize.append(amocrm_tasks_plugin)
+        logger.info("✅ SimpleAmoCRM Tasks Plugin зарегистрирован")
+    except Exception as e:
+        logger.warning(f"⚠️ SimpleAmoCRM Tasks Plugin недоступен: {e}")
+    
+    try:
+        # 10. AmoCRM Advanced Plugin - для продвинутых операций
+        logger.info("📦 Регистрация SimpleAmoCRM Advanced Plugin...")
+        from app.plugins.simple_amocrm_advanced import SimpleAmoCRMAdvancedPlugin
+        amocrm_advanced_plugin = SimpleAmoCRMAdvancedPlugin()
+        engine.register_plugin(amocrm_advanced_plugin)
+        plugins_to_initialize.append(amocrm_advanced_plugin)
+        logger.info("✅ SimpleAmoCRM Advanced Plugin зарегистрирован")
+    except Exception as e:
+        logger.warning(f"⚠️ SimpleAmoCRM Advanced Plugin недоступен: {e}")
+    
+    try:
+        # 11. AmoCRM Admin Plugin - для административных операций
+        logger.info("📦 Регистрация SimpleAmoCRM Admin Plugin...")
+        from app.plugins.simple_amocrm_admin import SimpleAmoCRMAdminPlugin
+        amocrm_admin_plugin = SimpleAmoCRMAdminPlugin()
+        engine.register_plugin(amocrm_admin_plugin)
+        plugins_to_initialize.append(amocrm_admin_plugin)
+        logger.info("✅ SimpleAmoCRM Admin Plugin зарегистрирован")
+    except Exception as e:
+        logger.warning(f"⚠️ SimpleAmoCRM Admin Plugin недоступен: {e}")
+    
+    # === ИНИЦИАЛИЗАЦИЯ ПЛАГИНОВ (ПОСЛЕ РЕГИСТРАЦИИ) ===
+    
+    logger.info("🔧 Инициализация зарегистрированных плагинов...")
+    
+    for plugin in plugins_to_initialize:
+        try:
+            logger.info(f"🚀 Инициализация {plugin.name}...")
+            await plugin.initialize()
+            logger.info(f"✅ {plugin.name} инициализирован")
+        except Exception as e:
+            logger.warning(f"⚠️ Ошибка инициализации {plugin.name}: {e}")
     
     # === ФИНАЛИЗАЦИЯ ===
     

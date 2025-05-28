@@ -80,12 +80,22 @@ class MongoPlugin(BasePlugin):
             except Exception as e:
                 logger.error(f"❌ Ошибка подключения к MongoDB (попытка {attempt + 1}): {e}")
                 
+                # Очищаем клиент при ошибке
+                if self.client:
+                    try:
+                        self.client.close()
+                    except:
+                        pass
+                    self.client = None
+                    self.db = None
+                
                 if attempt < DB_CONFIG.retry_attempts - 1:
                     logger.info(f"⏳ Ожидание {DB_CONFIG.retry_delay} секунд перед повторной попыткой...")
                     await asyncio.sleep(DB_CONFIG.retry_delay)
                 else:
                     logger.error("❌ Все попытки подключения к MongoDB исчерпаны")
                     self.client = None
+                    self.db = None
             
     async def _ensure_database_structure(self):
         """Гарантирует корректную структуру БД через миграции."""
@@ -179,7 +189,7 @@ class MongoPlugin(BasePlugin):
     async def healthcheck(self) -> bool:
         """Проверяет состояние MongoDB подключения."""
         try:
-            if not self.client:
+            if self.client is None:
                 return False
                 
             # Пинг БД
@@ -195,7 +205,7 @@ class MongoPlugin(BasePlugin):
     async def create_scenario(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Создает новый сценарий."""
         try:
-            if not self.client:
+            if self.client is None:
                 raise Exception("MongoDB не подключен")
                 
             # Создаем сценарий из контекста
@@ -245,7 +255,7 @@ class MongoPlugin(BasePlugin):
     async def get_scenario_by_id(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Получает сценарий по scenario_id."""
         try:
-            if not self.client:
+            if self.client is None:
                 logger.error("MongoDB не подключен")
                 return context
                 
@@ -291,7 +301,7 @@ class MongoPlugin(BasePlugin):
     async def list_scenarios(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Получает список сценариев."""
         try:
-            if not self.client:
+            if self.client is None:
                 return {"success": False, "error": "MongoDB не подключен"}
                 
             # Простой поиск всех сценариев
@@ -322,7 +332,7 @@ class MongoPlugin(BasePlugin):
     async def create_execution(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Создает запись о выполнении сценария."""
         try:
-            if not self.client:
+            if self.client is None:
                 return {"success": False, "error": "MongoDB не подключен"}
                 
             execution_data = {
@@ -353,7 +363,7 @@ class MongoPlugin(BasePlugin):
     async def update_scenario(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Обновляет сценарий."""
         try:
-            if not self.client:
+            if self.client is None:
                 return {"success": False, "error": "MongoDB не подключен"}
                 
             scenario_id = context["scenario_id"]
@@ -374,7 +384,7 @@ class MongoPlugin(BasePlugin):
     async def delete_scenario(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Удаляет сценарий (жёсткое удаление для простоты)."""
         try:
-            if not self.client:
+            if self.client is None:
                 return {"success": False, "error": "MongoDB не подключен"}
                 
             scenario_id = context["scenario_id"]
@@ -391,7 +401,7 @@ class MongoPlugin(BasePlugin):
     async def get_execution(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Получает выполнение по ID."""
         try:
-            if not self.client:
+            if self.client is None:
                 return {"success": False, "error": "MongoDB не подключен"}
                 
             execution_id = context["execution_id"]
@@ -413,7 +423,7 @@ class MongoPlugin(BasePlugin):
     async def update_execution(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Обновляет выполнение."""
         try:
-            if not self.client:
+            if self.client is None:
                 return {"success": False, "error": "MongoDB не подключен"}
                 
             execution_id = context["execution_id"]
@@ -433,7 +443,7 @@ class MongoPlugin(BasePlugin):
     async def list_executions(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Получает список выполнений."""
         try:
-            if not self.client:
+            if self.client is None:
                 return {"success": False, "error": "MongoDB не подключен"}
                 
             filters = {}
@@ -461,7 +471,7 @@ class MongoPlugin(BasePlugin):
     async def create_channel_mapping(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Создаёт новый маппинг канала на сценарий."""
         try:
-            if not self.client:
+            if self.client is None:
                 logger.error("MongoDB не подключен")
                 return context
                 
@@ -513,7 +523,7 @@ class MongoPlugin(BasePlugin):
     async def get_channel_mapping(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Получает маппинг по channel_id."""
         try:
-            if not self.client:
+            if self.client is None:
                 logger.error("MongoDB не подключен")
                 return context
                 
@@ -548,7 +558,7 @@ class MongoPlugin(BasePlugin):
     async def list_channel_mappings(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Получает список маппингов."""
         try:
-            if not self.client:
+            if self.client is None:
                 logger.error("MongoDB не подключен")
                 return context
                 
@@ -591,7 +601,7 @@ class MongoPlugin(BasePlugin):
     async def delete_channel_mapping(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Удаляет маппинг по channel_id."""
         try:
-            if not self.client:
+            if self.client is None:
                 logger.error("MongoDB не подключен")
                 return context
                 
@@ -626,7 +636,7 @@ class MongoPlugin(BasePlugin):
     async def insert_document(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Универсальная вставка документа в любую коллекцию."""
         try:
-            if not self.client:
+            if self.client is None:
                 return {"success": False, "error": "MongoDB не подключен"}
                 
             collection_name = context["collection"]
@@ -650,7 +660,7 @@ class MongoPlugin(BasePlugin):
     async def upsert_document(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Универсальная вставка/обновление документа."""
         try:
-            if not self.client:
+            if self.client is None:
                 return {"success": False, "error": "MongoDB не подключен"}
                 
             collection_name = context["collection"]
@@ -681,7 +691,7 @@ class MongoPlugin(BasePlugin):
     async def find_documents(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Универсальный поиск документов."""
         try:
-            if not self.client:
+            if self.client is None:
                 return {"success": False, "error": "MongoDB не подключен"}
                 
             collection_name = context["collection"]
@@ -715,7 +725,7 @@ class MongoPlugin(BasePlugin):
     async def find_one_document(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Универсальный поиск одного документа."""
         try:
-            if not self.client:
+            if self.client is None:
                 return {"success": False, "error": "MongoDB не подключен"}
                 
             collection_name = context["collection"]
@@ -747,7 +757,7 @@ class MongoPlugin(BasePlugin):
     async def update_document(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Универсальное обновление документа."""
         try:
-            if not self.client:
+            if self.client is None:
                 return {"success": False, "error": "MongoDB не подключен"}
                 
             collection_name = context["collection"]
@@ -773,7 +783,7 @@ class MongoPlugin(BasePlugin):
     async def delete_document(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Универсальное удаление документа."""
         try:
-            if not self.client:
+            if self.client is None:
                 return {"success": False, "error": "MongoDB не подключен"}
                 
             collection_name = context["collection"]
@@ -819,4 +829,124 @@ class MongoPlugin(BasePlugin):
             
         except Exception as e:
             logger.error(f"❌ Ошибка сохранения сценария: {e}")
+            return {"success": False, "error": str(e)}
+    
+    # === ПРЯМЫЕ МЕТОДЫ ДЛЯ ПЛАГИНОВ ===
+    
+    async def _find_one(self, collection_name: str, filter_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """Прямой метод поиска одного документа для использования другими плагинами"""
+        try:
+            if self.client is None or self.db is None:
+                return {"success": False, "error": "MongoDB не подключен"}
+                
+            # Дополнительная проверка подключения
+            await self.client.admin.command('ismaster')
+                
+            collection = self.db[collection_name]
+            document = await collection.find_one(filter_dict)
+            
+            if document:
+                # Конвертируем ObjectId в строку
+                if "_id" in document:
+                    document["_id"] = str(document["_id"])
+                    
+                return {"success": True, "document": document}
+            else:
+                return {"success": True, "document": None}
+                
+        except Exception as e:
+            logger.error(f"Ошибка поиска документа в {collection_name}: {e}")
+            return {"success": False, "error": str(e)}
+    
+    async def _find(self, collection_name: str, filter_dict: Dict[str, Any], limit: int = None) -> Dict[str, Any]:
+        """Прямой метод поиска документов для использования другими плагинами"""
+        try:
+            if self.client is None:
+                return {"success": False, "error": "MongoDB не подключен"}
+                
+            collection = self.db[collection_name]
+            cursor = collection.find(filter_dict)
+            
+            if limit:
+                cursor = cursor.limit(limit)
+                
+            documents = await cursor.to_list(length=None)
+            
+            # Конвертируем ObjectId в строки
+            for doc in documents:
+                if "_id" in doc:
+                    doc["_id"] = str(doc["_id"])
+                    
+            return {"success": True, "documents": documents}
+                
+        except Exception as e:
+            logger.error(f"Ошибка поиска документов в {collection_name}: {e}")
+            return {"success": False, "error": str(e)}
+    
+    async def _update_one(self, collection_name: str, filter_dict: Dict[str, Any], 
+                         update_dict: Dict[str, Any], upsert: bool = False) -> Dict[str, Any]:
+        """Прямой метод обновления документа для использования другими плагинами"""
+        try:
+            if self.client is None or self.db is None:
+                return {"success": False, "error": "MongoDB не подключен"}
+                
+            # Дополнительная проверка подключения
+            await self.client.admin.command('ismaster')
+                
+            collection = self.db[collection_name]
+            result = await collection.update_one(filter_dict, update_dict, upsert=upsert)
+            
+            return {
+                "success": True,
+                "matched_count": result.matched_count,
+                "modified_count": result.modified_count,
+                "upserted_id": str(result.upserted_id) if result.upserted_id else None
+            }
+                
+        except Exception as e:
+            logger.error(f"Ошибка обновления документа в {collection_name}: {e}")
+            return {"success": False, "error": str(e)}
+    
+    async def _insert_one(self, collection_name: str, document: Dict[str, Any]) -> Dict[str, Any]:
+        """Прямой метод вставки документа для использования другими плагинами"""
+        try:
+            if self.client is None or self.db is None:
+                return {"success": False, "error": "MongoDB не подключен"}
+                
+            # Дополнительная проверка подключения
+            await self.client.admin.command('ismaster')
+                
+            collection = self.db[collection_name]
+            result = await collection.insert_one(document)
+            
+            return {
+                "success": True,
+                "inserted_id": str(result.inserted_id)
+            }
+                
+        except Exception as e:
+            logger.error(f"Ошибка вставки документа в {collection_name}: {e}")
+            return {"success": False, "error": str(e)}
+    
+    async def _create_index(self, collection_name: str, index_spec, unique: bool = False) -> Dict[str, Any]:
+        """Прямой метод создания индекса для использования другими плагинами"""
+        try:
+            if self.client is None or self.db is None:
+                return {"success": False, "error": "MongoDB не подключен"}
+                
+            # Дополнительная проверка подключения
+            await self.client.admin.command('ismaster')
+                
+            collection = self.db[collection_name]
+            
+            # Создаем индекс
+            if unique:
+                result = await collection.create_index(index_spec, unique=True)
+            else:
+                result = await collection.create_index(index_spec)
+            
+            return {"success": True, "index_name": result}
+                
+        except Exception as e:
+            logger.error(f"Ошибка создания индекса в {collection_name}: {e}")
             return {"success": False, "error": str(e)}

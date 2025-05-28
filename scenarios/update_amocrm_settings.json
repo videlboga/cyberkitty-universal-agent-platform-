@@ -1,0 +1,57 @@
+{
+  "scenario_id": "update_amocrm_settings",
+  "name": "Обновление настроек AmoCRM",
+  "description": "Сценарий для обновления кредов AmoCRM в базе данных",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "save_settings"
+    },
+    {
+      "id": "save_settings",
+      "type": "action",
+      "params": {
+        "action": "mongo_upsert_document",
+        "collection": "plugin_settings",
+        "filter": {"plugin_name": "{plugin_name}"},
+        "document": {
+          "plugin_name": "{plugin_name}",
+          "base_url": "{base_url}",
+          "access_token": "{access_token}",
+          "updated_at": "{current_datetime}"
+        },
+        "output_var": "save_result"
+      },
+      "next_step": "verify_settings"
+    },
+    {
+      "id": "verify_settings",
+      "type": "action",
+      "params": {
+        "action": "mongo_find_one_document",
+        "collection": "plugin_settings",
+        "filter": {"plugin_name": "{plugin_name}"},
+        "output_var": "verify_result"
+      },
+      "next_step": "log_result"
+    },
+    {
+      "id": "log_result",
+      "type": "log_message",
+      "params": {
+        "message": "✅ Настройки AmoCRM обновлены: base_url={verify_result.document.base_url}",
+        "level": "INFO"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "params": {
+        "message": "Настройки AmoCRM успешно обновлены"
+      }
+    }
+  ]
+} 

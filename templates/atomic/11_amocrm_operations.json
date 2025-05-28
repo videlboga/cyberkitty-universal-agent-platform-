@@ -1,0 +1,260 @@
+{
+  "scenario_id": "atomic_amocrm_operations",
+  "name": "Атомарные операции AmoCRM",
+  "description": "Демонстрация всех возможностей SimpleAmoCRMPlugin",
+  "initial_context": {
+    "user_telegram_id": "123456789",
+    "user_name": "Иван Петров",
+    "user_phone": "+79001234567",
+    "user_email": "ivan@example.com"
+  },
+  "steps": [
+    {
+      "id": "start_step",
+      "type": "log_message",
+      "params": {
+        "message": "🚀 Начинаем демонстрацию AmoCRM операций",
+        "level": "INFO"
+      },
+      "next_step": "find_existing_contact"
+    },
+    {
+      "id": "find_existing_contact",
+      "type": "amocrm_find_contact",
+      "params": {
+        "telegram_id": "{user_telegram_id}",
+        "output_var": "existing_contact"
+      },
+      "next_step": "check_contact_exists"
+    },
+    {
+      "id": "check_contact_exists",
+      "type": "conditional",
+      "params": {
+        "condition": "{existing_contact.found}",
+        "true_step": "update_existing_contact",
+        "false_step": "create_new_contact"
+      }
+    },
+    {
+      "id": "create_new_contact",
+      "type": "amocrm_create_contact",
+      "params": {
+        "name": "{user_name}",
+        "first_name": "Иван",
+        "last_name": "Петров",
+        "custom_fields": {
+          "telegram_id": "{user_telegram_id}",
+          "phone": "{user_phone}",
+          "email": "{user_email}",
+          "source": "Telegram"
+        },
+        "output_var": "created_contact"
+      },
+      "next_step": "log_contact_created"
+    },
+    {
+      "id": "update_existing_contact",
+      "type": "amocrm_update_contact",
+      "params": {
+        "contact_id": "{existing_contact.contact.id}",
+        "update_data": {
+          "phone": "{user_phone}",
+          "email": "{user_email}",
+          "notes": "Обновлено через Telegram бота"
+        },
+        "output_var": "updated_contact"
+      },
+      "next_step": "log_contact_updated"
+    },
+    {
+      "id": "log_contact_created",
+      "type": "log_message",
+      "params": {
+        "message": "✅ Создан новый контакт: {created_contact.contact_id}",
+        "level": "INFO"
+      },
+      "next_step": "create_lead_for_contact"
+    },
+    {
+      "id": "log_contact_updated",
+      "type": "log_message",
+      "params": {
+        "message": "✅ Обновлен существующий контакт: {existing_contact.contact.id}",
+        "level": "INFO"
+      },
+      "next_step": "create_lead_for_contact"
+    },
+    {
+      "id": "create_lead_for_contact",
+      "type": "amocrm_create_lead",
+      "params": {
+        "name": "Сделка от {user_name}",
+        "price": 50000,
+        "contact_id": "{created_contact.contact_id || existing_contact.contact.id}",
+        "custom_fields": {
+          "source": "Telegram",
+          "budget": 50000
+        },
+        "output_var": "created_lead"
+      },
+      "next_step": "add_note_to_lead"
+    },
+    {
+      "id": "add_note_to_lead",
+      "type": "amocrm_add_note",
+      "params": {
+        "entity_type": "leads",
+        "entity_id": "{created_lead.lead_id}",
+        "note_text": "Сделка создана автоматически через Telegram бота. Пользователь: {user_name} (ID: {user_telegram_id})",
+        "note_type": "common",
+        "output_var": "note_result"
+      },
+      "next_step": "search_similar_contacts"
+    },
+    {
+      "id": "search_similar_contacts",
+      "type": "amocrm_search",
+      "params": {
+        "query": "Иван",
+        "entity_type": "contacts",
+        "limit": 10,
+        "output_var": "similar_contacts"
+      },
+      "next_step": "log_search_results"
+    },
+    {
+      "id": "log_search_results",
+      "type": "log_message",
+      "params": {
+        "message": "🔍 Найдено похожих контактов: {similar_contacts.count}",
+        "level": "INFO"
+      },
+      "next_step": "final_summary"
+    },
+    {
+      "id": "final_summary",
+      "type": "log_message",
+      "params": {
+        "message": "🎯 AmoCRM операции завершены успешно! Контакт: {created_contact.contact_id || existing_contact.contact.id}, Сделка: {created_lead.lead_id}",
+        "level": "INFO"
+      }
+    }
+  ],
+  "examples": {
+    "find_contact_by_telegram": {
+      "description": "Поиск контакта по Telegram ID",
+      "step": {
+        "type": "amocrm_find_contact",
+        "params": {
+          "telegram_id": "123456789",
+          "output_var": "found_contact"
+        }
+      }
+    },
+    "find_contact_by_phone": {
+      "description": "Поиск контакта по телефону",
+      "step": {
+        "type": "amocrm_find_contact",
+        "params": {
+          "phone": "+79001234567",
+          "output_var": "found_contact"
+        }
+      }
+    },
+    "create_contact_with_custom_fields": {
+      "description": "Создание контакта с кастомными полями",
+      "step": {
+        "type": "amocrm_create_contact",
+        "params": {
+          "name": "Новый клиент",
+          "first_name": "Иван",
+          "last_name": "Петров",
+          "custom_fields": {
+            "telegram_id": "123456789",
+            "phone": "+79001234567",
+            "email": "ivan@example.com",
+            "source": "Telegram",
+            "budget": 100000,
+            "interests": ["Продажи", "Маркетинг"]
+          },
+          "output_var": "new_contact"
+        }
+      }
+    },
+    "create_lead_with_contact": {
+      "description": "Создание сделки с привязкой к контакту",
+      "step": {
+        "type": "amocrm_create_lead",
+        "params": {
+          "name": "Важная сделка",
+          "price": 150000,
+          "contact_id": 12345,
+          "pipeline_id": 1,
+          "status_id": 142,
+          "custom_fields": {
+            "source": "Telegram",
+            "budget": 150000
+          },
+          "output_var": "new_lead"
+        }
+      }
+    },
+    "add_note_to_contact": {
+      "description": "Добавление заметки к контакту",
+      "step": {
+        "type": "amocrm_add_note",
+        "params": {
+          "entity_type": "contacts",
+          "entity_id": 12345,
+          "note_text": "Клиент проявил интерес к нашим услугам",
+          "note_type": "common",
+          "output_var": "note_added"
+        }
+      }
+    },
+    "search_leads": {
+      "description": "Поиск сделок",
+      "step": {
+        "type": "amocrm_search",
+        "params": {
+          "query": "важная",
+          "entity_type": "leads",
+          "limit": 20,
+          "output_var": "found_leads"
+        }
+      }
+    },
+    "update_contact_info": {
+      "description": "Обновление информации о контакте",
+      "step": {
+        "type": "amocrm_update_contact",
+        "params": {
+          "contact_id": 12345,
+          "update_data": {
+            "name": "Иван Петрович Сидоров",
+            "phone": "+79009876543",
+            "email": "new_email@example.com",
+            "notes": "Обновленная информация"
+          },
+          "output_var": "updated_contact"
+        }
+      }
+    }
+  },
+  "configuration": {
+    "required_env_vars": [
+      "AMO_BASE_URL",
+      "AMO_ACCESS_TOKEN"
+    ],
+    "optional_files": [
+      "app/config/amo_fields.json"
+    ],
+    "notes": [
+      "Для работы плагина необходимо настроить переменные окружения",
+      "Файл amo_fields.json содержит карту кастомных полей AmoCRM",
+      "ID полей и enum значений должны соответствовать вашему аккаунту AmoCRM",
+      "Плагин поддерживает все основные типы полей AmoCRM"
+    ]
+  }
+} 

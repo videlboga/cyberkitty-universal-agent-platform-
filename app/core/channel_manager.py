@@ -10,7 +10,7 @@ Channel Manager для Universal Agent Platform.
 """
 
 import asyncio
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from loguru import logger
 
 from app.core.simple_engine import SimpleScenarioEngine
@@ -262,4 +262,180 @@ class ChannelManager:
         await self._load_channels_from_db()
         await self._start_all_polling()
         
-        logger.info(f"🔄 Каналы перезагружены. Активных: {len(self.channels)}") 
+        logger.info(f"🔄 Каналы перезагружены. Активных: {len(self.channels)}")
+        
+    # ===== НОВЫЕ УНИВЕРСАЛЬНЫЕ МЕТОДЫ =====
+    
+    async def send_message(self, channel_id: str, chat_id: str, text: str, **kwargs) -> Dict[str, Any]:
+        """
+        Универсальный метод отправки сообщения через канал
+        
+        Args:
+            channel_id: ID канала
+            chat_id: ID чата
+            text: Текст сообщения
+            **kwargs: Дополнительные параметры
+        
+        Returns:
+            Dict с результатом отправки
+        """
+        try:
+            # Получаем Telegram плагин для канала
+            telegram_plugin = self.telegram_plugins.get(channel_id)
+            if not telegram_plugin:
+                logger.error(f"❌ Плагин для канала {channel_id} не найден")
+                return {"success": False, "error": f"Channel {channel_id} not found"}
+            
+            # Отправляем сообщение через плагин
+            result = await telegram_plugin.send_message(chat_id, text, **kwargs)
+            logger.info(f"✅ Сообщение отправлено через канал {channel_id}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка отправки сообщения через канал {channel_id}: {e}")
+            return {"success": False, "error": str(e)}
+    
+    async def send_buttons(self, channel_id: str, chat_id: str, text: str, buttons: List[List[Dict[str, str]]], **kwargs) -> Dict[str, Any]:
+        """
+        Универсальный метод отправки сообщения с кнопками через канал
+        
+        Args:
+            channel_id: ID канала
+            chat_id: ID чата
+            text: Текст сообщения
+            buttons: Массив кнопок
+            **kwargs: Дополнительные параметры
+        
+        Returns:
+            Dict с результатом отправки
+        """
+        try:
+            telegram_plugin = self.telegram_plugins.get(channel_id)
+            if not telegram_plugin:
+                logger.error(f"❌ Плагин для канала {channel_id} не найден")
+                return {"success": False, "error": f"Channel {channel_id} not found"}
+            
+            result = await telegram_plugin.send_buttons(chat_id, text, buttons, **kwargs)
+            logger.info(f"✅ Сообщение с кнопками отправлено через канал {channel_id}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка отправки кнопок через канал {channel_id}: {e}")
+            return {"success": False, "error": str(e)}
+    
+    async def edit_message(self, channel_id: str, chat_id: str, message_id: int, text: str, **kwargs) -> Dict[str, Any]:
+        """
+        Универсальный метод редактирования сообщения через канал
+        
+        Args:
+            channel_id: ID канала
+            chat_id: ID чата
+            message_id: ID сообщения
+            text: Новый текст
+            **kwargs: Дополнительные параметры
+        
+        Returns:
+            Dict с результатом редактирования
+        """
+        try:
+            telegram_plugin = self.telegram_plugins.get(channel_id)
+            if not telegram_plugin:
+                logger.error(f"❌ Плагин для канала {channel_id} не найден")
+                return {"success": False, "error": f"Channel {channel_id} not found"}
+            
+            result = await telegram_plugin.edit_message(chat_id, message_id, text, **kwargs)
+            logger.info(f"✅ Сообщение отредактировано через канал {channel_id}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка редактирования сообщения через канал {channel_id}: {e}")
+            return {"success": False, "error": str(e)}
+    
+    async def update_channel_token(self, channel_id: str, new_token: str) -> Dict[str, Any]:
+        """
+        Обновление токена канала
+        
+        Args:
+            channel_id: ID канала
+            new_token: Новый токен
+        
+        Returns:
+            Dict с результатом обновления
+        """
+        try:
+            # Останавливаем старый поллинг
+            if channel_id in self.polling_tasks:
+                await self._stop_channel_polling(channel_id)
+            
+            # Обновляем токен в конфигурации канала
+            if channel_id in self.channels:
+                self.channels[channel_id]["channel_config"]["telegram_bot_token"] = new_token
+                
+                # Обновляем в БД
+                await self._update_channel_config_in_db(channel_id, {"telegram_bot_token": new_token})
+                
+                # Перезапускаем поллинг с новым токеном
+                await self._start_channel_polling(channel_id, self.channels[channel_id])
+                
+                logger.info(f"✅ Токен обновлен для канала {channel_id}")
+                return {"success": True, "message": "Token updated successfully"}
+            else:
+                logger.error(f"❌ Канал {channel_id} не найден")
+                return {"success": False, "error": f"Channel {channel_id} not found"}
+                
+        except Exception as e:
+            logger.error(f"❌ Ошибка обновления токена для канала {channel_id}: {e}")
+            return {"success": False, "error": str(e)}
+    
+    async def _update_channel_config_in_db(self, channel_id: str, config_update: Dict[str, Any]):
+        """Обновляет конфигурацию канала в БД"""
+        try:
+            step = {
+                "id": "update_channel_config",
+                "type": "mongo_update_document",
+                "params": {
+                    "collection": "channel_mappings",
+                    "filter": {"channel_id": channel_id},
+                    "update": {"$set": {"channel_config": config_update}},
+                    "output_var": "update_result"
+                }
+            }
+            context = {}
+            await self.engine.execute_step(step, context)
+            logger.info(f"✅ Конфигурация канала {channel_id} обновлена в БД")
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка обновления конфигурации канала {channel_id} в БД: {e}")
+    
+    async def _stop_channel_polling(self, channel_id: str):
+        """Останавливает поллинг для конкретного канала"""
+        try:
+            # Останавливаем задачу поллинга
+            if channel_id in self.polling_tasks:
+                task = self.polling_tasks[channel_id]
+                if not task.done():
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
+                del self.polling_tasks[channel_id]
+            
+            # Очищаем плагин
+            if channel_id in self.telegram_plugins:
+                plugin = self.telegram_plugins[channel_id]
+                await plugin.stop_polling()
+                del self.telegram_plugins[channel_id]
+            
+            logger.info(f"⏹️ Поллинг остановлен для канала {channel_id}")
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка остановки поллинга для канала {channel_id}: {e}")
+    
+    def get_active_channels(self) -> List[str]:
+        """Возвращает список активных каналов"""
+        return list(self.channels.keys())
+    
+    def get_channel_info(self, channel_id: str) -> Optional[Dict[str, Any]]:
+        """Возвращает информацию о канале"""
+        return self.channels.get(channel_id) 

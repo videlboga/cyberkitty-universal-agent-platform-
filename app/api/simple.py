@@ -453,6 +453,74 @@ async def mongo_insert(
         return MongoResponse(success=False, error=str(e))
 
 
+@router.post("/mongo/update", response_model=MongoResponse)
+async def mongo_update(
+    request: MongoRequest,
+    engine: SimpleScenarioEngine = Depends(create_engine)
+):
+    """Обновление документа в MongoDB."""
+    try:
+        step = {
+            "id": "update_doc",
+            "type": "mongo_update_document",
+            "params": {
+                "collection": request.collection,
+                "filter": request.filter,
+                "update": request.document,
+                "output_var": "update_result"
+            }
+        }
+        context = {}
+        result_context = await engine.execute_step(step, context)
+        
+        # Результат находится в переменной update_result
+        result = result_context.get("update_result", {})
+        
+        return MongoResponse(
+            success=result.get("success", False),
+            data={
+                "modified_count": result.get("modified_count", 0),
+                "matched_count": result.get("matched_count", 0)
+            },
+            error=result.get("error")
+        )
+    except Exception as e:
+        logger.error(f"Ошибка mongo_update: {e}")
+        return MongoResponse(success=False, error=str(e))
+
+
+@router.post("/mongo/delete", response_model=MongoResponse)
+async def mongo_delete(
+    request: MongoRequest,
+    engine: SimpleScenarioEngine = Depends(create_engine)
+):
+    """Удаление документа из MongoDB."""
+    try:
+        step = {
+            "id": "delete_doc",
+            "type": "mongo_delete_document",
+            "params": {
+                "collection": request.collection,
+                "filter": request.filter,
+                "output_var": "delete_result"
+            }
+        }
+        context = {}
+        result_context = await engine.execute_step(step, context)
+        
+        # Результат находится в переменной delete_result
+        result = result_context.get("delete_result", {})
+        
+        return MongoResponse(
+            success=result.get("success", False),
+            data={"deleted_count": result.get("deleted_count", 0)},
+            error=result.get("error")
+        )
+    except Exception as e:
+        logger.error(f"Ошибка mongo_delete: {e}")
+        return MongoResponse(success=False, error=str(e))
+
+
 @router.post("/mongo/save-scenario", response_model=MongoResponse)
 async def mongo_save_scenario(
     request: MongoRequest,

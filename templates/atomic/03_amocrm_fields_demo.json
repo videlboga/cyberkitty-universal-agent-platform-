@@ -1,0 +1,147 @@
+{
+  "atomic_template": "amocrm_fields_demo",
+  "version": "1.0",
+  "description": "Демонстрация работы с картой полей AmoCRM - получение, сохранение и использование",
+  "author": "KittyCore Universal Agent Platform",
+  
+  "parameters": {
+    "entity_type": {
+      "type": "string",
+      "description": "Тип сущности для карты полей",
+      "default": "contacts",
+      "example": "contacts"
+    },
+    "contact_name": {
+      "type": "string", 
+      "description": "Имя контакта для создания",
+      "required": true,
+      "example": "Тестовый Контакт"
+    },
+    "contact_phone": {
+      "type": "string",
+      "description": "Телефон контакта",
+      "example": "+79001234567"
+    },
+    "contact_email": {
+      "type": "string",
+      "description": "Email контакта",
+      "example": "test@example.com"
+    },
+    "custom_fields": {
+      "type": "object",
+      "description": "Кастомные поля контакта",
+      "example": {
+        "POSITION": "Разработчик",
+        "TG_USERNAME": "@testuser",
+        "СЕМЕЙНОЕ_ПОЛОЖЕНИЕ": "Женат"
+      }
+    }
+  },
+  
+  "scenario_id": "atomic_amocrm_fields_demo",
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "get_current_fields"
+    },
+    {
+      "id": "get_current_fields",
+      "type": "amocrm_get_fields",
+      "params": {
+        "entity_type": "contacts",
+        "output_var": "current_fields"
+      },
+      "next_step": "log_fields_info"
+    },
+    {
+      "id": "log_fields_info",
+      "type": "log_message",
+      "params": {
+        "message": "📋 Карта полей в БД: {current_fields.fields_count} полей",
+        "level": "info"
+      },
+      "next_step": "create_contact"
+    },
+    {
+      "id": "create_contact",
+      "type": "amocrm_create_contact",
+      "params": {
+        "name": "{contact_name}",
+        "phone": "{contact_phone}",
+        "email": "{contact_email}",
+        "custom_fields": "{custom_fields}",
+        "output_var": "created_contact"
+      },
+      "next_step": "log_result"
+    },
+    {
+      "id": "log_result",
+      "type": "log_message",
+      "params": {
+        "message": "✅ Результат: контакт {created_contact.contact_id}, карта полей: {created_contact.used_fields_map}, кастомных полей: {created_contact.custom_fields_count}",
+        "level": "info"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  
+  "examples": [
+    {
+      "name": "Создание контакта с кастомными полями",
+      "context": {
+        "contact_name": "Иван Петров",
+        "contact_phone": "+79001234567",
+        "contact_email": "ivan@example.com",
+        "custom_fields": {
+          "POSITION": "Менеджер",
+          "TG_USERNAME": "@ivan_petrov",
+          "СЕМЕЙНОЕ_ПОЛОЖЕНИЕ": "Женат",
+          "ВОЗРАСТ": "35"
+        }
+      }
+    },
+    {
+      "name": "Создание контакта с селектом",
+      "context": {
+        "contact_name": "Анна Сидорова",
+        "contact_phone": "+79009876543",
+        "custom_fields": {
+          "POSITION": "Дизайнер",
+          "СЕМЕЙНОЕ_ПОЛОЖЕНИЕ": "Не замужем"
+        }
+      }
+    }
+  ],
+  
+  "requirements": {
+    "plugins": ["SimpleAmoCRMPlugin", "MongoPlugin"],
+    "context_variables": ["contact_name"],
+    "settings": ["simple_amocrm", "amocrm_fields_contacts"]
+  },
+  
+  "output": {
+    "context_updates": {
+      "current_fields": "Текущая карта полей из БД",
+      "created_contact": "Результат создания контакта с кастомными полями"
+    },
+    "description": "Демонстрирует использование карты полей AmoCRM при создании контакта"
+  },
+  
+  "field_mapping_info": {
+    "description": "Карта полей автоматически загружается при инициализации плагина и используется для маппинга кастомных полей",
+    "supported_field_types": [
+      "text - текстовые поля",
+      "numeric - числовые поля", 
+      "select - одиночный выбор (используются enum_id)",
+      "multiselect - множественный выбор",
+      "multitext - поля с типами (телефон, email)"
+    ],
+    "enum_mapping": "Для селектов автоматически находится enum_id по значению или коду",
+    "fallback": "Если поле не найдено в карте, выводится предупреждение в логи"
+  }
+} 

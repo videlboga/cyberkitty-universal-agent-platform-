@@ -10,6 +10,7 @@
 
 import os
 import asyncio
+from datetime import datetime
 from typing import Dict, Callable, Any, Optional, List
 from telegram import Bot, Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, MessageHandler, CommandHandler, CallbackQueryHandler, filters
@@ -55,13 +56,13 @@ class SimpleTelegramPlugin(BasePlugin):
         
     async def _do_initialize(self):
         """Инициализация Telegram бота."""
-        # Если токен не задан, пытаемся загрузить из БД
-        if not self.bot_token:
-            await self._load_token_from_db()
+        # Загружаем настройки из БД
+        await self._load_settings_from_db()
             
         if not self.bot_token:
             # В тестовом режиме без реального бота
-            self.logger.warning("TELEGRAM_BOT_TOKEN не установлен, работаю в тестовом режиме")
+            self.logger.warning("⚠️ Telegram бот работает в ограниченном режиме - токен не найден в БД")
+            self.logger.info("💡 Для настройки используйте: POST /admin/plugins/telegram/settings")
             self.bot = None
             self.application = None
             return
@@ -120,42 +121,88 @@ class SimpleTelegramPlugin(BasePlugin):
             
         self.logger.info("Telegram handlers зарегистрированы")
     
-    async def _load_token_from_db(self):
-        """Загружает токен бота из БД через конфигурацию канала."""
+    async def _load_settings_from_db(self):
+        """Загружает настройки Telegram из MongoDB"""
         try:
-            if not hasattr(self, 'engine') or not self.engine:
-                self.logger.warning("Движок недоступен для загрузки токена из БД")
+            if not self.engine or not hasattr(self.engine, 'plugins') or 'mongo' not in self.engine.plugins:
+                self.logger.warning("MongoDB плагин недоступен для загрузки настроек Telegram")
                 return
                 
-            # Получаем маппинг канала
-            step = {
-                "id": "get_channel_config",
-                "type": "mongo_get_channel_mapping",
-                "params": {
-                    "channel_id": self.channel_id,
-                    "output_var": "channel_mapping"
-                }
-            }
+            mongo_plugin = self.engine.plugins['mongo']
             
-            context = {}
-            result_context = await self.engine.execute_step(step, context)
+            # Загружаем настройки Telegram
+            settings_result = await mongo_plugin._find_one("plugin_settings", {"plugin_name": "telegram"})
             
-            mapping_result = result_context.get("channel_mapping", {})
-            if mapping_result.get("success") and mapping_result.get("mapping"):
-                mapping = mapping_result["mapping"]
-                channel_config = mapping.get("channel_config", {})
-                bot_token = channel_config.get("bot_token")
+            if settings_result and settings_result.get("success") and settings_result.get("document"):
+                settings = settings_result["document"]
+                self.bot_token = settings.get("bot_token")
+                webhook_url = settings.get("webhook_url")
+                webhook_secret = settings.get("webhook_secret")
                 
-                if bot_token:
-                    self.bot_token = bot_token
-                    self.logger.info(f"✅ Токен бота загружен из БД для канала {self.channel_id}")
-                else:
-                    self.logger.warning(f"⚠️ Токен бота не найден в конфигурации канала {self.channel_id}")
+                self.logger.info("✅ Настройки Telegram загружены из БД")
             else:
-                self.logger.warning(f"⚠️ Маппинг канала {self.channel_id} не найден в БД")
+                self.logger.info("⚠️ Настройки Telegram не найдены в БД")
                 
         except Exception as e:
-            self.logger.error(f"❌ Ошибка загрузки токена из БД: {e}")
+            self.logger.error(f"❌ Ошибка загрузки настроек Telegram из БД: {e}")
+    
+    # === МЕТОДЫ ДЛЯ НАСТРОЙКИ ЧЕРЕЗ API ===
+    
+    async def save_settings_to_db(self, bot_token: str, webhook_url: str = None, webhook_secret: str = None) -> Dict[str, Any]:
+        """Сохраняет настройки Telegram в MongoDB (для использования через API)"""
+        try:
+            if not self.engine or not hasattr(self.engine, 'plugins') or 'mongo' not in self.engine.plugins:
+                return {"success": False, "error": "MongoDB недоступен"}
+                
+            mongo_plugin = self.engine.plugins['mongo']
+            
+            settings_doc = {
+                "plugin_name": "telegram",
+                "bot_token": bot_token,
+                "webhook_url": webhook_url,
+                "webhook_secret": webhook_secret,
+                "updated_at": datetime.now().isoformat()
+            }
+            
+            # Используем upsert для обновления или создания
+            result = await mongo_plugin._update_one(
+                "plugin_settings", 
+                {"plugin_name": "telegram"}, 
+                {"$set": settings_doc},
+                upsert=True
+            )
+            
+            if result.get("success"):
+                # Обновляем настройки в плагине
+                old_token = self.bot_token
+                self.bot_token = bot_token
+                
+                # Переинициализируем бота если токен изменился
+                if old_token != bot_token:
+                    if self.application:
+                        await self.stop_polling()
+                    await self._do_initialize()
+                
+                self.logger.info("✅ Настройки Telegram сохранены в БД и применены")
+                return {"success": True, "message": "Настройки сохранены"}
+            else:
+                error_msg = result.get('error', 'неизвестная ошибка')
+                self.logger.warning(f"⚠️ Не удалось сохранить настройки Telegram в БД: {error_msg}")
+                return {"success": False, "error": error_msg}
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка сохранения настроек Telegram в БД: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def get_current_settings(self) -> Dict[str, Any]:
+        """Возвращает текущие настройки плагина"""
+        return {
+            "bot_token": "***" if self.bot_token else None,
+            "bot_token_set": bool(self.bot_token),
+            "bot_initialized": bool(self.bot),
+            "polling_active": bool(self._polling_task and not self._polling_task.done()),
+            "configured": bool(self.bot_token)
+        }
     
     async def update_bot_token(self, new_token: str, scenario_id: str = None):
         """Обновляет токен бота в БД и переинициализирует бота."""

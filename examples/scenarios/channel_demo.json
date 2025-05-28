@@ -1,0 +1,270 @@
+{
+  "scenario_id": "modern_channel_demo",
+  "name": "Демонстрация современной системы каналов",
+  "description": "Показывает возможности универсальной системы каналов",
+  "version": "3.0.0",
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "welcome_message"
+    },
+    {
+      "id": "welcome_message",
+      "type": "channel_send_message",
+      "params": {
+        "channel_id": "{channel_id}",
+        "chat_id": "{chat_id}",
+        "text": "🎉 Добро пожаловать в современную систему каналов!\n\nЭто универсальная платформа для работы с любыми типами каналов.",
+        "parse_mode": "HTML",
+        "output_var": "welcome_result"
+      },
+      "next_step": "show_menu"
+    },
+    {
+      "id": "show_menu",
+      "type": "channel_send_buttons",
+      "params": {
+        "channel_id": "{channel_id}",
+        "chat_id": "{chat_id}",
+        "text": "🔧 Выберите функцию для тестирования:",
+        "buttons": [
+          [
+            {"text": "📝 Отправить сообщение", "callback_data": "test_message"},
+            {"text": "✏️ Редактировать сообщение", "callback_data": "test_edit"}
+          ],
+          [
+            {"text": "🤖 LLM запрос", "callback_data": "test_llm"},
+            {"text": "🔀 Условные переходы", "callback_data": "test_branch"}
+          ],
+          [
+            {"text": "🚪 Завершить демо", "callback_data": "finish"}
+          ]
+        ],
+        "output_var": "menu_result"
+      },
+      "next_step": "wait_choice"
+    },
+    {
+      "id": "wait_choice",
+      "type": "input",
+      "params": {
+        "input_type": "callback_query",
+        "timeout": 300,
+        "output_var": "user_choice"
+      },
+      "next_step": "process_choice"
+    },
+    {
+      "id": "process_choice",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.callback_data == 'test_message'",
+            "next_step_id": "test_message_demo"
+          },
+          {
+            "condition": "context.callback_data == 'test_edit'",
+            "next_step_id": "test_edit_demo"
+          },
+          {
+            "condition": "context.callback_data == 'test_llm'",
+            "next_step_id": "test_llm_demo"
+          },
+          {
+            "condition": "context.callback_data == 'test_branch'",
+            "next_step_id": "test_branch_demo"
+          },
+          {
+            "condition": "context.callback_data == 'finish'",
+            "next_step_id": "finish_demo"
+          }
+        ],
+        "default_next_step_id": "show_menu"
+      }
+    },
+    {
+      "id": "test_message_demo",
+      "type": "channel_send_message",
+      "params": {
+        "channel_id": "{channel_id}",
+        "chat_id": "{chat_id}",
+        "text": "✅ Демонстрация отправки сообщения!\n\n📋 Параметры:\n• Channel ID: {channel_id}\n• Chat ID: {chat_id}\n• Время: {current_datetime}",
+        "parse_mode": "HTML",
+        "output_var": "demo_message_result"
+      },
+      "next_step": "back_to_menu"
+    },
+    {
+      "id": "test_edit_demo",
+      "type": "channel_send_message",
+      "params": {
+        "channel_id": "{channel_id}",
+        "chat_id": "{chat_id}",
+        "text": "📝 Сейчас это сообщение будет отредактировано...",
+        "output_var": "edit_demo_original"
+      },
+      "next_step": "edit_message_step"
+    },
+    {
+      "id": "edit_message_step",
+      "type": "channel_edit_message",
+      "params": {
+        "channel_id": "{channel_id}",
+        "chat_id": "{chat_id}",
+        "message_id": "{edit_demo_original.message_id}",
+        "text": "✅ Сообщение успешно отредактировано!\n\n🔄 Message ID: {edit_demo_original.message_id}\n⏰ Время: {current_datetime}",
+        "parse_mode": "HTML",
+        "output_var": "edit_result"
+      },
+      "next_step": "back_to_menu"
+    },
+    {
+      "id": "test_llm_demo",
+      "type": "action",
+      "params": {
+        "action": "llm_chat",
+        "prompt": "Пользователь тестирует LLM функциональность. Расскажи кратко о возможностях современных языковых моделей.",
+        "output_var": "llm_response"
+      },
+      "next_step": "show_llm_result"
+    },
+    {
+      "id": "show_llm_result",
+      "type": "channel_send_message",
+      "params": {
+        "channel_id": "{channel_id}",
+        "chat_id": "{chat_id}",
+        "text": "🤖 LLM ответ:\n\n{llm_response}",
+        "output_var": "llm_demo_result"
+      },
+      "next_step": "back_to_menu"
+    },
+    {
+      "id": "test_branch_demo",
+      "type": "channel_send_message",
+      "params": {
+        "channel_id": "{channel_id}",
+        "chat_id": "{chat_id}",
+        "text": "🔀 Демонстрация условных переходов!\n\nСейчас система проверит случайное условие...",
+        "output_var": "branch_demo_msg"
+      },
+      "next_step": "random_branch"
+    },
+    {
+      "id": "random_branch",
+      "type": "action",
+      "params": {
+        "action_type": "update_context",
+        "updates": {
+          "random_number": "42"
+        }
+      },
+      "next_step": "check_random"
+    },
+    {
+      "id": "check_random",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "int(context.random_number) > 30",
+            "next_step_id": "branch_success"
+          }
+        ],
+        "default_next_step_id": "branch_fail"
+      }
+    },
+    {
+      "id": "branch_success",
+      "type": "channel_send_message",
+      "params": {
+        "channel_id": "{channel_id}",
+        "chat_id": "{chat_id}",
+        "text": "✅ Условие выполнено! Число {random_number} больше 30.",
+        "output_var": "branch_result"
+      },
+      "next_step": "back_to_menu"
+    },
+    {
+      "id": "branch_fail",
+      "type": "channel_send_message",
+      "params": {
+        "channel_id": "{channel_id}",
+        "chat_id": "{chat_id}",
+        "text": "❌ Условие не выполнено. Число {random_number} меньше или равно 30.",
+        "output_var": "branch_result"
+      },
+      "next_step": "back_to_menu"
+    },
+    {
+      "id": "back_to_menu",
+      "type": "channel_send_buttons",
+      "params": {
+        "channel_id": "{channel_id}",
+        "chat_id": "{chat_id}",
+        "text": "🔄 Хотите протестировать что-то еще?",
+        "buttons": [
+          [
+            {"text": "🔙 Вернуться в меню", "callback_data": "back_menu"},
+            {"text": "🚪 Завершить", "callback_data": "finish"}
+          ]
+        ],
+        "output_var": "back_menu_result"
+      },
+      "next_step": "wait_back_choice"
+    },
+    {
+      "id": "wait_back_choice",
+      "type": "input",
+      "params": {
+        "input_type": "callback_query",
+        "timeout": 300,
+        "output_var": "back_choice"
+      },
+      "next_step": "process_back_choice"
+    },
+    {
+      "id": "process_back_choice",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.callback_data == 'back_menu'",
+            "next_step_id": "show_menu"
+          },
+          {
+            "condition": "context.callback_data == 'finish'",
+            "next_step_id": "finish_demo"
+          }
+        ],
+        "default_next_step_id": "finish_demo"
+      }
+    },
+    {
+      "id": "finish_demo",
+      "type": "channel_send_message",
+      "params": {
+        "channel_id": "{channel_id}",
+        "chat_id": "{chat_id}",
+        "text": "🎉 Демонстрация современной системы завершена!\n\n✅ Протестированные возможности:\n• Универсальные каналы\n• Современные условные переходы\n• LLM интеграция\n• Динамическое редактирование\n\n🚀 Система готова к работе!",
+        "parse_mode": "HTML",
+        "output_var": "finish_result"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "params": {
+        "message": "Демо современной системы завершено"
+      }
+    }
+  ],
+  "metadata": {
+    "created_at": "2024-12-XX",
+    "version": "3.0.0",
+    "architecture": "modern_universal"
+  }
+} 

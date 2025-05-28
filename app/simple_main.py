@@ -80,7 +80,8 @@ async def root():
             "docs": "/docs",
             "simple_api": "/api/v1/simple",
             "health": "/api/v1/simple/health",
-            "telegram_polling": "/api/v1/simple/telegram/start-polling"
+            "mongo_api": "/api/v1/simple/mongo",
+            "execute_step": "/api/v1/simple/execute"
         },
         "principles": [
             "ПРОСТОТА ПРЕВЫШЕ ВСЕГО!",

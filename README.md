@@ -15,7 +15,8 @@ SimpleScenarioEngine (единственный движок)
     ├── SimpleLLMPlugin (llm_chat, llm_generate)
     ├── SimpleRAGPlugin (rag_search, rag_index)
     ├── SimpleSchedulerPlugin (schedule_task, cancel_task)
-└── SimpleHTTPPlugin (http_get, http_post, http_request)
+    ├── SimpleHTTPPlugin (http_get, http_post, http_request)
+    └── SimpleAmoCRMPlugin (amocrm_find_contact, amocrm_create_contact, amocrm_create_lead)
 
 Simple API (app/api/simple.py)
 ├── POST /simple/channels/{channel_id}/execute (основной endpoint)
@@ -51,6 +52,8 @@ app/
 │   ├── simple_llm_plugin.py      # LLM интеграция (OpenAI, Anthropic)
 │   ├── simple_rag_plugin.py      # RAG поиск и индексация
 │   ├── simple_scheduler_plugin.py # Планировщик задач
+│   ├── simple_http_plugin.py     # HTTP клиент для внешних API
+│   ├── simple_amocrm_plugin.py   # AmoCRM интеграция
 │   └── plugin_template.py        # Шаблон для новых плагинов
 ├── api/
 │   └── simple.py                 # Единый API
@@ -87,6 +90,10 @@ MONGODB_DATABASE_NAME=universal_agent_platform
 # LLM API ключи (опционально)
 OPENAI_API_KEY=your_openai_key
 ANTHROPIC_API_KEY=your_anthropic_key
+
+# AmoCRM интеграция (опционально)
+AMO_BASE_URL=https://your_domain.amocrm.ru
+AMO_ACCESS_TOKEN=your_access_token
 
 # Логирование
 LOG_LEVEL=INFO
@@ -193,6 +200,15 @@ docker-compose -f docker-compose.simple.yml up
 - `http_put` - PUT запрос для обновления
 - `http_delete` - DELETE запрос
 - `http_request` - Универсальный HTTP запрос
+
+### AmoCRM (SimpleAmoCRMPlugin):
+- `amocrm_find_contact` - Поиск контакта по различным критериям
+- `amocrm_create_contact` - Создание нового контакта
+- `amocrm_update_contact` - Обновление существующего контакта
+- `amocrm_find_lead` - Поиск сделки
+- `amocrm_create_lead` - Создание новой сделки
+- `amocrm_add_note` - Добавление заметки к сущности
+- `amocrm_search` - Универсальный поиск по AmoCRM
 
 ## 📝 Пример сценария
 

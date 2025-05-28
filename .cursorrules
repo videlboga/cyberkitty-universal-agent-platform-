@@ -65,11 +65,74 @@
 // - Переключение сценариев через switch_scenario шаг
 // - Контекст сохраняется между переключениями
 
-// === API ===
-// - Только один endpoint: POST /simple/channels/{channel_id}/execute
-// - Payload: {user_id?, chat_id?, scenario_id?, context?}
-// - Response: {success, scenario_id, final_context, message}
-// - Все ошибки возвращают 500 с описанием
+// === API ENDPOINTS (Порт: 8085) ===
+// ОСНОВНОЙ ENDPOINT:
+// POST /api/v1/simple/channels/{channel_id}/execute
+// - Payload: {"user_id"?: string, "chat_id"?: string, "scenario_id"?: string, "context"?: object}
+// - Response: {"success": boolean, "scenario_id": string, "final_context": object, "message"?: string, "error"?: string}
+
+// СИСТЕМНЫЕ ENDPOINTS:
+// GET /health - быстрая проверка здоровья
+// GET /api/v1/simple/health - полная проверка здоровья
+// GET /api/v1/simple/info - информация о системе и плагинах
+// GET / - корневая страница
+
+// MONGODB ENDPOINTS:
+// POST /api/v1/simple/mongo/find
+// - Payload: {"collection": string, "filter"?: object}
+// - Response: {"success": boolean, "data": array, "error"?: string}
+
+// POST /api/v1/simple/mongo/insert  
+// - Payload: {"collection": string, "document": object}
+// - Response: {"success": boolean, "data": object, "error"?: string}
+
+// POST /api/v1/simple/mongo/update
+// - Payload: {"collection": string, "filter": object, "document": object}
+// - Response: {"success": boolean, "data": object, "error"?: string}
+
+// POST /api/v1/simple/mongo/delete
+// - Payload: {"collection": string, "filter": object}
+// - Response: {"success": boolean, "data": object, "error"?: string}
+
+// POST /api/v1/simple/mongo/save-scenario
+// - Payload: {"collection": string, "scenario_id": string, "document": object}
+// - Response: {"success": boolean, "data": object, "error"?: string}
+
+// ВЫПОЛНЕНИЕ ШАГОВ:
+// POST /api/v1/simple/execute
+// - Payload: {"step": object, "context": object}
+// - Response: {"success": boolean, "context": object, "error"?: string}
+
+// === ЗАРЕГИСТРИРОВАННЫЕ ПЛАГИНЫ ===
+// - mongo: MongoDB операции
+// - simple_telegram: Telegram бот
+// - simple_llm: LLM интеграция
+// - simple_rag: RAG поиск
+// - simple_scheduler: Планировщик задач
+// - simple_http: HTTP запросы
+// - simple_amocrm: AmoCRM интеграция
+
+// === ДОСТУПНЫЕ HANDLERS ===
+// Базовые: start, end, action, input, conditional_execute, switch_scenario, log_message, branch
+// MongoDB: mongo_insert_document, mongo_upsert_document, mongo_find_documents, mongo_find_one_document, mongo_update_document, mongo_delete_document
+// Telegram: telegram_send_message, telegram_edit_message, telegram_send_buttons, telegram_update_token, telegram_load_token, telegram_start_polling
+// LLM: llm_query, llm_chat
+// RAG: rag_search, rag_answer
+// HTTP: http_get, http_post, http_put, http_delete, http_request
+// AmoCRM (простой плагин): 
+//   amocrm_find_contact - поиск контакта по query
+//   amocrm_create_contact - создание контакта (name, phone, email)
+//   amocrm_find_lead - поиск сделки по query
+//   amocrm_create_lead - создание сделки (name, price, contact_id)
+//   amocrm_add_note - добавление заметки к сущности
+//   amocrm_search - универсальный поиск (contacts, leads)
+// Scheduler: scheduler_create_task, scheduler_list_tasks, scheduler_get_task, scheduler_cancel_task, scheduler_get_stats
+
+// === ДИНАМИЧЕСКАЯ ЗАГРУЗКА НАСТРОЕК ===
+// - Все плагины ДОЛЖНЫ загружать настройки динамически из БД
+// - Метод _ensure_fresh_settings() вызывается перед каждым запросом
+// - НЕ кешировать настройки в памяти плагина
+// - Настройки обновляются без перезапуска контейнера
 
 // === БЕЗОПАСНОСТЬ ===
 // - Все секреты только в .env

@@ -1,0 +1,113 @@
+{
+  "telegram_id": {
+    "id": 123456,
+    "name": "Telegram ID",
+    "type": "text",
+    "code": "TELEGRAM_ID"
+  },
+  "telegram_username": {
+    "id": 123457,
+    "name": "Telegram Username",
+    "type": "text",
+    "code": "TELEGRAM_USERNAME"
+  },
+  "phone": {
+    "id": 123458,
+    "name": "Телефон",
+    "type": "multiphonemail",
+    "code": "PHONE",
+    "enums": [
+      {
+        "id": 1,
+        "value": "WORK",
+        "enum_code": "WORK"
+      },
+      {
+        "id": 2,
+        "value": "MOBILE",
+        "enum_code": "MOBILE"
+      },
+      {
+        "id": 3,
+        "value": "HOME",
+        "enum_code": "HOME"
+      }
+    ]
+  },
+  "email": {
+    "id": 123459,
+    "name": "Email",
+    "type": "multiphonemail",
+    "code": "EMAIL",
+    "enums": [
+      {
+        "id": 1,
+        "value": "WORK",
+        "enum_code": "WORK"
+      },
+      {
+        "id": 2,
+        "value": "PRIV",
+        "enum_code": "PRIV"
+      }
+    ]
+  },
+  "source": {
+    "id": 123460,
+    "name": "Источник",
+    "type": "select",
+    "code": "SOURCE",
+    "enums": [
+      {
+        "id": 1,
+        "value": "Telegram",
+        "enum_code": "TELEGRAM"
+      },
+      {
+        "id": 2,
+        "value": "Сайт",
+        "enum_code": "WEBSITE"
+      },
+      {
+        "id": 3,
+        "value": "Реклама",
+        "enum_code": "ADS"
+      }
+    ]
+  },
+  "budget": {
+    "id": 123461,
+    "name": "Бюджет",
+    "type": "numeric",
+    "code": "BUDGET"
+  },
+  "interests": {
+    "id": 123462,
+    "name": "Интересы",
+    "type": "multiselect",
+    "code": "INTERESTS",
+    "enums": [
+      {
+        "id": 1,
+        "value": "Продажи",
+        "enum_code": "SALES"
+      },
+      {
+        "id": 2,
+        "value": "Маркетинг",
+        "enum_code": "MARKETING"
+      },
+      {
+        "id": 3,
+        "value": "IT",
+        "enum_code": "IT"
+      }
+    ]
+  },
+  "notes": {
+    "id": 123463,
+    "name": "Заметки",
+    "type": "multitext",
+    "code": "NOTES"
+  }
+} 

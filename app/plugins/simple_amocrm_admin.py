@@ -72,7 +72,7 @@ class SimpleAmoCRMAdminPlugin(BasePlugin):
                 return
                 
             mongo_plugin = self.engine.plugins['mongo']
-            settings_result = await mongo_plugin._find_one("plugin_settings", {"plugin_name": "simple_amocrm"})
+            settings_result = await mongo_plugin._find_one("settings", {"plugin_name": "simple_amocrm"})
             
             if settings_result and settings_result.get("success") and settings_result.get("document"):
                 settings = settings_result["document"]

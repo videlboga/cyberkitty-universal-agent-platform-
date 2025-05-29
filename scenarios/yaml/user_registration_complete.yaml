@@ -1,0 +1,48 @@
+scenario_id: user_registration_complete
+description: "Завершение регистрации обычного пользователя"
+
+initial_context:
+  user_type: "user"
+  registration_complete: true
+
+steps:
+  - id: start
+    type: start
+    next_step: success_message
+
+  - id: success_message
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        ✅ **Регистрация завершена!**
+        
+        Привет, {user_name}! Вы зарегистрированы как обычный пользователь.
+        
+        🎯 Доступные возможности:
+        • Выполнение сценариев
+        • Получение уведомлений
+        • Базовые команды бота
+        
+        Используйте /help для получения списка команд.
+      parse_mode: HTML
+    next_step: main_menu
+
+  - id: main_menu
+    type: channel_action
+    params:
+      action: send_buttons
+      chat_id: "{chat_id}"
+      text: "Что хотите сделать?"
+      buttons:
+        - - text: "🚀 Запустить сценарий"
+            callback_data: "run_scenario"
+        - - text: "📊 Мой профиль"
+            callback_data: "my_profile"
+        - - text: "❓ Помощь"
+            callback_data: "help"
+    next_step: end
+
+  - id: end
+    type: end 

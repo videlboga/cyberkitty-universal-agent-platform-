@@ -14,6 +14,7 @@ import sys
 import os
 import asyncio
 from contextlib import asynccontextmanager
+from typing import Optional
 
 # Добавляем корневую папку в PYTHONPATH для импортов
 sys.path.append('/app')
@@ -25,8 +26,12 @@ from loguru import logger
 # Импортируем API роутеры
 from app.api.simple import router as simple_router
 
-# Глобальный ChannelManager
-_channel_manager = None
+# Импортируем компоненты платформы
+from app.core.channel_manager import ChannelManager
+from app.simple_dependencies import initialize_global_engine, get_global_engine_sync
+
+# === ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ===
+_channel_manager: Optional[ChannelManager] = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -34,40 +39,40 @@ async def lifespan(app: FastAPI):
     Управление жизненным циклом приложения.
     
     НОВАЯ АРХИТЕКТУРА:
-    1. ChannelManager НЕ запускается автоматически
-    2. Каналы запускаются по требованию через API
-    3. Каждый канал = отдельный экземпляр движка
+    1. ОДИН ГЛОБАЛЬНЫЙ движок для всех каналов
+    2. ChannelManager использует глобальный движок
+    3. Каналы запускаются по требованию через API
     """
-    global _channel_manager
-    
     logger.info("🚀 Запуск Universal Agent Platform...")
     
     try:
-        # Создаем ChannelManager БЕЗ автоинициализации
-        logger.info("🔧 Создание ChannelManager (без автозапуска)...")
-        from app.core.channel_manager import ChannelManager
-        _channel_manager = ChannelManager()
-        logger.info("✅ ChannelManager создан (каналы запускаются по требованию)")
+        # 1. КРИТИЧНО: Сначала инициализируем глобальный движок
+        await initialize_global_engine()
         
-        logger.info("🎉 Universal Agent Platform запущена!")
+        # 2. Затем инициализируем ChannelManager с глобальным движком
+        global _channel_manager
+        global_engine = get_global_engine_sync()
+        _channel_manager = ChannelManager(global_engine=global_engine)
+        await _channel_manager.initialize()
         
-        yield
+        logger.info("✅ Universal Agent Platform запущена")
+        
+        yield  # Приложение работает
         
     except Exception as e:
         logger.error(f"❌ Ошибка запуска приложения: {e}")
         raise
     finally:
-        # Очистка ресурсов
         logger.info("🛑 Остановка Universal Agent Platform...")
         
+        # Останавливаем ChannelManager
         if _channel_manager:
-            # Останавливаем все активные каналы
             await _channel_manager.stop_all_polling()
-                
+            
         logger.info("✅ Universal Agent Platform остановлена")
 
-def get_channel_manager():
-    """Получить глобальный ChannelManager."""
+def get_channel_manager() -> Optional[ChannelManager]:
+    """Возвращает глобальный ChannelManager."""
     return _channel_manager
 
 # Настраиваем логирование
@@ -145,14 +150,18 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
     
+    # Читаем настройки из переменных окружения
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8085"))
+    
     logger.info("🚀 Запуск Universal Agent Platform - Simple")
     logger.info("📋 Архитектура: Каналы + Сценарии + SimpleScenarioEngine")
-    logger.info("🔗 API документация: http://localhost:8000/docs")
+    logger.info(f"🔗 API документация: http://localhost:{port}/docs")
     
     uvicorn.run(
         "app.simple_main:app",
-        host="0.0.0.0",
-        port=8000,
+        host=host,
+        port=port,
         reload=False,  # В продакшене отключаем reload
         log_level="info"
     ) 

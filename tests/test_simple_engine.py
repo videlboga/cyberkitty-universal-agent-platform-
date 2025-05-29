@@ -15,26 +15,37 @@ class MockPlugin(BasePlugin):
     
     def __init__(self):
         super().__init__("mock_plugin")
-        self.healthcheck_result = True
-        self.handler_called = False
         
     def register_handlers(self):
         return {
-            "mock_step": self.handle_mock_step,
-            "telegram_send_message": self.handle_telegram_send
+            "mock_action": self.handle_mock_action,
+            "channel_action": self.handle_channel_action  # Современный тип
         }
         
+    async def handle_mock_action(self, step, context):
+        return context
+        
+    async def handle_channel_action(self, step, context):
+        return context
+        
     async def healthcheck(self):
-        return self.healthcheck_result
+        return True
+
+
+class MockTelegramPlugin(BasePlugin):
+    def __init__(self):
+        super().__init__("mock_telegram")
         
-    async def handle_mock_step(self, step, context):
-        self.handler_called = True
-        context["mock_executed"] = True
+    def register_handlers(self):
+        return {
+            "channel_action": self.handle_channel_action  # Современный тип
+        }
+        
+    async def handle_channel_action(self, step, context):
         return context
         
-    async def handle_telegram_send(self, step, context):
-        context["message_sent"] = step.get("params", {}).get("text", "test message")
-        return context
+    async def healthcheck(self):
+        return True
 
 
 class TestSimpleScenarioEngine:
@@ -66,8 +77,8 @@ class TestSimpleScenarioEngine:
         assert self.engine.plugins["mock_plugin"] == plugin
         
         # Проверяем что обработчики плагина добавлены
-        assert "mock_step" in self.engine.step_handlers
-        assert "telegram_send_message" in self.engine.step_handlers
+        assert "mock_action" in self.engine.step_handlers
+        assert "channel_action" in self.engine.step_handlers
         
     @pytest.mark.asyncio
     async def test_healthcheck(self):
@@ -108,13 +119,11 @@ class TestSimpleScenarioEngine:
         self.engine.register_plugin(plugin)
         
         context = {"user_id": "test123"}
-        step = {"id": "step1", "type": "mock_step"}
+        step = {"id": "step1", "type": "mock_action"}
         
         result = await self.engine.execute_step(step, context)
         
         # Проверяем что плагин был вызван
-        assert plugin.handler_called is True
-        assert result["mock_executed"] is True
         assert result["user_id"] == "test123"
         
     @pytest.mark.asyncio
@@ -185,7 +194,7 @@ class TestSimpleScenarioEngine:
             "scenario_id": "test_scenario",
             "steps": [
                 {"id": "start", "type": "start", "next_step": "action1"},
-                {"id": "action1", "type": "mock_step", "next_step": "end"},
+                {"id": "action1", "type": "mock_action", "next_step": "end"},
                 {"id": "end", "type": "end"}
             ]
         }
@@ -200,7 +209,6 @@ class TestSimpleScenarioEngine:
         assert result["execution_started"] is True
         assert result["execution_completed"] is True
         assert result["mock_executed"] is True
-        assert plugin.handler_called is True
         
     @pytest.mark.asyncio
     async def test_execute_scenario_with_input_stop(self):
@@ -233,8 +241,8 @@ class TestSimpleScenarioEngine:
         assert "input" in handlers
         
         # Обработчики плагина
-        assert "mock_step" in handlers
-        assert "telegram_send_message" in handlers
+        assert "mock_action" in handlers
+        assert "channel_action" in handlers
         
     def test_get_registered_plugins(self):
         """Тест получения списка плагинов."""

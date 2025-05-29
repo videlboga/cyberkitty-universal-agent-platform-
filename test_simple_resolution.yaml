@@ -1,0 +1,32 @@
+scenario_id: test_simple_resolution
+description: "Тест разрешения вложенных переменных в AmoCRM операциях"
+
+initial_context:
+  chat_id: "test_chat"
+  channel_id: "test_channel"
+
+steps:
+  - id: start
+    type: start
+    next_step: create_contact
+
+  - id: create_contact
+    type: amocrm_create_contact
+    params:
+      name: "Тестовый контакт"
+      phone: "+7999111222"
+      email: "test@example.com"
+      output_var: "new_contact"
+    next_step: create_lead
+
+  - id: create_lead
+    type: amocrm_create_lead
+    params:
+      name: "Тестовая сделка"
+      price: 5000
+      contact_id: "{new_contact.contact_id}"
+      output_var: "new_lead"
+    next_step: end
+
+  - id: end
+    type: end 

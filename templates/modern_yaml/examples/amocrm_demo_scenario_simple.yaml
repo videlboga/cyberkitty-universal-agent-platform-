@@ -1,0 +1,107 @@
+# === УПРОЩЕННЫЙ ДЕМОНСТРАЦИОННЫЙ СЦЕНАРИЙ AMOCRM ===
+# Версия БЕЗ channel_action для демонстрации только AmoCRM функций
+
+scenario_id: amocrm_demo_simple
+description: "Упрощенная демонстрация AmoCRM плагина без UI"
+
+# Начальные данные сценария
+initial_context:
+  version: "1.0"
+  template_type: "amocrm_demo_simple"
+  demo_company_name: "ООО Простая Демо Компания"
+  demo_contact_name: "Петр Простой"
+  demo_phone: "+79001234567"
+  demo_email: "petr.simple@example.com"
+  
+steps:
+  # === ОБЯЗАТЕЛЬНЫЙ СТАРТ ===
+  - id: start
+    type: start
+    next_step: search_existing_contacts
+
+  # === ПОИСК СУЩЕСТВУЮЩИХ КОНТАКТОВ ===
+  - id: search_existing_contacts
+    type: amocrm_search
+    params:
+      entity: "contacts"
+      query: "test"
+      output_var: "existing_contacts"
+    next_step: create_new_contact
+
+  # === СОЗДАНИЕ НОВОГО КОНТАКТА ===
+  - id: create_new_contact
+    type: amocrm_create_contact
+    params:
+      name: "{demo_contact_name}"
+      phone: "{demo_phone}"
+      email: "{demo_email}"
+      output_var: "new_contact"
+    next_step: create_new_lead
+
+  # === СОЗДАНИЕ НОВОЙ СДЕЛКИ ===
+  - id: create_new_lead
+    type: amocrm_create_lead
+    params:
+      name: "Простая демонстрационная сделка"
+      price: 75000
+      contact_id: "{new_contact.contact_id}"
+      output_var: "new_lead"
+    next_step: add_note_to_lead
+
+  # === ДОБАВЛЕНИЕ ЗАМЕТКИ К СДЕЛКЕ ===
+  - id: add_note_to_lead
+    type: amocrm_add_note
+    params:
+      entity_type: "leads"
+      entity_id: "{new_lead.lead_id}"
+      note_text: "Сделка создана через упрощенный демонстрационный сценарий. Контакт: {demo_contact_name} ({demo_phone})"
+      note_type: "common"
+      output_var: "lead_note"
+    next_step: create_company
+
+  # === СОЗДАНИЕ КОМПАНИИ ===
+  - id: create_company
+    type: amocrm_create_company
+    params:
+      name: "{demo_company_name}"
+      output_var: "new_company"
+    next_step: link_contact_to_company
+
+  # === СВЯЗЫВАНИЕ КОНТАКТА С КОМПАНИЕЙ ===
+  - id: link_contact_to_company
+    type: amocrm_link_contact_to_company
+    params:
+      contact_id: "{new_contact.contact_id}"
+      company_id: "{new_company.company_id}"
+      output_var: "link_result"
+    next_step: create_task
+
+  # === СОЗДАНИЕ ЗАДАЧИ ===
+  - id: create_task
+    type: amocrm_create_task
+    params:
+      text: "Связаться с клиентом {demo_contact_name}"
+      complete_till: 1750000000
+      entity_type: "leads"
+      entity_id: "{new_lead.lead_id}"
+      output_var: "new_task"
+    next_step: log_summary
+
+  # === ЛОГИРОВАНИЕ ИТОГОВ ===
+  - id: log_summary
+    type: log_message
+    params:
+      message: "Демонстрация AmoCRM завершена: контакт {new_contact.contact_id}, сделка {new_lead.lead_id}, компания {new_company.company_id}, задача {new_task.task_id}"
+      level: "info"
+    next_step: end
+
+  # === ОБЯЗАТЕЛЬНЫЙ КОНЕЦ ===
+  - id: end
+    type: end
+
+# === ОСОБЕННОСТИ УПРОЩЕННОЙ ВЕРСИИ ===
+# 1. НЕ использует channel_action для избежания проблем с каналами
+# 2. Демонстрирует чистую AmoCRM функциональность
+# 3. Использует log_message для вывода результатов
+# 4. Можно запускать через простой execute API
+# 5. Все AmoCRM операции остаются полными 

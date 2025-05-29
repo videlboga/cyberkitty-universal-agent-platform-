@@ -53,8 +53,8 @@ class SimpleLLMPlugin(BasePlugin):
                 
             mongo_plugin = self.engine.plugins['mongo']
             
-            # Загружаем настройки LLM
-            settings_result = await mongo_plugin._find_one("plugin_settings", {"plugin_name": "llm"})
+            # Загружаем настройки LLM из коллекции settings
+            settings_result = await mongo_plugin._find_one("settings", {"plugin_name": "llm"})
             
             if settings_result and settings_result.get("success") and settings_result.get("document"):
                 settings = settings_result["document"]
@@ -90,9 +90,9 @@ class SimpleLLMPlugin(BasePlugin):
                 "updated_at": datetime.now().isoformat()
             }
             
-            # Используем upsert для обновления или создания
+            # Используем upsert для обновления или создания в коллекции settings
             result = await mongo_plugin._update_one(
-                "plugin_settings", 
+                "settings", 
                 {"plugin_name": "llm"}, 
                 {"$set": settings_doc},
                 upsert=True

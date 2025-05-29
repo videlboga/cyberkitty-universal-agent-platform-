@@ -35,9 +35,10 @@ class BasePlugin(ABC):
             
         Example:
             {
-                "telegram_send_message": self.handle_send_message,
-                "mongo_save": self.handle_save_data,
-                "switch_scenario": self.handle_switch_scenario
+                "mongo_find_documents": self.handle_find_documents,
+                "mongo_insert_document": self.handle_insert_document, 
+                "llm_query": self.handle_llm_query,
+                "amocrm_find_contact": self.handle_find_contact
             }
         """
         pass
@@ -91,7 +92,7 @@ class BasePlugin(ABC):
         Обрабатывает шаг сценария.
         
         Args:
-            step_type: Тип шага (например, "telegram_send_message")
+            step_type: Тип шага (например, "mongo_find_documents")
             step: Данные шага из сценария
             context: Контекст выполнения
             

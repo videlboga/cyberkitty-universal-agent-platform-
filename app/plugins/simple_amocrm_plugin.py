@@ -59,8 +59,13 @@ class SimpleAmoCRMPlugin(BasePlugin):
                 
             mongo_plugin = self.engine.plugins['mongo']
             
-            # Загружаем настройки AmoCRM
-            settings_result = await mongo_plugin._find_one("plugin_settings", {"plugin_name": "simple_amocrm"})
+            # Загружаем настройки AmoCRM из коллекции settings
+            settings_result = await mongo_plugin._find_one("settings", {"plugin_name": "simple_amocrm"})
+            
+            # ОТЛАДКА: логируем результат запроса
+            logger.info(f"🔍 ОТЛАДКА settings_result: {settings_result}")
+            if settings_result and settings_result.get("success"):
+                logger.info(f"🔍 ОТЛАДКА document: {settings_result.get('document')}")
             
             if settings_result and settings_result.get("success") and settings_result.get("document"):
                 settings = settings_result["document"]
@@ -82,17 +87,17 @@ class SimpleAmoCRMPlugin(BasePlugin):
                 
             mongo_plugin = self.engine.plugins['mongo']
             
-            # Загружаем карту полей для контактов (основная карта)
-            fields_result = await mongo_plugin._find_one("plugin_settings", {"plugin_name": "amocrm_fields_contacts"})
+            # Загружаем карту полей из коллекции settings (УПРОЩЕНО!)
+            fields_result = await mongo_plugin._find_one("settings", {"plugin": "simple_amocrm_fields"})
             
             if fields_result and fields_result.get("success") and fields_result.get("document"):
-                self.fields_map = fields_result["document"].get("fields_map", {})
-                logger.info(f"✅ Карта полей AmoCRM загружена из БД: {len(self.fields_map)} полей")
+                self.fields_map = fields_result["document"].get("contact_fields", {})
+                logger.info(f"✅ Карта полей AmoCRM загружена из settings: {len(self.fields_map)} полей")
             else:
-                logger.info("⚠️ Карта полей AmoCRM не найдена в БД")
+                logger.info("⚠️ Карта полей AmoCRM не найдена в settings")
                 
         except Exception as e:
-            logger.error(f"❌ Ошибка загрузки карты полей AmoCRM из БД: {e}")
+            logger.error(f"❌ Ошибка загрузки карты полей AmoCRM из settings: {e}")
 
     def register_handlers(self) -> Dict[str, Any]:
         """Регистрация обработчиков шагов"""
@@ -125,7 +130,7 @@ class SimpleAmoCRMPlugin(BasePlugin):
                 return
                 
             mongo_plugin = self.engine.plugins['mongo']
-            settings_result = await mongo_plugin._find_one("plugin_settings", {"plugin_name": "simple_amocrm"})
+            settings_result = await mongo_plugin._find_one("settings", {"plugin_name": "simple_amocrm"})
             
             if settings_result and settings_result.get("success") and settings_result.get("document"):
                 settings = settings_result["document"]
@@ -229,14 +234,23 @@ class SimpleAmoCRMPlugin(BasePlugin):
             result = await self._make_request("GET", endpoint, params={"query": query})
             
             if result["success"]:
-                contacts = result["data"].get("_embedded", {}).get("contacts", [])
-                context[output_var] = {
-                    "success": True,
-                    "contact": contacts[0] if contacts else None,
-                    "found": len(contacts) > 0,
-                    "count": len(contacts)
-                }
-                logger.info(f"✅ Поиск контакта: найдено {len(contacts)} результатов")
+                # Проверяем что data является словарем
+                data = result.get("data", {})
+                if isinstance(data, dict):
+                    contacts = data.get("_embedded", {}).get("contacts", [])
+                    context[output_var] = {
+                        "success": True,
+                        "contact": contacts[0] if contacts else None,
+                        "found": len(contacts) > 0,
+                        "count": len(contacts)
+                    }
+                    logger.info(f"✅ Поиск контакта: найдено {len(contacts)} результатов")
+                else:
+                    context[output_var] = {
+                        "success": False,
+                        "error": f"Неожиданный формат ответа AmoCRM: {type(data).__name__}"
+                    }
+                    logger.error(f"❌ Неожиданный формат ответа AmoCRM: {data}")
             else:
                 context[output_var] = result
                 logger.error(f"❌ Ошибка поиска контакта: {result.get('error')}")
@@ -265,14 +279,23 @@ class SimpleAmoCRMPlugin(BasePlugin):
             result = await self._make_request("GET", endpoint, params={"query": query})
             
             if result["success"]:
-                leads = result["data"].get("_embedded", {}).get("leads", [])
-                context[output_var] = {
-                    "success": True,
-                    "lead": leads[0] if leads else None,
-                    "found": len(leads) > 0,
-                    "count": len(leads)
-                }
-                logger.info(f"✅ Поиск сделки: найдено {len(leads)} результатов")
+                # Проверяем что data является словарем
+                data = result.get("data", {})
+                if isinstance(data, dict):
+                    leads = data.get("_embedded", {}).get("leads", [])
+                    context[output_var] = {
+                        "success": True,
+                        "lead": leads[0] if leads else None,
+                        "found": len(leads) > 0,
+                        "count": len(leads)
+                    }
+                    logger.info(f"✅ Поиск сделки: найдено {len(leads)} результатов")
+                else:
+                    context[output_var] = {
+                        "success": False,
+                        "error": f"Неожиданный формат ответа AmoCRM: {type(data).__name__}"
+                    }
+                    logger.error(f"❌ Неожиданный формат ответа AmoCRM: {data}")
             else:
                 context[output_var] = result
                 logger.error(f"❌ Ошибка поиска сделки: {result.get('error')}")
@@ -302,14 +325,23 @@ class SimpleAmoCRMPlugin(BasePlugin):
             result = await self._make_request("GET", endpoint, params={"query": query})
             
             if result["success"]:
-                items = result["data"].get("_embedded", {}).get(entity_type, [])
-                context[output_var] = {
-                    "success": True,
-                    "items": items,
-                    "count": len(items),
-                    "entity_type": entity_type
-                }
-                logger.info(f"✅ Универсальный поиск {entity_type}: найдено {len(items)} результатов")
+                # Проверяем что data является словарем
+                data = result.get("data", {})
+                if isinstance(data, dict):
+                    items = data.get("_embedded", {}).get(entity_type, [])
+                    context[output_var] = {
+                        "success": True,
+                        "items": items,
+                        "count": len(items),
+                        "entity_type": entity_type
+                    }
+                    logger.info(f"✅ Универсальный поиск {entity_type}: найдено {len(items)} результатов")
+                else:
+                    context[output_var] = {
+                        "success": False,
+                        "error": f"Неожиданный формат ответа AmoCRM: {type(data).__name__}"
+                    }
+                    logger.error(f"❌ Неожиданный формат ответа AmoCRM: {data}")
             else:
                 context[output_var] = result
                 logger.error(f"❌ Ошибка универсального поиска: {result.get('error')}")
@@ -401,19 +433,28 @@ class SimpleAmoCRMPlugin(BasePlugin):
             result = await self._make_request("POST", endpoint, json=[contact_data])
             
             if result["success"]:
-                contacts = result["data"].get("_embedded", {}).get("contacts", [])
-                if contacts:
-                    contact = contacts[0]
-                    context[output_var] = {
-                        "success": True,
-                        "contact": contact,
-                        "contact_id": contact["id"],
-                        "used_fields_map": len(self.fields_map) > 0,
-                        "custom_fields_count": len(custom_fields)
-                    }
-                    logger.info(f"✅ Контакт создан: {contact['id']} (использовано {len(custom_fields)} кастомных полей)")
+                # Проверяем что data является словарем
+                data = result.get("data", {})
+                if isinstance(data, dict):
+                    contacts = data.get("_embedded", {}).get("contacts", [])
+                    if contacts:
+                        contact = contacts[0]
+                        context[output_var] = {
+                            "success": True,
+                            "contact": contact,
+                            "contact_id": contact["id"],
+                            "used_fields_map": len(self.fields_map) > 0,
+                            "custom_fields_count": len(custom_fields)
+                        }
+                        logger.info(f"✅ Контакт создан: {contact['id']} (использовано {len(custom_fields)} кастомных полей)")
+                    else:
+                        context[output_var] = {"success": False, "error": "Контакт не создан"}
                 else:
-                    context[output_var] = {"success": False, "error": "Контакт не создан"}
+                    context[output_var] = {
+                        "success": False,
+                        "error": f"Неожиданный формат ответа AmoCRM: {type(data).__name__}"
+                    }
+                    logger.error(f"❌ Неожиданный формат ответа AmoCRM при создании контакта: {data}")
             else:
                 context[output_var] = result
                 logger.error(f"❌ Ошибка создания контакта: {result.get('error')}")
@@ -456,17 +497,26 @@ class SimpleAmoCRMPlugin(BasePlugin):
             result = await self._make_request("POST", endpoint, json=[lead_data])
             
             if result["success"]:
-                leads = result["data"].get("_embedded", {}).get("leads", [])
-                if leads:
-                    lead = leads[0]
-                    context[output_var] = {
-                        "success": True,
-                        "lead": lead,
-                        "lead_id": lead["id"]
-                    }
-                    logger.info(f"✅ Сделка создана: {lead['id']}")
+                # Проверяем что data является словарем
+                data = result.get("data", {})
+                if isinstance(data, dict):
+                    leads = data.get("_embedded", {}).get("leads", [])
+                    if leads:
+                        lead = leads[0]
+                        context[output_var] = {
+                            "success": True,
+                            "lead": lead,
+                            "lead_id": lead["id"]
+                        }
+                        logger.info(f"✅ Сделка создана: {lead['id']}")
+                    else:
+                        context[output_var] = {"success": False, "error": "Сделка не создана"}
                 else:
-                    context[output_var] = {"success": False, "error": "Сделка не создана"}
+                    context[output_var] = {
+                        "success": False,
+                        "error": f"Неожиданный формат ответа AmoCRM: {type(data).__name__}"
+                    }
+                    logger.error(f"❌ Неожиданный формат ответа AmoCRM при создании сделки: {data}")
             else:
                 context[output_var] = result
                 logger.error(f"❌ Ошибка создания сделки: {result.get('error')}")
@@ -665,28 +715,28 @@ class SimpleAmoCRMPlugin(BasePlugin):
                 
             mongo_plugin = self.engine.plugins['mongo']
             
-            # Загружаем карту полей из БД
-            fields_result = await mongo_plugin._find_one("plugin_settings", {"plugin_name": f"amocrm_fields_{entity_type}"})
+            # Загружаем карту полей из settings (УПРОЩЕНО!)
+            fields_result = await mongo_plugin._find_one("settings", {"plugin": f"simple_amocrm_fields_{entity_type}"})
             
             if fields_result and fields_result.get("success") and fields_result.get("document"):
                 fields_doc = fields_result["document"]
                 context[output_var] = {
                     "success": True,
                     "entity_type": entity_type,
-                    "fields_map": fields_doc.get("fields_map", {}),
-                    "fields_count": len(fields_doc.get("fields_map", {})),
+                    "fields_map": fields_doc.get("contact_fields", {}),  # УПРОЩЕНО: contact_fields
+                    "fields_count": len(fields_doc.get("contact_fields", {})),
                     "updated_at": fields_doc.get("updated_at"),
-                    "message": f"Найдено {len(fields_doc.get('fields_map', {}))} полей для {entity_type}"
+                    "message": f"Найдено {len(fields_doc.get('contact_fields', {}))} полей для {entity_type}"
                 }
-                logger.info(f"✅ Карта полей получена из БД: {len(fields_doc.get('fields_map', {}))} полей для {entity_type}")
+                logger.info(f"✅ Карта полей получена из settings: {len(fields_doc.get('contact_fields', {}))} полей для {entity_type}")
             else:
                 context[output_var] = {
                     "success": False,
-                    "error": f"Карта полей для {entity_type} не найдена в БД",
+                    "error": f"Карта полей для {entity_type} не найдена в settings",
                     "entity_type": entity_type,
                     "fields_count": 0
                 }
-                logger.warning(f"⚠️ Карта полей для {entity_type} не найдена в БД")
+                logger.warning(f"⚠️ Карта полей для {entity_type} не найдена в settings")
                 
         except Exception as e:
             logger.error(f"❌ Ошибка получения карты полей: {e}")
@@ -778,6 +828,9 @@ class SimpleAmoCRMPlugin(BasePlugin):
     async def healthcheck(self) -> bool:
         """Проверка работоспособности AmoCRM плагина"""
         try:
+            # Динамически загружаем актуальные настройки из БД
+            await self._ensure_fresh_settings()
+            
             if not self.base_url or not self.access_token:
                 logger.warning("❌ AmoCRM healthcheck: отсутствуют настройки")
                 return False
@@ -846,16 +899,17 @@ class SimpleAmoCRMPlugin(BasePlugin):
             mongo_plugin = self.engine.plugins['mongo']
             
             fields_doc = {
-                "plugin_name": f"amocrm_fields_{entity_type}",
+                "plugin": f"simple_amocrm_fields_{entity_type}",
+                "plugin_name": "simple_amocrm",
                 "entity_type": entity_type,
-                "fields_map": fields_map,
+                "contact_fields": fields_map,  # УПРОЩЕНО: используем contact_fields
                 "updated_at": datetime.now().isoformat()
             }
             
-            # Используем upsert для обновления или создания
+            # Используем upsert для обновления или создания в settings
             result = await mongo_plugin._update_one(
-                "plugin_settings", 
-                {"plugin_name": f"amocrm_fields_{entity_type}"}, 
+                "settings",  # УПРОЩЕНО: сохраняем в settings 
+                {"plugin": f"simple_amocrm_fields_{entity_type}"}, 
                 {"$set": fields_doc},
                 upsert=True
             )
@@ -865,13 +919,13 @@ class SimpleAmoCRMPlugin(BasePlugin):
                 if entity_type == "contacts":
                     self.fields_map = fields_map
                 
-                logger.info(f"✅ Карта полей AmoCRM сохранена в БД: {len(fields_map)} полей для {entity_type}")
+                logger.info(f"✅ Карта полей AmoCRM сохранена в settings: {len(fields_map)} полей для {entity_type}")
                 return {"success": True, "message": f"Карта полей сохранена ({len(fields_map)} полей для {entity_type})"}
             else:
                 error_msg = result.get('error', 'неизвестная ошибка')
-                logger.warning(f"⚠️ Не удалось сохранить карту полей AmoCRM в БД: {error_msg}")
+                logger.warning(f"⚠️ Не удалось сохранить карту полей AmoCRM в settings: {error_msg}")
                 return {"success": False, "error": error_msg}
             
         except Exception as e:
-            logger.error(f"❌ Ошибка сохранения карты полей AmoCRM в БД: {e}")
+            logger.error(f"❌ Ошибка сохранения карты полей AmoCRM в settings: {e}")
             return {"success": False, "error": str(e)} 

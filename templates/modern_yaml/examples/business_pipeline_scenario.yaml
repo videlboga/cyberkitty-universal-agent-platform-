@@ -1,0 +1,258 @@
+# === ПОЛНОЦЕННЫЙ БИЗНЕС-ПРОЦЕСС ===
+# Демонстрация реальной бизнес-логики с AmoCRM
+
+scenario_id: business_pipeline_full
+description: "Полный бизнес-процесс: от лида до закрытия сделки"
+
+initial_context:
+  version: "2.0"
+  process_type: "lead_to_deal"
+  
+steps:
+  # === СТАРТ ПРОЦЕССА ===
+  - id: start
+    type: start
+    next_step: search_existing_contact
+
+  # === ПОИСК СУЩЕСТВУЮЩЕГО КОНТАКТА ===
+  - id: search_existing_contact
+    type: amocrm_find_contact
+    params:
+      query: "{phone}"
+      output_var: existing_contact
+    next_step: check_contact_exists
+
+  # === ПРОВЕРКА СУЩЕСТВОВАНИЯ КОНТАКТА ===
+  - id: check_contact_exists
+    type: branch
+    params:
+      conditions:
+        - condition: "context.get('existing_contact', {}).get('found', False)"
+          next_step: use_existing_contact
+      default_next_step: create_new_contact
+
+  # === ИСПОЛЬЗОВАНИЕ СУЩЕСТВУЮЩЕГО КОНТАКТА ===
+  - id: use_existing_contact
+    type: action
+    params:
+      script: |
+        contact_data = context.get('existing_contact', {}).get('contact', {})
+        context['main_contact'] = {
+          'contact_id': contact_data.get('id'),
+          'success': True,
+          'name': contact_data.get('name', 'Неизвестно'),
+          'source': 'existing'
+        }
+      output_var: main_contact
+    next_step: log_contact_found
+
+  # === СОЗДАНИЕ НОВОГО КОНТАКТА ===
+  - id: create_new_contact
+    type: amocrm_create_contact
+    params:
+      name: "{client_name}"
+      phone: "{phone}"
+      email: "{email}"
+      output_var: new_contact
+    next_step: prepare_main_contact
+
+  # === ПОДГОТОВКА ОСНОВНОГО КОНТАКТА ===
+  - id: prepare_main_contact
+    type: action
+    params:
+      script: |
+        new_contact = context.get('new_contact', {})
+        context['main_contact'] = {
+          'contact_id': new_contact.get('contact_id'),
+          'success': new_contact.get('success', False),
+          'name': context.get('client_name', 'Новый клиент'),
+          'source': 'created'
+        }
+      output_var: main_contact
+    next_step: log_contact_created
+
+  # === ЛОГИРОВАНИЕ НАЙДЕННОГО КОНТАКТА ===
+  - id: log_contact_found
+    type: log_message
+    params:
+      message: "Найден существующий контакт: {main_contact.name} (ID: {main_contact.contact_id})"
+      level: "info"
+    next_step: check_company_needed
+
+  # === ЛОГИРОВАНИЕ СОЗДАННОГО КОНТАКТА ===
+  - id: log_contact_created
+    type: log_message
+    params:
+      message: "Создан новый контакт: {main_contact.name} (ID: {main_contact.contact_id})"
+      level: "info"
+    next_step: check_company_needed
+
+  # === ПРОВЕРКА НЕОБХОДИМОСТИ КОМПАНИИ ===
+  - id: check_company_needed
+    type: branch
+    params:
+      conditions:
+        - condition: "bool(context.get('company_name', '').strip())"
+          next_step: search_existing_company
+      default_next_step: create_lead_directly
+
+  # === ПОИСК СУЩЕСТВУЮЩЕЙ КОМПАНИИ ===
+  - id: search_existing_company
+    type: amocrm_search
+    params:
+      entity_type: "companies"
+      query: "{company_name}"
+      output_var: existing_company
+    next_step: check_company_exists
+
+  # === ПРОВЕРКА СУЩЕСТВОВАНИЯ КОМПАНИИ ===
+  - id: check_company_exists
+    type: branch
+    params:
+      conditions:
+        - condition: "context.get('existing_company', {}).get('found', False)"
+          next_step: use_existing_company
+      default_next_step: create_new_company
+
+  # === ИСПОЛЬЗОВАНИЕ СУЩЕСТВУЮЩЕЙ КОМПАНИИ ===
+  - id: use_existing_company
+    type: action
+    params:
+      script: |
+        company_data = context.get('existing_company', {}).get('companies', [{}])[0]
+        context['main_company'] = {
+          'company_id': company_data.get('id'),
+          'success': True,
+          'name': company_data.get('name', 'Неизвестно'),
+          'source': 'existing'
+        }
+      output_var: main_company
+    next_step: link_contact_to_company
+
+  # === СОЗДАНИЕ НОВОЙ КОМПАНИИ ===
+  - id: create_new_company
+    type: amocrm_create_company
+    params:
+      name: "{company_name}"
+      output_var: new_company
+    next_step: prepare_main_company
+
+  # === ПОДГОТОВКА ОСНОВНОЙ КОМПАНИИ ===
+  - id: prepare_main_company
+    type: action
+    params:
+      script: |
+        new_company = context.get('new_company', {})
+        context['main_company'] = {
+          'company_id': new_company.get('company_id'),
+          'success': new_company.get('success', False),
+          'name': context.get('company_name', 'Новая компания'),
+          'source': 'created'
+        }
+      output_var: main_company
+    next_step: link_contact_to_company
+
+  # === СВЯЗЫВАНИЕ КОНТАКТА С КОМПАНИЕЙ ===
+  - id: link_contact_to_company
+    type: amocrm_link_contact_company
+    params:
+      contact_id: "{main_contact.contact_id}"
+      company_id: "{main_company.company_id}"
+      output_var: link_result
+    next_step: create_lead_with_company
+
+  # === СОЗДАНИЕ СДЕЛКИ С КОМПАНИЕЙ ===
+  - id: create_lead_with_company
+    type: amocrm_create_lead
+    params:
+      name: "{deal_name} - {company_name}"
+      price: "{deal_amount}"
+      contact_id: "{main_contact.contact_id}"
+      output_var: main_lead
+    next_step: add_initial_note
+
+  # === СОЗДАНИЕ СДЕЛКИ БЕЗ КОМПАНИИ ===
+  - id: create_lead_directly
+    type: amocrm_create_lead
+    params:
+      name: "{deal_name}"
+      price: "{deal_amount}"
+      contact_id: "{main_contact.contact_id}"
+      output_var: main_lead
+    next_step: add_initial_note
+
+  # === ДОБАВЛЕНИЕ НАЧАЛЬНОЙ ЗАМЕТКИ ===
+  - id: add_initial_note
+    type: amocrm_add_note
+    params:
+      entity_type: "leads"
+      entity_id: "{main_lead.lead_id}"
+      note_text: |
+        🚀 Сделка создана автоматически
+        
+        📋 Детали:
+        • Клиент: {main_contact.name} (ID: {main_contact.contact_id})
+        • Сумма: {deal_amount} руб.
+        • Источник контакта: {main_contact.source}
+        
+        📞 Контакты:
+        • Телефон: {phone}
+        • Email: {email}
+        
+        🏢 Компания: {company_name|default('Не указана')}
+      output_var: initial_note
+    next_step: create_follow_up_task
+
+  # === СОЗДАНИЕ ЗАДАЧИ ОТСЛЕЖИВАНИЯ ===
+  - id: create_follow_up_task
+    type: amocrm_create_task
+    params:
+      entity_type: "leads"
+      entity_id: "{main_lead.lead_id}"
+      task_type: "call"
+      text: "Связаться с клиентом {main_contact.name} по сделке '{deal_name}'"
+      complete_till: "{follow_up_date}"
+      output_var: follow_up_task
+    next_step: calculate_final_stats
+
+  # === РАСЧЕТ ФИНАЛЬНОЙ СТАТИСТИКИ ===
+  - id: calculate_final_stats
+    type: action
+    params:
+      script: |
+        context['process_summary'] = {
+          'contact_id': context.get('main_contact', {}).get('contact_id'),
+          'contact_source': context.get('main_contact', {}).get('source'),
+          'company_id': context.get('main_company', {}).get('company_id', 'none'),
+          'company_source': context.get('main_company', {}).get('source', 'none'),
+          'lead_id': context.get('main_lead', {}).get('lead_id'),
+          'deal_amount': context.get('deal_amount'),
+          'task_created': context.get('follow_up_task', {}).get('success', False),
+          'note_added': context.get('initial_note', {}).get('success', False),
+          'process_completed': True,
+          'total_entities_created': sum([
+            1 if context.get('main_contact', {}).get('source') == 'created' else 0,
+            1 if context.get('main_company', {}).get('source') == 'created' else 0,
+            1, # lead always created
+            1 if context.get('follow_up_task', {}).get('success') else 0,
+            1 if context.get('initial_note', {}).get('success') else 0
+          ])
+        }
+      output_var: process_summary
+    next_step: end
+
+  # === ЗАВЕРШЕНИЕ ===
+  - id: end
+    type: end
+
+# === ПРИМЕР ИСПОЛЬЗОВАНИЯ ===
+# Контекст для запуска:
+# {
+#   "client_name": "Иван Петров",
+#   "phone": "+7999555777",
+#   "email": "ivan@example.com",
+#   "company_name": "ООО Рога и Копыта",
+#   "deal_name": "Продажа системы CRM",
+#   "deal_amount": 150000,
+#   "follow_up_date": "2025-01-31T10:00:00Z"
+# } 

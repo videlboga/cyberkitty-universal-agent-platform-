@@ -23,51 +23,42 @@ logger.add(
     level="INFO"
 )
 
-# Глобальные переменные для кеширования
-_engine: Optional[SimpleScenarioEngine] = None
-_lock = asyncio.Lock()
+# === ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ===
+_global_engine: Optional[SimpleScenarioEngine] = None
 
-
-async def get_simple_engine() -> SimpleScenarioEngine:
+async def get_global_engine() -> SimpleScenarioEngine:
     """
-    Получает настроенный SimpleScenarioEngine.
+    Возвращает ГЛОБАЛЬНЫЙ движок который создается один раз при старте.
     
-    Singleton pattern - создается только один раз и переиспользуется.
-    Использует create_engine() из simple_engine.py для избежания дублирования.
+    КРИТИЧНО: НЕ создает новый движок при каждом вызове!
+    
+    Используется в FastAPI dependency injection.
     """
-    global _engine
-    
-    async with _lock:
-        if _engine is None:
-            logger.info("🔧 Инициализация SimpleScenarioEngine через create_engine()...")
-            
-            # Используем create_engine из simple_engine.py
-            _engine = await create_engine()
-            
-            logger.info("🎯 SimpleScenarioEngine настроен через create_engine()")
-            
-        return _engine
+    global _global_engine
+    if _global_engine is None:
+        raise RuntimeError("Global engine not initialized. Call initialize_global_engine() first.")
+    return _global_engine
 
+async def initialize_global_engine():
+    """Инициализирует глобальный движок один раз при старте."""
+    global _global_engine
+    if _global_engine is None:
+        logger.info("🚀 Создание ГЛОБАЛЬНОГО движка...")
+        _global_engine = await create_engine()
+        logger.info("✅ ГЛОБАЛЬНЫЙ движок создан и готов к работе")
+    else:
+        logger.info("⚠️ ГЛОБАЛЬНЫЙ движок уже инициализирован")
 
-async def cleanup_engine():
-    """Очистка ресурсов движка."""
-    global _engine
-    
-    if _engine:
-        logger.info("🧹 Очистка SimpleScenarioEngine...")
-        
-        # Здесь можно добавить логику очистки плагинов
-        # Например, закрытие соединений с БД
-        
-        _engine = None
-        logger.info("✅ SimpleScenarioEngine очищен")
-
+def get_global_engine_sync() -> Optional[SimpleScenarioEngine]:
+    """Синхронная версия для использования в ChannelManager."""
+    global _global_engine
+    return _global_engine
 
 # === УТИЛИТЫ ===
 
 def is_initialized() -> bool:
     """Проверяет инициализирована ли система."""
-    return _engine is not None
+    return _global_engine is not None
 
 
 async def healthcheck() -> dict:
@@ -77,21 +68,21 @@ async def healthcheck() -> dict:
     Returns:
         dict: Статус здоровья системы
     """
-    if not _engine:
+    if not _global_engine:
         return {
             "healthy": False,
             "reason": "System not initialized"
         }
     
     try:
-        engine_healthy = await _engine.healthcheck()
+        engine_healthy = await _global_engine.healthcheck()
         
         if engine_healthy:
             return {
                 "healthy": True,
                 "engine": "SimpleScenarioEngine",
-                "plugins": _engine.get_registered_plugins(),
-                "handlers": _engine.get_registered_handlers()
+                "plugins": _global_engine.get_registered_plugins(),
+                "handlers": _global_engine.get_registered_handlers()
             }
         else:
             return {
@@ -145,4 +136,35 @@ def validate_environment():
 validate_environment()
 
 logger.info("📦 Модуль simple_dependencies загружен")
-logger.info("💡 Используйте get_simple_engine() для получения движка") 
+logger.info("💡 Используйте get_global_engine() для получения движка")
+
+# === BACKWARD COMPATIBILITY ===
+# Старые функции для совместимости
+
+_engine = None
+
+async def get_engine() -> SimpleScenarioEngine:
+    """
+    УСТАРЕВШИЙ метод. Используйте get_global_engine().
+    
+    Использует create_engine() из simple_engine.py для избежания дублирования.
+    
+    Returns:
+        SimpleScenarioEngine: Настроенный движок
+    """
+    logger.warning("⚠️ get_engine() устарел, используйте get_global_engine()")
+    return await get_global_engine()
+
+async def cleanup_engine():
+    """Очистка ресурсов движка."""
+    global _engine, _global_engine
+    
+    if _engine:
+        logger.info("🧹 Очистка SimpleScenarioEngine...")
+        _engine = None
+        logger.info("✅ SimpleScenarioEngine очищен")
+        
+    if _global_engine:
+        logger.info("🧹 Очистка ГЛОБАЛЬНОГО движка...")
+        _global_engine = None
+        logger.info("✅ ГЛОБАЛЬНЫЙ движок очищен") 

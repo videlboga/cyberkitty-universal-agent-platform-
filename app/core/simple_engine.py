@@ -10,6 +10,8 @@ import json
 from loguru import logger
 import asyncio
 from .base_plugin import BasePlugin
+from .yaml_scenario_loader import yaml_loader
+from app.core.template_resolver import template_resolver
 
 # ===== ТИПЫ ДАННЫХ =====
 
@@ -280,13 +282,32 @@ class SimpleScenarioEngine:
         execution_context = {
             **context,
             "scenario_id": scenario_id,
-            "current_step": None,
             "execution_started": True
         }
         
+        # ИСПРАВЛЕНИЕ: НЕ перезаписываем current_step если он уже есть!
+        if "current_step" not in execution_context or execution_context["current_step"] is None:
+            execution_context["current_step"] = None
+        
         try:
-            # Ищем первый шаг (обычно type="start")
-            current_step = self._find_first_step(steps)
+            # УЛУЧШЕННАЯ ЛОГИКА: Ищем первый шаг или продолжаем с конкретного
+            if execution_context.get("current_step"):
+                # Продолжаем с указанного шага
+                target_step_id = execution_context["current_step"]
+                current_step = None
+                for step in steps:
+                    if step.get("id") == target_step_id:
+                        current_step = step
+                        break
+                        
+                if not current_step:
+                    self.logger.warning(f"⚠️ Не найден шаг {target_step_id}, начинаю с первого")
+                    current_step = self._find_first_step(steps)
+                else:
+                    self.logger.info(f"📍 Продолжаю выполнение с шага: {target_step_id}")
+            else:
+                # Ищем первый шаг (обычно type="start")
+                current_step = self._find_first_step(steps)
             
             if not current_step:
                 raise ValueError(f"Не найден первый шаг в сценарии {scenario_id}")
@@ -295,15 +316,41 @@ class SimpleScenarioEngine:
             while current_step:
                 execution_context["current_step"] = current_step.get("id")
                 
-                # Выполняем текущий шаг
-                step_result = await self.execute_step(current_step, execution_context)
-                
-                # Обновляем контекст результатом
-                execution_context.update(step_result)
-                
-                # Находим следующий шаг
-                current_step = self._find_next_step(steps, current_step, execution_context)
-                
+                try:
+                    # Выполняем текущий шаг
+                    step_result = await self.execute_step(current_step, execution_context)
+                    
+                    # Обновляем контекст результатом
+                    execution_context.update(step_result)
+                    
+                    # ПРОВЕРЯЕМ ПЕРЕКЛЮЧЕНИЕ СЦЕНАРИЯ
+                    if execution_context.get("scenario_switched"):
+                        new_scenario_id = execution_context.get("switched_to")
+                        if new_scenario_id and new_scenario_id != scenario_id:
+                            self.logger.info(f"🔄 Переключаюсь с {scenario_id} на {new_scenario_id}")
+                            
+                            try:
+                                # Рекурсивно выполняем новый сценарий
+                                return await self.execute_scenario(new_scenario_id, execution_context)
+                            except StopExecution as stop_e:
+                                # Новый сценарий ожидает ввод - это нормально!
+                                self.logger.info(f"⏱️ Переключенный сценарий ожидает ввод: {stop_e}")
+                                execution_context["execution_stopped"] = True
+                                execution_context["stop_reason"] = str(stop_e)
+                                execution_context["waiting_for_input"] = True
+                                return execution_context
+                    
+                    # Находим следующий шаг
+                    current_step = self._find_next_step(steps, current_step, execution_context)
+                    
+                except StopExecution as e:
+                    # НОРМАЛЬНОЕ ожидание ввода - НЕ ошибка!
+                    self.logger.info(f"⏱️ Выполнение остановлено для ожидания ввода: {e}")
+                    execution_context["execution_stopped"] = True
+                    execution_context["stop_reason"] = str(e)
+                    execution_context["waiting_for_input"] = True
+                    return execution_context
+            
             self.logger.info(
                 f"Сценарий {scenario_id} выполнен успешно",
                 scenario_id=scenario_id,
@@ -346,11 +393,23 @@ class SimpleScenarioEngine:
         if step_type not in self.step_handlers:
             raise ValueError(f"Неизвестный тип шага: {step_type}")
             
+        # === УНИВЕРСАЛЬНАЯ ПОДСТАНОВКА ПАРАМЕТРОВ ===
+        # Создаем копию шага с разрешенными параметрами
+        resolved_step = step.copy()
+        if "params" in resolved_step:
+            resolved_step["params"] = template_resolver.resolve_deep(resolved_step["params"], context)
+            
+        self.logger.debug(
+            f"Параметры шага {step_id} после подстановки",
+            original_params=step.get("params", {}),
+            resolved_params=resolved_step.get("params", {})
+        )
+            
         handler = self.step_handlers[step_type]
         
         try:
-            # Выполняем обработчик
-            result = await handler(step, context)
+            # Выполняем обработчик с разрешенными параметрами
+            result = await handler(resolved_step, context)
             
             self.logger.info(
                 f"Шаг {step_id} выполнен успешно",
@@ -360,6 +419,15 @@ class SimpleScenarioEngine:
             
             return result if result else context
             
+        except StopExecution as e:
+            # СПЕЦИАЛЬНАЯ обработка ожидания ввода - НЕ ошибка!
+            self.logger.info(
+                f"⏱️ Шаг {step_id} остановлен для ожидания ввода: {e}",
+                step_id=step_id,
+                step_type=step_type
+            )
+            # Пробрасываем StopExecution дальше для обработки в execute_scenario
+            raise
         except Exception as e:
             self.logger.error(
                 f"Ошибка выполнения шага {step_id}: {e}",
@@ -602,6 +670,9 @@ class SimpleScenarioEngine:
         """
         Обработчик переключения сценариев.
         
+        ВАЖНО: Только переключает контекст на новый сценарий,
+        НЕ выполняет новый сценарий синхронно!
+        
         Пример шага:
         {
             "id": "switch1",
@@ -616,6 +687,8 @@ class SimpleScenarioEngine:
         }
         """
         self.logger.info("Обрабатываю переключение сценария", step_id=step.get("id"))
+        
+        resolved_scenario_id = None  # Инициализируем переменную
         
         try:
             params = step.get("params", {})
@@ -647,25 +720,26 @@ class SimpleScenarioEngine:
                 resolved_value = self._resolve_template(str(source_template), context)
                 new_context[target_key] = resolved_value
                 
-            # Добавляем информацию о переключении (без циклических ссылок)
+            # Добавляем информацию о переключении
             new_context.update({
                 "switched_from_scenario": context.get("scenario_id"),
                 "switch_reason": "engine_switch"
             })
             
-            self.logger.info(f"Переключаюсь на сценарий: {resolved_scenario_id}")
+            self.logger.info(f"✅ Переключен контекст на сценарий: {resolved_scenario_id}")
             
-            # ВЫПОЛНЯЕМ НОВЫЙ СЦЕНАРИЙ ПРЯМО ЗДЕСЬ
-            switched_context = await self.execute_scenario(resolved_scenario_id, new_context)
-            
-            # Обновляем текущий контекст результатом переключения (без циклических ссылок)
+            # КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: Просто обновляем контекст для переключения
+            # НЕ выполняем новый сценарий синхронно!
+            context.update(new_context)
             context.update({
+                "scenario_id": resolved_scenario_id,
                 "scenario_switched": True,
                 "switched_to": resolved_scenario_id,
-                "switch_successful": True
+                "switch_successful": True,
+                # Сбрасываем step_id чтобы начать с начала нового сценария
+                "current_step_id": None
             })
             
-            self.logger.info(f"✅ Успешно переключился на сценарий {resolved_scenario_id}")
             return context
             
         except Exception as e:
@@ -678,29 +752,17 @@ class SimpleScenarioEngine:
             return context
     
     def _resolve_template(self, template: str, context: Dict[str, Any]) -> str:
-        """Простая подстановка переменных {var} в строке."""
-        if not isinstance(template, str):
-            return str(template)
-            
-        result = template
+        """
+        УЛУЧШЕННАЯ подстановка переменных с поддержкой всех современных форматов.
         
-        # Специальные переменные
-        special_vars = {
-            "current_timestamp": datetime.now().isoformat(),
-            "current_date": datetime.now().strftime("%Y-%m-%d"),
-            "current_time": datetime.now().strftime("%H:%M:%S"),
-            "current_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-        
-        # Подставляем специальные переменные
-        for key, value in special_vars.items():
-            result = result.replace(f"{{{key}}}", str(value))
-        
-        # Подставляем переменные из контекста
-        for key, value in context.items():
-            result = result.replace(f"{{{key}}}", str(value))
-            
-        return result
+        Поддерживает:
+        - {variable} - простые переменные
+        - {{variable}} - Django/Jinja2 стиль
+        - {user.name} - вложенные объекты
+        - {items[0]} - элементы массивов
+        - {current_timestamp} - специальные переменные
+        """
+        return template_resolver.resolve(template, context)
         
     def _resolve_condition(self, condition: str, context: Dict[str, Any]) -> str:
         """Простая подстановка переменных в условии."""

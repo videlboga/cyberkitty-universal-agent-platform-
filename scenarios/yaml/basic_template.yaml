@@ -1,0 +1,122 @@
+# === БАЗОВЫЙ LLM-FRIENDLY ШАБЛОН ===
+# Скопируйте этот файл и адаптируйте под свои задачи
+
+scenario_id: basic_template
+description: "Базовый шаблон для создания новых сценариев"
+
+# Начальные данные сценария
+initial_context:
+  version: "1.0"
+  template_type: "basic"
+  
+steps:
+  # === ОБЯЗАТЕЛЬНЫЙ СТАРТ ===
+  - id: start
+    type: start
+    next_step: welcome
+
+  # === ПРИВЕТСТВИЕ ===
+  - id: welcome
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        👋 **Добро пожаловать!**
+        
+        Это базовый шаблон сценария.
+        Адаптируйте его под свои задачи.
+        
+        Напишите что-нибудь для продолжения...
+      parse_mode: HTML
+    next_step: wait_input
+
+  # === ОЖИДАНИЕ ВВОДА ===
+  - id: wait_input
+    type: input
+    params:
+      prompt: "Жду ваш ответ..."
+      output_var: user_input
+    next_step: process_input
+
+  # === ОБРАБОТКА ВВОДА ===
+  - id: process_input
+    type: branch
+    params:
+      conditions:
+        - condition: "context.get('user_input', '').lower() == 'помощь'"
+          next_step: show_help
+        - condition: "context.get('user_input', '').lower() == 'меню'"
+          next_step: show_menu
+      default_next_step: echo_response
+
+  # === СПРАВКА ===
+  - id: show_help
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        📖 **Справка**
+        
+        Доступные команды:
+        • "помощь" - эта справка
+        • "меню" - показать меню
+        • любой текст - эхо ответ
+      parse_mode: HTML
+    next_step: final_menu
+
+  # === МЕНЮ ===
+  - id: show_menu
+    type: channel_action
+    params:
+      action: send_buttons
+      chat_id: "{chat_id}"
+      text: "Выберите действие:"
+      buttons:
+        - - text: "🔄 Начать заново"
+            callback_data: "restart"
+        - - text: "ℹ️ Информация"
+            callback_data: "info"
+        - - text: "✅ Завершить"
+            callback_data: "finish"
+    next_step: end
+
+  # === ЭХО ОТВЕТ ===
+  - id: echo_response
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        💬 **Вы написали:** "{user_input}"
+        
+        Длина сообщения: {user_input|length} символов
+        
+        Попробуйте написать "помощь" или "меню"
+      parse_mode: HTML
+    next_step: final_menu
+
+  # === ФИНАЛЬНОЕ МЕНЮ ===
+  - id: final_menu
+    type: channel_action
+    params:
+      action: send_buttons
+      chat_id: "{chat_id}"
+      text: "Что дальше?"
+      buttons:
+        - - text: "🔄 Еще раз"
+            callback_data: "restart"
+        - - text: "✅ Завершить"
+            callback_data: "finish"
+    next_step: end
+
+  # === ОБЯЗАТЕЛЬНЫЙ КОНЕЦ ===
+  - id: end
+    type: end
+
+# === ПРИМЕР ИСПОЛЬЗОВАНИЯ ===
+# 1. Скопируйте файл: cp basic_scenario.yaml my_scenario.yaml
+# 2. Измените scenario_id на уникальный
+# 3. Адаптируйте шаги под задачу
+# 4. Протестируйте через API 

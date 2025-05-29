@@ -1,3 +1,24 @@
+// === LLM-FRIENDLY ТИПЫ ШАГОВ (ОБЯЗАТЕЛЬНО!) ===
+// ChannelManager отвечает за ВСЕ Telegram операции
+// НЕ ИСПОЛЬЗУЙ: telegram_send_message, telegram_edit_message, telegram_send_buttons
+// ИСПОЛЬЗУЙ ТОЛЬКО: channel_action с параметром action
+
+// ПРАВИЛЬНЫЕ ТИПЫ ШАГОВ:
+// ✅ channel_action (action: send_message|send_buttons|edit_message)
+// ✅ start, end, action, input, conditional_execute, switch_scenario
+// ✅ mongo_insert_document, mongo_find_documents, mongo_update_document
+// ✅ branch, log_message
+// ❌ telegram_send_message, telegram_edit_message (УСТАРЕЛИ!)
+
+// ПРИМЕР TELEGRAM ШАГА:
+// - id: send_msg
+//   type: channel_action
+//   params:
+//     action: send_message
+//     chat_id: "{chat_id}"
+//     text: "Привет!"
+//   next_step: next_id
+
 // Universal Agent Platform - УПРОЩЕННАЯ АРХИТЕКТУРА  
 // Принцип: ПРОСТОТА ПРЕВЫШЕ ВСЕГО!
 

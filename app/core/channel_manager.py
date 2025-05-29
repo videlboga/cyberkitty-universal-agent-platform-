@@ -4,9 +4,9 @@ Channel Manager для Universal Agent Platform.
 
 НОВАЯ АРХИТЕКТУРА:
 1. ChannelManager - ОТДЕЛЬНЫЙ сервис
-2. Каждый канал = ОТДЕЛЬНЫЙ экземпляр движка
-3. Движок НЕ ЗНАЕТ о каналах
-4. ChannelManager создает движки для каналов
+2. ОДИН ГЛОБАЛЬНЫЙ движок для ВСЕХ каналов
+3. Каналы делят один настроенный движок
+4. ChannelManager управляет жизненным циклом каналов
 
 САМОДОСТАТОЧНЫЙ - работает напрямую с API каналов!
 """
@@ -23,55 +23,57 @@ class ChannelManager:
     САМОДОСТАТОЧНЫЙ менеджер каналов.
     
     НОВАЯ АРХИТЕКТУРА:
-    1. Каждый канал = отдельный экземпляр движка
-    2. Каналы ИЗОЛИРОВАНЫ друг от друга
-    3. Движок НЕ ЗНАЕТ о каналах
+    1. ОДИН ГЛОБАЛЬНЫЙ движок для ВСЕХ каналов
+    2. Каналы SHARED ресурсы
+    3. Масштабируемость до тысяч каналов
     4. ChannelManager управляет жизненным циклом каналов
     """
     
-    def __init__(self):
-        # НЕ ПРИНИМАЕМ движок в конструкторе!
-        # Создаем свои экземпляры для каждого канала
+    def __init__(self, global_engine=None):
+        # ПРИНИМАЕМ глобальный движок!
+        self.global_engine = global_engine
         self.channels: Dict[str, Dict] = {}  # channel_id -> channel_data
-        self.channel_engines: Dict[str, Any] = {}  # channel_id -> engine
         self.telegram_sessions: Dict[str, aiohttp.ClientSession] = {}  # channel_id -> session
         self.polling_tasks: Dict[str, asyncio.Task] = {}  # channel_id -> task
         self.last_update_ids: Dict[str, int] = {}  # channel_id -> last_update_id
         
     async def initialize(self):
         """Инициализация менеджера каналов."""
-        logger.info("🚀 Инициализация САМОДОСТАТОЧНОГО Channel Manager...")
+        logger.info("🚀 Инициализация МАСШТАБИРУЕМОГО Channel Manager...")
+        
+        # Убеждаемся что у нас есть глобальный движок
+        if not self.global_engine:
+            logger.error("❌ Глобальный движок не передан в ChannelManager!")
+            raise RuntimeError("Global engine required for ChannelManager")
         
         # Загружаем все каналы из БД
         await self._load_channels_from_db()
         
-        # Создаем движки для каждого канала
-        await self._create_channel_engines()
-        
-        # Запускаем поллинг для всех каналов
+        # Запускаем поллинг для всех каналов (БЕЗ создания новых движков!)
         await self._start_all_polling()
         
-        logger.info(f"✅ САМОДОСТАТОЧНЫЙ Channel Manager инициализирован. Активных каналов: {len(self.channels)}")
+        logger.info(f"✅ МАСШТАБИРУЕМЫЙ Channel Manager инициализирован. Активных каналов: {len(self.channels)}")
         
     async def _load_channels_from_db(self):
-        """Загружает все каналы из БД."""
+        """Загружает все каналы из БД используя ГЛОБАЛЬНЫЙ движок."""
         try:
-            # Создаем временный движок для загрузки каналов из БД
-            from app.core.simple_engine import create_engine
-            temp_engine = await create_engine()
+            # ИСПРАВЛЕНИЕ: Используем ГЛОБАЛЬНЫЙ движок
+            if not self.global_engine:
+                logger.error("❌ Глобальный движок недоступен для загрузки каналов")
+                return
             
             # Получаем все маппинги каналов через MongoDB плагин
             step = {
                 "id": "find_channels",
                 "type": "mongo_find_documents",
                 "params": {
-                    "collection": "channel_mappings",
+                    "collection": "channels",
                     "filter": {},
                     "output_var": "find_result"
                 }
             }
             context = {}
-            result_context = await temp_engine.execute_step(step, context)
+            result_context = await self.global_engine.execute_step(step, context)
             result = result_context.get("find_result", {})
             
             if result.get("success") and result.get("documents"):
@@ -88,23 +90,6 @@ class ChannelManager:
         except Exception as e:
             logger.error(f"❌ Ошибка загрузки каналов из БД: {e}")
             
-    async def _create_channel_engines(self):
-        """Создает отдельный движок для каждого канала."""
-        for channel_id, channel_data in self.channels.items():
-            try:
-                logger.info(f"🔧 Создаю движок для канала {channel_id}")
-                
-                # Создаем ОТДЕЛЬНЫЙ движок для канала
-                from app.core.simple_engine import create_engine
-                channel_engine = await create_engine()
-                
-                self.channel_engines[channel_id] = channel_engine
-                
-                logger.info(f"✅ Движок создан для канала {channel_id}")
-                
-            except Exception as e:
-                logger.error(f"❌ Ошибка создания движка для канала {channel_id}: {e}")
-                
     async def _start_all_polling(self):
         """Запускает поллинг для всех каналов."""
         for channel_id, channel_data in self.channels.items():
@@ -256,9 +241,9 @@ class ChannelManager:
     
     async def _execute_channel_scenario(self, channel_id: str, event_type: str, event_data: Dict):
         """
-        Выполняет стартовый сценарий канала при событии.
+        Выполняет сценарий канала при событии.
         
-        НОВАЯ АРХИТЕКТУРА: используется start_scenario_id!
+        УЛУЧШЕННАЯ АРХИТЕКТУРА: проверяет сохраненное состояние пользователя!
         """
         try:
             # Получаем данные канала
@@ -267,12 +252,202 @@ class ChannelManager:
                 logger.error(f"❌ Данные канала {channel_id} не найдены")
                 return
                 
-            # НОВАЯ АРХИТЕКТУРА: получаем start_scenario_id канала
-            start_scenario_id = channel_data.get("start_scenario_id")
-            if not start_scenario_id:
-                logger.error(f"❌ Стартовый сценарий start_scenario_id не указан для канала {channel_id}")
+            user_id = event_data.get("user_id")
+            chat_id = event_data.get("chat_id")
+            
+            if not user_id or not chat_id:
+                logger.error(f"❌ Не удалось извлечь user_id или chat_id из события")
                 return
+            
+            # НОВИНКА: Проверяем сохраненное состояние пользователя
+            saved_state = await self._load_user_state(channel_id, user_id)
+            
+            if saved_state and saved_state.get("waiting_for_input"):
+                # Пользователь находится в процессе выполнения сценария
+                logger.info(f"🔄 Продолжаю сценарий для пользователя {user_id} с шага {saved_state.get('current_step')}")
+                await self._continue_user_scenario(channel_id, event_type, event_data, saved_state)
+            else:
+                # Новый пользователь или завершенный сценарий - запускаем стартовый сценарий
+                start_scenario_id = channel_data.get("start_scenario_id")
+                if not start_scenario_id:
+                    logger.error(f"❌ Стартовый сценарий start_scenario_id не указан для канала {channel_id}")
+                    return
+                    
+                logger.info(f"🎭 Запуск стартового сценария {start_scenario_id} для нового пользователя {user_id}")
+                await self._start_new_user_scenario(channel_id, event_type, event_data, start_scenario_id)
                 
+        except Exception as e:
+            logger.error(f"❌ Ошибка выполнения сценария канала {channel_id}: {e}")
+    
+    async def _load_user_state(self, channel_id: str, user_id: str) -> Optional[Dict]:
+        """Загружает сохраненное состояние пользователя."""
+        try:
+            # ИСПРАВЛЕНИЕ: Используем существующий движок канала!
+            if not self.global_engine:
+                logger.error("❌ Глобальный движок недоступен для загрузки состояния пользователя")
+                return None
+            
+            # Ищем сохраненное состояние пользователя
+            step = {
+                "id": "load_user_state",
+                "type": "mongo_find_documents",
+                "params": {
+                    "collection": "user_states",
+                    "filter": {
+                        "channel_id": channel_id,
+                        "user_id": user_id
+                    },
+                    "output_var": "find_result"
+                }
+            }
+            
+            context = {}
+            result_context = await self.global_engine.execute_step(step, context)
+            result = result_context.get("find_result", {})
+            
+            if result.get("success") and result.get("documents"):
+                user_state = result["documents"][0]
+                logger.info(f"📋 Загружено состояние пользователя {user_id}: сценарий {user_state.get('scenario_id')}, шаг {user_state.get('current_step')}")
+                return user_state
+            else:
+                logger.info(f"📋 Состояние пользователя {user_id} не найдено - новый пользователь")
+                return None
+                
+        except Exception as e:
+            logger.error(f"❌ Ошибка загрузки состояния пользователя {user_id}: {e}")
+            return None
+    
+    async def _save_user_state(self, channel_id: str, user_id: str, context: Dict):
+        """Сохраняет состояние пользователя."""
+        try:
+            # ИСПРАВЛЕНИЕ: Используем существующий движок канала!
+            if not self.global_engine:
+                logger.error("❌ Глобальный движок недоступен для сохранения состояния пользователя")
+                return
+            
+            # Подготавливаем данные для сохранения
+            state_data = {
+                "channel_id": channel_id,
+                "user_id": user_id,
+                "scenario_id": context.get("scenario_id"),
+                "current_step": context.get("current_step"),
+                "waiting_for_input": context.get("waiting_for_input", False),
+                "input_step_id": context.get("input_step_id"),
+                "context": context,
+                "updated_at": "2024-12-29T16:00:00Z"
+            }
+            
+            # Сохраняем состояние (upsert)
+            step = {
+                "id": "save_user_state",
+                "type": "mongo_upsert_document",
+                "params": {
+                    "collection": "user_states",
+                    "filter": {
+                        "channel_id": channel_id,
+                        "user_id": user_id
+                    },
+                    "document": state_data,
+                    "output_var": "save_result"
+                }
+            }
+            
+            save_context = {}
+            await self.global_engine.execute_step(step, save_context)
+            
+            logger.info(f"💾 Состояние пользователя {user_id} сохранено: сценарий {state_data['scenario_id']}, шаг {state_data['current_step']}")
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка сохранения состояния пользователя {user_id}: {e}")
+    
+    async def _continue_user_scenario(self, channel_id: str, event_type: str, event_data: Dict, saved_state: Dict):
+        """Продолжает выполнение сценария с сохраненного места."""
+        try:
+            user_id = event_data.get("user_id")
+            
+            # Восстанавливаем контекст из сохраненного состояния
+            context = saved_state.get("context", {})
+            
+            # Добавляем новые данные события
+            context.update({
+                "channel_id": channel_id,
+                "event_type": event_type,
+                "telegram_update": {
+                    "message" if event_type == "message" else "callback_query": event_data
+                },
+                **event_data
+            })
+            
+            # Если это текстовое сообщение и мы ждали ввод - сохраняем текст
+            if event_type == "message" and saved_state.get("waiting_for_input"):
+                input_var = saved_state.get("input_step_id", "user_input")
+                context[input_var] = event_data.get("message_text", "")
+                context["user_input"] = event_data.get("message_text", "")
+                
+                # Убираем флаг ожидания ввода
+                context["waiting_for_input"] = False
+                context.pop("input_step_id", None)
+            
+            # ИСПРАВЛЕНИЕ: Находим следующий шаг после input шага
+            scenario_id = saved_state.get("scenario_id")
+            current_step_id = saved_state.get("current_step")
+            
+            logger.info(f"🔄 Продолжаю сценарий {scenario_id} после input шага {current_step_id} для пользователя {user_id}")
+            
+            # Загружаем сценарий чтобы найти следующий шаг
+            scenario_result = await self.global_engine.execute_step({
+                "id": "load_scenario",
+                "type": "mongo_find_documents",
+                "params": {
+                    "collection": "scenarios",
+                    "filter": {"scenario_id": scenario_id},
+                    "output_var": "find_result"
+                }
+            }, context)
+            
+            next_step_id = None
+            if scenario_result.get("find_result", {}).get("success") and scenario_result.get("find_result", {}).get("documents"):
+                scenario_data = scenario_result["find_result"]["documents"][0]
+                scenario_steps = scenario_data.get("steps", [])
+                logger.info(f"🔍 ОТЛАДКА: Найдено {len(scenario_steps)} шагов в сценарии {scenario_id}")
+                
+                # Находим текущий input шаг и берем его next_step
+                for step in scenario_steps:
+                    if step.get("id") == current_step_id:
+                        next_step_id = step.get("next_step")
+                        logger.info(f"🔍 ОТЛАДКА: Найден шаг {current_step_id}, next_step = {next_step_id}")
+                        break
+                else:
+                    logger.warning(f"🔍 ОТЛАДКА: Шаг {current_step_id} НЕ НАЙДЕН в {len(scenario_steps)} шагах!")
+                    for step in scenario_steps:
+                        logger.info(f"🔍 ОТЛАДКА: Доступный шаг: {step.get('id')}")
+                        
+                if next_step_id:
+                    logger.info(f"📍 Продолжаю с СЛЕДУЮЩИМ шагом после input: {next_step_id}")
+                    # КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: Устанавливаем текущий шаг как следующий после input
+                    context["current_step"] = next_step_id
+                else:
+                    logger.warning(f"⚠️ Не найден next_step для шага {current_step_id}")
+                    context["current_step"] = None
+            else:
+                logger.error(f"❌ Сценарий {scenario_id} не найден в БД!")
+            
+            # Выполняем сценарий с правильной позиции
+            final_context = await self.global_engine.execute_scenario(scenario_id, context)
+            
+            # Сохраняем обновленное состояние
+            await self._save_user_state(channel_id, user_id, final_context)
+            
+            logger.info(f"✅ Сценарий {scenario_id} продолжен для пользователя {user_id}")
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка продолжения сценария для пользователя {event_data.get('user_id')}: {e}")
+    
+    async def _start_new_user_scenario(self, channel_id: str, event_type: str, event_data: Dict, start_scenario_id: str):
+        """Запускает стартовый сценарий для нового пользователя."""
+        try:
+            user_id = event_data.get("user_id")
+            
             # Подготавливаем контекст с данными Telegram
             context = {
                 "channel_id": channel_id,
@@ -284,15 +459,22 @@ class ChannelManager:
                 **event_data
             }
             
-            # Выполняем стартовый сценарий НАПРЯМУЮ через движок
-            logger.info(f"🎭 Запуск стартового сценария {start_scenario_id} для канала {channel_id}")
-            final_context = await self.channel_engines[channel_id].execute_scenario(start_scenario_id, context)
+            # Выполняем стартовый сценарий
+            final_context = await self.global_engine.execute_scenario(start_scenario_id, context)
             
-            logger.info(f"✅ Стартовый сценарий {start_scenario_id} выполнен для канала {channel_id}")
+            # КРИТИЧНО: Всегда сохраняем состояние после выполнения
+            if final_context.get("waiting_for_input"):
+                logger.info(f"💾 Пользователь {user_id} ждет ввода - сохраняю состояние")
+            else:
+                logger.info(f"💾 Сценарий завершен для пользователя {user_id} - сохраняю состояние")
+            
+            await self._save_user_state(channel_id, user_id, final_context)
+            
+            logger.info(f"✅ Стартовый сценарий {start_scenario_id} выполнен для нового пользователя {user_id}")
             
         except Exception as e:
-            logger.error(f"❌ Ошибка выполнения стартового сценария для канала {channel_id}: {e}")
-            
+            logger.error(f"❌ Ошибка запуска стартового сценария для пользователя {event_data.get('user_id')}: {e}")
+    
     async def stop_all_polling(self):
         """Останавливает поллинг для всех каналов."""
         logger.info("🛑 Остановка всех каналов...")
@@ -454,21 +636,22 @@ class ChannelManager:
         """Загружает конкретный канал из БД."""
         try:
             # Создаем временный движок для загрузки канала из БД
-            from app.core.simple_engine import create_engine
-            temp_engine = await create_engine()
+            if not self.global_engine:
+                logger.error("❌ Глобальный движок недоступен для загрузки канала")
+                return False
             
             # Получаем конкретный канал через MongoDB плагин
             step = {
                 "id": "find_channel",
                 "type": "mongo_find_documents",
                 "params": {
-                    "collection": "channel_mappings",
+                    "collection": "channels",
                     "filter": {"channel_id": channel_id},
                     "output_var": "find_result"
                 }
             }
             context = {}
-            result_context = await temp_engine.execute_step(step, context)
+            result_context = await self.global_engine.execute_step(step, context)
             result = result_context.get("find_result", {})
             
             if result.get("success") and result.get("documents"):
@@ -485,25 +668,27 @@ class ChannelManager:
             return False
             
     async def _create_channel_engine(self, channel_id: str):
-        """Создает движок для конкретного канала."""
+        """Подготавливает канал для работы с глобальным движком."""
         try:
-            if channel_id not in self.channels:
-                logger.error(f"❌ Канал {channel_id} не загружен")
-                return False
+            if channel_id in self.channels:
+                logger.info(f"✅ Канал {channel_id} уже готов к работе с глобальным движком")
+                return True
                 
-            logger.info(f"🔧 Создаю движок для канала {channel_id}")
+            logger.info(f"🔧 Подготавливаю канал {channel_id} для работы с глобальным движком")
             
-            # Создаем ОТДЕЛЬНЫЙ движок для канала
-            from app.core.simple_engine import create_engine
-            channel_engine = await create_engine()
+            # ИСПРАВЛЕНИЕ: НЕ создаем новый движок, используем глобальный!
+            # Загружаем данные канала из БД если нужно
+            success = await self._load_specific_channel(channel_id)
             
-            self.channel_engines[channel_id] = channel_engine
-            
-            logger.info(f"✅ Движок создан для канала {channel_id}")
-            return True
+            if success:
+                logger.info(f"✅ Канал {channel_id} готов к работе с глобальным движком")
+                return True
+            else:
+                logger.error(f"❌ Не удалось подготовить канал {channel_id}")
+                return False
             
         except Exception as e:
-            logger.error(f"❌ Ошибка создания движка для канала {channel_id}: {e}")
+            logger.error(f"❌ Ошибка подготовки канала {channel_id}: {e}")
             return False
             
     async def _stop_channel_polling(self, channel_id: str):
@@ -527,16 +712,13 @@ class ChannelManager:
                 del self.telegram_sessions[channel_id]
                 logger.info(f"🔌 Сессия закрыта для канала {channel_id}")
             
-            # Удаляем из активных каналов
-            if channel_id in self.channels:
-                del self.channels[channel_id]
-            
-            if channel_id in self.channel_engines:
-                del self.channel_engines[channel_id]
-                
+            # Очищаем last_update_id для канала
             if channel_id in self.last_update_ids:
                 del self.last_update_ids[channel_id]
-                
+            
+            # ИСПРАВЛЕНИЕ: НЕ удаляем канал из channels - он может быть нужен
+            # Канал остается в памяти для возможного перезапуска
+            
             logger.info(f"✅ Канал {channel_id} полностью остановлен")
             
         except Exception as e:

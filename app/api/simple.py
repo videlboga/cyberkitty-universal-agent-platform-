@@ -12,8 +12,10 @@ from typing import Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from loguru import logger
+from datetime import datetime
 
-from app.core.simple_engine import SimpleScenarioEngine, create_engine
+from app.simple_dependencies import get_global_engine
+from app.core.simple_engine import SimpleScenarioEngine
 
 
 def safe_serialize_context(context: Dict[str, Any]) -> Dict[str, Any]:
@@ -77,7 +79,10 @@ async def _load_scenario(channel_id: str, scenario_id: str = None) -> Dict[str, 
     Загружает сценарий для канала.
     
     Принцип: ПРОСТОТА ПРЕВЫШЕ ВСЕГО!
-    Использует ChannelMapping вместо сложной модели Agent.
+    Приоритет загрузки:
+    1. MongoDB (новые сценарии)
+    2. YAML файлы (scenarios/yaml/)
+    3. Хардкодированные сценарии (legacy)
     
     Args:
         channel_id: ID канала
@@ -91,7 +96,7 @@ async def _load_scenario(channel_id: str, scenario_id: str = None) -> Dict[str, 
     """
     # Сначала пытаемся загрузить из MongoDB
     try:
-        engine = await create_engine()
+        engine = await get_global_engine()
         
         # Если указан конкретный scenario_id, ищем его
         if scenario_id:
@@ -142,130 +147,76 @@ async def _load_scenario(channel_id: str, scenario_id: str = None) -> Dict[str, 
     
     except Exception as e:
         logger.error(f"Ошибка загрузки сценария из MongoDB: {e}")
-        # Если сценарий не найден в БД - ошибка
-        raise HTTPException(
-            status_code=404, 
-            detail=f"Сценарий '{scenario_id}' не найден в базе данных"
-        )
+        # Продолжаем поиск в YAML файлах
     
-    # Определяем какой сценарий загружать
-    if scenario_id:
+    # Пытаемся загрузить из YAML файлов
+    try:
+        from app.core.yaml_scenario_loader import yaml_loader
+        from pathlib import Path
         
-        # Специальные сценарии для переключения
-        if scenario_id == "user_registration_complete":
-            return {
-                "scenario_id": "user_registration_complete",
-                "description": "Завершение регистрации обычного пользователя",
-                "initial_context": {
-                    "user_type": "user",
-                    "registration_complete": True
-                },
-                "steps": [
-                    {
-                        "id": "start",
-                        "type": "start",
-                        "params": {
-                            "message": "Завершаем регистрацию обычного пользователя"
-                        },
-                        "next_step": "success_message"
-                    },
-                    {
-                        "id": "success_message",
-                        "type": "telegram_send_message",
-                        "params": {
-                            "chat_id": "{chat_id}",
-                            "text": "✅ <b>Регистрация завершена!</b>\n\nПривет, {user_name}! Вы зарегистрированы как обычный пользователь.\n\n🎯 Доступные возможности:\n• Выполнение сценариев\n• Получение уведомлений\n• Базовые команды бота\n\nИспользуйте /help для получения списка команд.",
-                            "parse_mode": "HTML"
-                        },
-                        "next_step": "main_menu"
-                    },
-                    {
-                        "id": "main_menu",
-                        "type": "telegram_send_buttons",
-                        "params": {
-                            "chat_id": "{chat_id}",
-                            "text": "Что хотите сделать?",
-                            "buttons": [
-                                [{"text": "🚀 Запустить сценарий", "callback_data": "run_scenario"}],
-                                [{"text": "📊 Мой профиль", "callback_data": "my_profile"}],
-                                [{"text": "❓ Помощь", "callback_data": "help"}]
-                            ]
-                        },
-                        "next_step": "end"
-                    },
-                    {
-                        "id": "end",
-                        "type": "end",
-                        "params": {
-                            "message": "Регистрация пользователя завершена успешно"
-                        }
-                    }
-                ]
-            }
-        elif scenario_id == "admin_registration_complete":
-            return {
-                "scenario_id": "admin_registration_complete",
-                "description": "Завершение регистрации администратора",
-                "initial_context": {
-                    "user_type": "admin",
-                    "registration_complete": True
-                },
-                "steps": [
-                    {
-                        "id": "start",
-                        "type": "start",
-                        "params": {
-                            "message": "Завершаем регистрацию администратора"
-                        },
-                        "next_step": "success_message"
-                    },
-                    {
-                        "id": "success_message",
-                        "type": "telegram_send_message",
-                        "params": {
-                            "chat_id": "{chat_id}",
-                            "text": "👑 <b>Регистрация администратора завершена!</b>\n\nДобро пожаловать, {user_name}! У вас есть полный доступ к системе.\n\n🔧 Административные возможности:\n• Управление ботом\n• Просмотр статистики\n• Создание сценариев\n• Управление пользователями\n• Все пользовательские функции\n\nИспользуйте /admin для доступа к панели администратора.",
-                            "parse_mode": "HTML"
-                        },
-                        "next_step": "admin_menu"
-                    },
-                    {
-                        "id": "admin_menu",
-                        "type": "telegram_send_buttons",
-                        "params": {
-                            "chat_id": "{chat_id}",
-                            "text": "Панель администратора:",
-                            "buttons": [
-                                [{"text": "📊 Статистика", "callback_data": "admin_stats"}],
-                                [{"text": "👥 Пользователи", "callback_data": "admin_users"}],
-                                [{"text": "🎭 Сценарии", "callback_data": "admin_scenarios"}],
-                                [{"text": "⚙️ Настройки", "callback_data": "admin_settings"}],
-                                [{"text": "🚀 Запустить сценарий", "callback_data": "run_scenario"}]
-                            ]
-                        },
-                        "next_step": "end"
-                    },
-                    {
-                        "id": "end",
-                        "type": "end",
-                        "params": {
-                            "message": "Регистрация администратора завершена успешно"
-                        }
-                    }
-                ]
-            }
-        else:
-            # Если сценарий не найден в БД - ошибка
-            raise HTTPException(
-                status_code=404, 
-                detail=f"Сценарий '{scenario_id}' не найден в базе данных"
-            )
-    
+        yaml_path = Path(f"scenarios/yaml/{scenario_id}.yaml")
+        if yaml_path.exists():
+            logger.info(f"📄 Сценарий {scenario_id} загружен из YAML: {yaml_path}")
+            scenario = yaml_loader.load_from_file(str(yaml_path))
+            return scenario
+            
+    except Exception as e:
+        logger.error(f"Ошибка загрузки YAML сценария {scenario_id}: {e}")
+
     # Если ничего не найдено - ошибка
     raise HTTPException(
         status_code=404, 
-        detail=f"Сценарий для канала '{channel_id}' не найден"
+        detail=f"Сценарий '{scenario_id}' не найден ни в MongoDB, ни в YAML файлах"
     )
+
+
+async def _ensure_channel_ready(channel_id: str) -> bool:
+    """
+    Убеждается что канал готов к работе.
+    
+    НОВАЯ АРХИТЕКТУРА: автоматически запускает канал если нужно!
+    
+    Args:
+        channel_id: ID канала
+        
+    Returns:
+        bool: True если канал готов
+    """
+    try:
+        from app.simple_main import get_channel_manager
+        channel_manager = get_channel_manager()
+        
+        if not channel_manager:
+            logger.warning("ChannelManager не инициализирован")
+            return False
+        
+        # Проверяем есть ли канал в памяти
+        if channel_id not in channel_manager.channels:
+            logger.info(f"🔄 Канал {channel_id} не загружен, загружаю...")
+            # Загружаем канал из БД
+            success = await channel_manager._load_specific_channel(channel_id)
+            if not success:
+                logger.warning(f"⚠️ Канал {channel_id} не найден в БД")
+                return False
+        
+        # ИСПРАВЛЕНИЕ: Канал готов если есть глобальный движок
+        if not channel_manager.global_engine:
+            logger.error("❌ Глобальный движок недоступен")
+            return False
+        
+        # Запускаем поллинг если нужно (для автономных каналов)
+        channel_data = channel_manager.channels.get(channel_id)
+        if channel_data and channel_data.get("channel_type") == "telegram":
+            if channel_id not in channel_manager.polling_tasks:
+                logger.info(f"🚀 Запускаю поллинг для канала {channel_id}")
+                await channel_manager._start_channel_polling(channel_id, channel_data)
+        
+        logger.info(f"✅ Канал {channel_id} готов к работе с глобальным движком")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка подготовки канала {channel_id}: {e}")
+        return False
 
 
 # === ENDPOINTS ===
@@ -274,21 +225,34 @@ async def _load_scenario(channel_id: str, scenario_id: str = None) -> Dict[str, 
 async def execute_channel_scenario(
     channel_id: str,
     request: ExecuteRequest,
-    engine: SimpleScenarioEngine = Depends(create_engine)
+    engine: SimpleScenarioEngine = Depends(get_global_engine)
 ):
     """
     ЕДИНСТВЕННЫЙ API ENDPOINT для выполнения сценариев каналов.
     
     Принцип: ПРОСТОТА ПРЕВЫШЕ ВСЕГО!
     Один endpoint для всех каналов и сценариев.
-    Использует ChannelMapping вместо сложной модели Agent.
+    
+    НОВАЯ ЛОГИКА: может работать БЕЗ канала в БД если указан scenario_id!
     """
     try:
         logger.info(f"🚀 Выполнение сценария для канала {channel_id}", 
-                   user_id=request.user_id, chat_id=request.chat_id)
+                   user_id=request.user_id, chat_id=request.chat_id, scenario_id=request.scenario_id)
         
-        # Загружаем сценарий
-        scenario = await _load_scenario(channel_id, request.scenario_id)
+        # Загружаем сценарий (приоритет: scenario_id > канал)
+        scenario = None
+        
+        if request.scenario_id:
+            # Прямое выполнение по scenario_id (БЕЗ привязки к каналу)
+            logger.info(f"📄 Прямое выполнение сценария {request.scenario_id}")
+            scenario = await _load_scenario_direct(request.scenario_id)
+        else:
+            # Выполнение через канал (нужна подготовка канала)
+            logger.info(f"📡 Выполнение через канал {channel_id}")
+            channel_ready = await _ensure_channel_ready(channel_id)
+            if not channel_ready:
+                raise HTTPException(status_code=404, detail=f"Канал {channel_id} не найден и scenario_id не указан")
+            scenario = await _load_scenario(channel_id, None)
         
         # Подготавливаем контекст
         context = {
@@ -304,9 +268,6 @@ async def execute_channel_scenario(
         
         # Выполняем сценарий
         final_context = await engine.execute_scenario(scenario, context)
-        
-        # УПРОЩЕНО: Переключение сценариев теперь обрабатывается внутри движка
-        # Никаких дополнительных проверок не требуется
         
         logger.info(f"✅ Сценарий {scenario['scenario_id']} успешно выполнен")
         
@@ -335,8 +296,68 @@ async def execute_channel_scenario(
         )
 
 
+async def _load_scenario_direct(scenario_id: str) -> Dict[str, Any]:
+    """
+    Загружает сценарий напрямую по scenario_id.
+    
+    ПРОСТАЯ ЛОГИКА: только scenario_id, без канала!
+    Приоритет загрузки:
+    1. MongoDB (сценарии)
+    2. YAML файлы (scenarios/yaml/)
+    
+    Args:
+        scenario_id: ID сценария
+        
+    Returns:
+        Dict: Сценарий в JSON формате
+        
+    Raises:
+        HTTPException: Если сценарий не найден
+    """
+    # 1. Пытаемся загрузить из MongoDB
+    try:
+        engine = await get_global_engine()
+        
+        step = {
+            "id": "get_scenario",
+            "type": "mongo_get_scenario",
+            "params": {
+                "scenario_id": scenario_id,
+                "output_var": "scenario_result"
+            }
+        }
+        context = {}
+        result_context = await engine.execute_step(step, context)
+        if result_context.get("scenario_result", {}).get("success"):
+            logger.info(f"📋 Сценарий {scenario_id} загружен из MongoDB")
+            return result_context["scenario_result"]["scenario"]
+    
+    except Exception as e:
+        logger.error(f"Ошибка загрузки сценария {scenario_id} из MongoDB: {e}")
+    
+    # 2. Пытаемся загрузить из YAML файлов
+    try:
+        from app.core.yaml_scenario_loader import yaml_loader
+        from pathlib import Path
+        
+        yaml_path = Path(f"scenarios/yaml/{scenario_id}.yaml")
+        if yaml_path.exists():
+            logger.info(f"📄 Сценарий {scenario_id} загружен из YAML: {yaml_path}")
+            scenario = yaml_loader.load_from_file(str(yaml_path))
+            return scenario
+            
+    except Exception as e:
+        logger.error(f"Ошибка загрузки YAML сценария {scenario_id}: {e}")
+    
+    # Если ничего не найдено - ошибка
+    raise HTTPException(
+        status_code=404, 
+        detail=f"Сценарий '{scenario_id}' не найден ни в MongoDB, ни в YAML файлах"
+    )
+
+
 @router.get("/health")
-async def health_check(engine: SimpleScenarioEngine = Depends(create_engine)):
+async def health_check(engine: SimpleScenarioEngine = Depends(get_global_engine)):
     """Проверка здоровья системы."""
     try:
         is_healthy = await engine.healthcheck()
@@ -356,7 +377,7 @@ async def health_check(engine: SimpleScenarioEngine = Depends(create_engine)):
 
 
 @router.get("/info")
-async def get_info(engine: SimpleScenarioEngine = Depends(create_engine)):
+async def get_info(engine: SimpleScenarioEngine = Depends(get_global_engine)):
     """Информация о системе."""
     return {
         "platform": "Universal Agent Platform - Simplified Architecture",
@@ -392,7 +413,7 @@ class MongoResponse(BaseModel):
 @router.post("/mongo/find", response_model=MongoResponse)
 async def mongo_find(
     request: MongoRequest,
-    engine: SimpleScenarioEngine = Depends(create_engine)
+    engine: SimpleScenarioEngine = Depends(get_global_engine)
 ):
     """Поиск документов в MongoDB."""
     try:
@@ -424,7 +445,7 @@ async def mongo_find(
 @router.post("/mongo/insert", response_model=MongoResponse)
 async def mongo_insert(
     request: MongoRequest,
-    engine: SimpleScenarioEngine = Depends(create_engine)
+    engine: SimpleScenarioEngine = Depends(get_global_engine)
 ):
     """Вставка документа в MongoDB."""
     try:
@@ -456,7 +477,7 @@ async def mongo_insert(
 @router.post("/mongo/update", response_model=MongoResponse)
 async def mongo_update(
     request: MongoRequest,
-    engine: SimpleScenarioEngine = Depends(create_engine)
+    engine: SimpleScenarioEngine = Depends(get_global_engine)
 ):
     """Обновление документа в MongoDB."""
     try:
@@ -492,7 +513,7 @@ async def mongo_update(
 @router.post("/mongo/delete", response_model=MongoResponse)
 async def mongo_delete(
     request: MongoRequest,
-    engine: SimpleScenarioEngine = Depends(create_engine)
+    engine: SimpleScenarioEngine = Depends(get_global_engine)
 ):
     """Удаление документа из MongoDB."""
     try:
@@ -524,7 +545,7 @@ async def mongo_delete(
 @router.post("/mongo/save-scenario", response_model=MongoResponse)
 async def mongo_save_scenario(
     request: MongoRequest,
-    engine: SimpleScenarioEngine = Depends(create_engine)
+    engine: SimpleScenarioEngine = Depends(get_global_engine)
 ):
     """Сохранение сценария в MongoDB."""
     try:
@@ -573,7 +594,7 @@ class StepResponse(BaseModel):
 @router.post("/execute", response_model=StepResponse)
 async def execute_step(
     request: StepRequest,
-    engine: SimpleScenarioEngine = Depends(create_engine)
+    engine: SimpleScenarioEngine = Depends(get_global_engine)
 ):
     """Выполнение одного шага сценария."""
     try:
@@ -600,35 +621,31 @@ async def execute_step(
 @router.post("/channels/{channel_id}/start")
 async def start_channel(channel_id: str):
     """
-    Запускает конкретный канал.
+    Явно запускает канал.
     
-    НОВАЯ АРХИТЕКТУРА: каналы запускаются по требованию!
+    ПРИМЕЧАНИЕ: execute endpoint теперь автоматически запускает каналы!
+    Этот endpoint нужен только для предварительного запуска.
     """
     try:
-        from app.simple_main import get_channel_manager
-        channel_manager = get_channel_manager()
+        logger.info(f"📡 Явный запуск канала {channel_id}")
         
-        if not channel_manager:
-            return {"success": False, "error": "ChannelManager не инициализирован"}
+        channel_ready = await _ensure_channel_ready(channel_id)
         
-        # Загружаем канал из БД
-        await channel_manager._load_specific_channel(channel_id)
-        
-        # Создаем движок для канала
-        await channel_manager._create_channel_engine(channel_id)
-        
-        # Запускаем поллинг
-        channel_data = channel_manager.channels.get(channel_id)
-        if channel_data:
-            await channel_manager._start_channel_polling(channel_id, channel_data)
+        if channel_ready:
+            # Получаем информацию о канале
+            from app.simple_main import get_channel_manager
+            channel_manager = get_channel_manager()
+            channel_data = channel_manager.channels.get(channel_id, {})
+            
             return {
                 "success": True, 
                 "message": f"Канал {channel_id} запущен",
                 "channel_type": channel_data.get("channel_type"),
-                "start_scenario_id": channel_data.get("start_scenario_id")
+                "start_scenario_id": channel_data.get("start_scenario_id"),
+                "auto_polling": channel_id in channel_manager.polling_tasks
             }
         else:
-            return {"success": False, "error": f"Канал {channel_id} не найден в БД"}
+            return {"success": False, "error": f"Не удалось запустить канал {channel_id}"}
             
     except Exception as e:
         logger.error(f"❌ Ошибка запуска канала {channel_id}: {e}")
@@ -721,4 +738,268 @@ async def list_channels():
         
     except Exception as e:
         logger.error(f"❌ Ошибка получения списка каналов: {e}")
-        return {"success": False, "error": str(e)} 
+        return {"success": False, "error": str(e)}
+
+@router.post("/api/v1/simple/amocrm/setup")
+async def setup_amocrm_plugin(
+    settings_data: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Настройка AmoCRM плагина.
+    
+    Автоматически:
+    1. Сохраняет настройки в MongoDB
+    2. Инициализирует плагин
+    3. Загружает карту полей
+    4. Тестирует подключение
+    
+    Payload:
+    {
+        "domain": "example.amocrm.ru",
+        "client_id": "your_client_id", 
+        "client_secret": "your_client_secret",
+        "redirect_uri": "your_redirect_uri",
+        "access_token": "your_access_token",
+        "refresh_token": "your_refresh_token"
+    }
+    """
+    try:
+        # 1. Валидация обязательных полей
+        required_fields = ["domain", "client_id", "client_secret", "access_token"]
+        missing_fields = [field for field in required_fields if not settings_data.get(field)]
+        
+        if missing_fields:
+            return {
+                "success": False,
+                "error": f"Отсутствуют обязательные поля: {', '.join(missing_fields)}"
+            }
+        
+        # 2. Создаем движок для выполнения операций
+        engine = await get_global_engine()
+        
+        # 3. Сохраняем настройки в MongoDB
+        save_settings_step = {
+            "id": "save_amocrm_settings",
+            "type": "mongo_upsert_document",
+            "params": {
+                "collection": "plugin_settings",
+                "filter": {"plugin_name": "simple_amocrm"},
+                "document": {
+                    "plugin_name": "simple_amocrm",
+                    "settings": settings_data,
+                    "updated_at": datetime.now().isoformat(),
+                    "enabled": True
+                }
+            }
+        }
+        
+        context = {}
+        await engine.execute_step(save_settings_step, context)
+        
+        # 4. Получаем свежий экземпляр плагина из движка
+        if "simple_amocrm" not in engine.plugins:
+            return {
+                "success": False,
+                "error": "AmoCRM плагин не зарегистрирован в движке"
+            }
+        
+        amocrm_plugin = engine.plugins["simple_amocrm"]
+        
+        # 5. Форсируем обновление настроек плагина
+        await amocrm_plugin._ensure_fresh_settings()
+        
+        # 6. Тестируем подключение
+        healthcheck_result = await amocrm_plugin.healthcheck()
+        
+        if not healthcheck_result:
+            # Получаем детали ошибки из плагина
+            test_step = {
+                "id": "test_connection",
+                "type": "amocrm_get_account",
+                "params": {}
+            }
+            
+            test_context = {}
+            try:
+                await engine.execute_step(test_step, test_context)
+                test_success = test_context.get("amocrm_get_account", {}).get("success", False)
+                if not test_success:
+                    return {
+                        "success": False,
+                        "error": "Не удалось подключиться к AmoCRM. Проверьте настройки.",
+                        "details": test_context.get("amocrm_get_account", {})
+                    }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": f"Ошибка тестирования подключения: {str(e)}"
+                }
+        
+        # 7. Загружаем карту полей для всех сущностей
+        field_mapping = {}
+        entities = ["contacts", "leads", "companies"]
+        
+        for entity in entities:
+            try:
+                load_fields_step = {
+                    "id": f"load_{entity}_fields",
+                    "type": "amocrm_get_custom_fields",
+                    "params": {
+                        "entity_type": entity,
+                        "output_var": f"{entity}_fields"
+                    }
+                }
+                
+                fields_context = {}
+                await engine.execute_step(load_fields_step, fields_context)
+                
+                fields_result = fields_context.get(f"{entity}_fields", {})
+                if fields_result.get("success"):
+                    field_mapping[entity] = fields_result.get("data", [])
+                else:
+                    logger.warning(f"Не удалось загрузить поля для {entity}: {fields_result.get('error')}")
+                    field_mapping[entity] = []
+                    
+            except Exception as e:
+                logger.error(f"Ошибка загрузки полей для {entity}: {e}")
+                field_mapping[entity] = []
+        
+        # 8. Сохраняем карту полей в MongoDB
+        save_fields_step = {
+            "id": "save_field_mapping",
+            "type": "mongo_upsert_document", 
+            "params": {
+                "collection": "amocrm_field_mapping",
+                "filter": {"domain": settings_data["domain"]},
+                "document": {
+                    "domain": settings_data["domain"],
+                    "field_mapping": field_mapping,
+                    "updated_at": datetime.now().isoformat()
+                }
+            }
+        }
+        
+        await engine.execute_step(save_fields_step, context)
+        
+        # 9. Финальная проверка
+        final_healthcheck = await amocrm_plugin.healthcheck()
+        
+        return {
+            "success": True,
+            "message": "AmoCRM плагин успешно настроен",
+            "details": {
+                "domain": settings_data["domain"],
+                "healthcheck_passed": final_healthcheck,
+                "field_mapping_loaded": len(field_mapping),
+                "entities_mapped": list(field_mapping.keys()),
+                "total_fields": sum(len(fields) for fields in field_mapping.values())
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка настройки AmoCRM: {e}")
+        return {
+            "success": False,
+            "error": f"Ошибка настройки AmoCRM: {str(e)}"
+        }
+
+@router.get("/api/v1/simple/amocrm/status")
+async def get_amocrm_status() -> Dict[str, Any]:
+    """
+    Получение текущего статуса AmoCRM плагина.
+    
+    Возвращает:
+    - Состояние настроек
+    - Результат healthcheck
+    - Информацию о карте полей
+    - Статистику использования
+    """
+    try:
+        # Создаем движок
+        engine = await get_global_engine()
+        
+        if "simple_amocrm" not in engine.plugins:
+            return {
+                "success": False,
+                "error": "AmoCRM плагин не зарегистрирован"
+            }
+        
+        amocrm_plugin = engine.plugins["simple_amocrm"]
+        
+        # Получаем настройки из MongoDB
+        get_settings_step = {
+            "id": "get_amocrm_settings",
+            "type": "mongo_find_one_document",
+            "params": {
+                "collection": "plugin_settings",
+                "filter": {"plugin_name": "simple_amocrm"},
+                "output_var": "settings_doc"
+            }
+        }
+        
+        context = {}
+        await engine.execute_step(get_settings_step, context)
+        
+        settings_doc = context.get("settings_doc", {}).get("data")
+        has_settings = bool(settings_doc)
+        
+        # Проверяем healthcheck
+        healthcheck_result = await amocrm_plugin.healthcheck()
+        
+        # Получаем карту полей
+        get_fields_step = {
+            "id": "get_field_mapping",
+            "type": "mongo_find_one_document",
+            "params": {
+                "collection": "amocrm_field_mapping",
+                "filter": {"domain": settings_doc.get("settings", {}).get("domain") if settings_doc else ""},
+                "output_var": "fields_doc"
+            }
+        }
+        
+        await engine.execute_step(get_fields_step, context)
+        
+        fields_doc = context.get("fields_doc", {}).get("data")
+        has_field_mapping = bool(fields_doc)
+        
+        field_stats = {}
+        if fields_doc:
+            field_mapping = fields_doc.get("field_mapping", {})
+            field_stats = {
+                entity: len(fields) 
+                for entity, fields in field_mapping.items()
+            }
+        
+        # Формируем ответ
+        status = {
+            "success": True,
+            "plugin_registered": True,
+            "has_settings": has_settings,
+            "healthcheck_passed": healthcheck_result,
+            "has_field_mapping": has_field_mapping,
+            "domain": settings_doc.get("settings", {}).get("domain") if settings_doc else None,
+            "settings_updated": settings_doc.get("updated_at") if settings_doc else None,
+            "fields_updated": fields_doc.get("updated_at") if fields_doc else None,
+            "field_stats": field_stats
+        }
+        
+        # Добавляем рекомендации
+        recommendations = []
+        if not has_settings:
+            recommendations.append("Настройте AmoCRM через /api/v1/simple/amocrm/setup")
+        elif not healthcheck_result:
+            recommendations.append("Проверьте настройки подключения к AmoCRM")
+        elif not has_field_mapping:
+            recommendations.append("Обновите карту полей через /api/v1/simple/amocrm/setup")
+        
+        status["recommendations"] = recommendations
+        status["ready_for_use"] = has_settings and healthcheck_result and has_field_mapping
+        
+        return status
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка получения статуса AmoCRM: {e}")
+        return {
+            "success": False,
+            "error": f"Ошибка получения статуса: {str(e)}"
+        } 

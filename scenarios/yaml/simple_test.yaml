@@ -1,0 +1,52 @@
+# === ПРОСТОЙ ТЕСТОВЫЙ СЦЕНАРИЙ ===
+# Демонстрирует новый YAML формат для Universal Agent Platform
+
+scenario_id: simple_yaml_test
+description: "Простой тест YAML сценария"
+
+initial_context:
+  test_data: {}
+  message_count: 0
+
+steps:
+  # Начальный шаг
+  - id: start
+    type: start
+    next_step: send_welcome
+
+  # Отправляем приветствие
+  - id: send_welcome
+    type: telegram_send_message
+    params:
+      chat_id: "${chat_id}"
+      text: |
+        🎯 Тест YAML сценария!
+        
+        Новый формат работает отлично!
+        
+        Напишите что-нибудь для продолжения...
+      parse_mode: HTML
+    next_step: wait_input
+
+  # Ждем ввод от пользователя
+  - id: wait_input
+    type: input
+    params:
+      variable: user_message
+      save_to: test_data.message
+    next_step: respond
+
+  # Отвечаем пользователю
+  - id: respond
+    type: telegram_send_message
+    params:
+      chat_id: "${chat_id}"
+      text: |
+        ✅ Получено: "${user_message}"
+        
+        YAML сценарий работает!
+    next_step: end
+
+  # Завершение
+  - id: end
+    type: end 

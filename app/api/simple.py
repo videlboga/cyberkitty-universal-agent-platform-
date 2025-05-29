@@ -592,4 +592,133 @@ async def execute_step(
             success=False,
             context=request.context,
             error=str(e)
-        ) 
+        )
+
+
+# === УПРАВЛЕНИЕ КАНАЛАМИ ===
+
+@router.post("/channels/{channel_id}/start")
+async def start_channel(channel_id: str):
+    """
+    Запускает конкретный канал.
+    
+    НОВАЯ АРХИТЕКТУРА: каналы запускаются по требованию!
+    """
+    try:
+        from app.simple_main import get_channel_manager
+        channel_manager = get_channel_manager()
+        
+        if not channel_manager:
+            return {"success": False, "error": "ChannelManager не инициализирован"}
+        
+        # Загружаем канал из БД
+        await channel_manager._load_specific_channel(channel_id)
+        
+        # Создаем движок для канала
+        await channel_manager._create_channel_engine(channel_id)
+        
+        # Запускаем поллинг
+        channel_data = channel_manager.channels.get(channel_id)
+        if channel_data:
+            await channel_manager._start_channel_polling(channel_id, channel_data)
+            return {
+                "success": True, 
+                "message": f"Канал {channel_id} запущен",
+                "channel_type": channel_data.get("channel_type"),
+                "start_scenario_id": channel_data.get("start_scenario_id")
+            }
+        else:
+            return {"success": False, "error": f"Канал {channel_id} не найден в БД"}
+            
+    except Exception as e:
+        logger.error(f"❌ Ошибка запуска канала {channel_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+@router.post("/channels/{channel_id}/stop")
+async def stop_channel(channel_id: str):
+    """Останавливает конкретный канал."""
+    try:
+        from app.simple_main import get_channel_manager
+        channel_manager = get_channel_manager()
+        
+        if not channel_manager:
+            return {"success": False, "error": "ChannelManager не инициализирован"}
+        
+        await channel_manager._stop_channel_polling(channel_id)
+        
+        return {"success": True, "message": f"Канал {channel_id} остановлен"}
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка остановки канала {channel_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+@router.post("/channels/{channel_id}/restart")
+async def restart_channel(channel_id: str):
+    """Перезапускает конкретный канал."""
+    try:
+        from app.simple_main import get_channel_manager
+        channel_manager = get_channel_manager()
+        
+        if not channel_manager:
+            return {"success": False, "error": "ChannelManager не инициализирован"}
+        
+        # Останавливаем
+        await channel_manager._stop_channel_polling(channel_id)
+        
+        # Перезагружаем из БД
+        await channel_manager._load_specific_channel(channel_id)
+        
+        # Пересоздаем движок
+        await channel_manager._create_channel_engine(channel_id)
+        
+        # Запускаем заново
+        channel_data = channel_manager.channels.get(channel_id)
+        if channel_data:
+            await channel_manager._start_channel_polling(channel_id, channel_data)
+            return {
+                "success": True, 
+                "message": f"Канал {channel_id} перезапущен",
+                "channel_type": channel_data.get("channel_type"),
+                "start_scenario_id": channel_data.get("start_scenario_id")
+            }
+        else:
+            return {"success": False, "error": f"Канал {channel_id} не найден в БД"}
+            
+    except Exception as e:
+        logger.error(f"❌ Ошибка перезапуска канала {channel_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+@router.get("/channels")
+async def list_channels():
+    """Возвращает список всех каналов."""
+    try:
+        from app.simple_main import get_channel_manager
+        channel_manager = get_channel_manager()
+        
+        if not channel_manager:
+            return {"success": False, "error": "ChannelManager не инициализирован"}
+        
+        # Загружаем все каналы из БД
+        await channel_manager._load_channels_from_db()
+        
+        channels_info = []
+        for channel_id, channel_data in channel_manager.channels.items():
+            is_active = channel_id in channel_manager.polling_tasks
+            channels_info.append({
+                "channel_id": channel_id,
+                "channel_type": channel_data.get("channel_type"),
+                "start_scenario_id": channel_data.get("start_scenario_id"),
+                "is_active": is_active,
+                "description": channel_data.get("settings", {}).get("description", "")
+            })
+        
+        return {
+            "success": True,
+            "channels": channels_info,
+            "total": len(channels_info),
+            "active": len(channel_manager.polling_tasks)
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка получения списка каналов: {e}")
+        return {"success": False, "error": str(e)} 

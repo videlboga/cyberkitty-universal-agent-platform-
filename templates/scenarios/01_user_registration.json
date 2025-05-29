@@ -1,0 +1,153 @@
+{
+  "scenario_id": "user_registration",
+  "version": "1.0",
+  "description": "Регистрация пользователя: проверка в БД, создание профиля, контакта и сделки в AmoCRM",
+  "author": "KittyCore Universal Agent Platform",
+  
+  "initial_context": {
+    "stage": 0,
+    "subscription_level": 0,
+    "dialog_context": []
+  },
+  
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "check_user_exists"
+    },
+    {
+      "id": "check_user_exists",
+      "type": "mongo_find_one_document",
+      "params": {
+        "collection": "users",
+        "filter": {"user_id": "{user_id}"},
+        "output_var": "existing_user"
+      },
+      "next_step": "branch_user_exists"
+    },
+    {
+      "id": "branch_user_exists",
+      "type": "branch",
+      "params": {
+        "condition": "{existing_user.found}",
+        "true_step": "load_user_profile",
+        "false_step": "create_user_profile"
+      }
+    },
+    {
+      "id": "load_user_profile",
+      "type": "log_message",
+      "params": {
+        "message": "👋 Добро пожаловать обратно! Продолжаем с этапа {existing_user.document.stage}",
+        "level": "info"
+      },
+      "next_step": "route_by_stage"
+    },
+    {
+      "id": "create_user_profile",
+      "type": "mongo_insert_document",
+      "params": {
+        "collection": "users",
+        "document": {
+          "user_id": "{user_id}",
+          "chat_id": "{chat_id}",
+          "stage": 0,
+          "subscription_level": 0,
+          "amocrm_contact_id": null,
+          "amocrm_lead_id": null,
+          "profile": {
+            "name": "",
+            "phone": "",
+            "email": "",
+            "position": "",
+            "company": "",
+            "tg_username": "{username}",
+            "first_name": "{first_name}",
+            "last_name": "{last_name}"
+          },
+          "dialog_context": [],
+          "created_at": "{current_datetime}",
+          "updated_at": "{current_datetime}"
+        },
+        "output_var": "created_user"
+      },
+      "next_step": "welcome_new_user"
+    },
+    {
+      "id": "welcome_new_user",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "🎉 Добро пожаловать! Давайте знакомиться.\n\nЯ помогу вам пройти диагностику и подобрать оптимальную программу развития.\n\nНачнем с нескольких вопросов о вас:",
+        "output_var": "welcome_sent"
+      },
+      "next_step": "start_questionnaire"
+    },
+    {
+      "id": "start_questionnaire",
+      "type": "switch_scenario",
+      "params": {
+        "scenario_id": "user_questionnaire",
+        "preserve_context": true
+      }
+    },
+    {
+      "id": "route_by_stage",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.existing_user.document.stage == 0",
+            "next_step_id": "start_questionnaire"
+          },
+          {
+            "condition": "context.existing_user.document.stage == 1", 
+            "next_step_id": "start_diagnosis"
+          },
+          {
+            "condition": "context.existing_user.document.stage == 2",
+            "next_step_id": "check_subscription_status"
+          }
+        ],
+        "default_next_step_id": "unknown_stage"
+      }
+    },
+    {
+      "id": "start_diagnosis",
+      "type": "switch_scenario",
+      "params": {
+        "scenario_id": "user_diagnosis",
+        "preserve_context": true
+      }
+    },
+    {
+      "id": "check_subscription_status",
+      "type": "switch_scenario",
+      "params": {
+        "scenario_id": "subscription_check",
+        "preserve_context": true
+      }
+    },
+    {
+      "id": "unknown_stage",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "🤔 Произошла ошибка в определении вашего этапа. Обратитесь к администратору.",
+        "output_var": "error_sent"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  
+  "requirements": {
+    "plugins": ["MongoPlugin", "SimpleTelegramPlugin", "SimpleAmoCRMPlugin"],
+    "context_variables": ["user_id", "chat_id"],
+    "collections": ["users"]
+  }
+} 

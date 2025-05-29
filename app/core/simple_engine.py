@@ -172,13 +172,16 @@ class SimpleScenarioEngine:
             "switch_scenario": self._handle_switch_scenario,  # Переключение сценариев
             "log_message": self._handle_log_message,  # Логирование сообщений
             
-            # === УНИВЕРСАЛЬНЫЕ ОБРАБОТЧИКИ КАНАЛОВ ===
-            "channel_send_message": self._handle_channel_send_message,
-            "channel_send_buttons": self._handle_channel_send_buttons,
-            "channel_edit_message": self._handle_channel_edit_message,
-            "channel_start_polling": self._handle_channel_start_polling,
-            "channel_update_token": self._handle_channel_update_token,
-            "channel_load_token": self._handle_channel_load_token,
+            # === УНИВЕРСАЛЬНЫЙ ХЕНДЛЕР КАНАЛОВ ===
+            "channel_action": self._handle_channel_action,  # Универсальные действия с каналами
+            
+            # === СПЕЦИФИЧНЫЕ ХЕНДЛЕРЫ ДЛЯ СИСТЕМЫ ПОЛЬЗОВАТЕЛЕЙ ===
+            "extract_telegram_context": self._handle_extract_telegram_context,
+            "validate_field": self._handle_validate_field,
+            "increment": self._handle_increment,
+            "save_to_object": self._handle_save_to_object,
+            "build_diagnosis_prompt": self._handle_build_diagnosis_prompt,
+            "route_callback": self._handle_route_callback,
         })
         self.logger.info("Зарегистрированы современные обработчики", handlers=list(self.step_handlers.keys()))
         
@@ -780,274 +783,350 @@ class SimpleScenarioEngine:
         
         return await handler(fake_step, context)
     
-    # ===== НОВЫЕ УНИВЕРСАЛЬНЫЕ ОБРАБОТЧИКИ КАНАЛОВ =====
+    # === СПЕЦИФИЧНЫЕ ХЕНДЛЕРЫ ДЛЯ СИСТЕМЫ ПОЛЬЗОВАТЕЛЕЙ ===
     
-    async def _handle_channel_send_message(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Универсальный обработчик отправки сообщения через канал
-        
-        Параметры шага:
-        - channel_id: ID канала (обязательно)
-        - chat_id: ID чата (обязательно)
-        - text: Текст сообщения (обязательно)
-        - parse_mode: Режим парсинга (опционально)
-        - output_var: Переменная для сохранения результата (опционально)
-        """
-        params = step.get("params", {})
-        
+    async def _handle_extract_telegram_context(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Извлекает данные из Telegram update."""
         try:
-            channel_id = self._resolve_template(str(params.get("channel_id", "")), context)
-            chat_id = self._resolve_template(str(params.get("chat_id", "")), context)
-            text = self._resolve_template(str(params.get("text", "")), context)
+            telegram_update = context.get("telegram_update", {})
             
-            if not channel_id:
-                raise ValueError("channel_id обязателен для channel_send_message")
-            if not chat_id:
-                raise ValueError("chat_id обязателен для channel_send_message")
-            if not text:
-                raise ValueError("text обязателен для channel_send_message")
+            # Извлекаем основные данные
+            telegram_data = {
+                "type": "unknown",
+                "user_id": None,
+                "chat_id": None,
+                "username": None,
+                "first_name": None,
+                "last_name": None,
+                "text": None,
+                "callback_data": None
+            }
             
-            # Получаем ChannelManager из движка
-            channel_manager = getattr(self, 'channel_manager', None)
-            if not channel_manager:
-                raise ValueError("ChannelManager не инициализирован в движке")
+            # Обработка сообщения
+            if "message" in telegram_update:
+                message = telegram_update["message"]
+                telegram_data["type"] = "message"
+                telegram_data["text"] = message.get("text", "")
+                
+                if "from" in message:
+                    user = message["from"]
+                    telegram_data["user_id"] = str(user.get("id", ""))
+                    telegram_data["username"] = user.get("username", "")
+                    telegram_data["first_name"] = user.get("first_name", "")
+                    telegram_data["last_name"] = user.get("last_name", "")
+                
+                if "chat" in message:
+                    telegram_data["chat_id"] = str(message["chat"].get("id", ""))
             
-            # Подготавливаем дополнительные параметры
-            kwargs = {}
-            if "parse_mode" in params:
-                kwargs["parse_mode"] = params["parse_mode"]
+            # Обработка callback query
+            elif "callback_query" in telegram_update:
+                callback = telegram_update["callback_query"]
+                telegram_data["type"] = "callback_query"
+                telegram_data["callback_data"] = callback.get("data", "")
+                
+                if "from" in callback:
+                    user = callback["from"]
+                    telegram_data["user_id"] = str(user.get("id", ""))
+                    telegram_data["username"] = user.get("username", "")
+                    telegram_data["first_name"] = user.get("first_name", "")
+                    telegram_data["last_name"] = user.get("last_name", "")
+                
+                if "message" in callback and "chat" in callback["message"]:
+                    telegram_data["chat_id"] = str(callback["message"]["chat"].get("id", ""))
             
-            # Отправляем сообщение через ChannelManager
-            result = await channel_manager.send_message(channel_id, chat_id, text, **kwargs)
+            # Сохраняем результат
+            output_var = step.get("params", {}).get("output_var", "telegram_data")
+            context[output_var] = telegram_data
             
-            # Сохраняем результат в контекст
-            output_var = params.get("output_var", "channel_send_result")
-            context[output_var] = result
-            
-            self.logger.info(f"✅ Сообщение отправлено через канал {channel_id}")
+            self.logger.info(f"✅ Telegram контекст извлечен: {telegram_data['type']}")
             return context
             
         except Exception as e:
-            self.logger.error(f"❌ Ошибка channel_send_message: {e}")
+            self.logger.error(f"❌ Ошибка extract_telegram_context: {e}")
             context["__step_error__"] = str(e)
             return context
     
-    async def _handle_channel_send_buttons(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Универсальный обработчик отправки сообщения с кнопками через канал
-        
-        Параметры шага:
-        - channel_id: ID канала (обязательно)
-        - chat_id: ID чата (обязательно)
-        - text: Текст сообщения (обязательно)
-        - buttons: Массив кнопок (обязательно)
-        - output_var: Переменная для сохранения результата (опционально)
-        """
-        params = step.get("params", {})
-        
+    async def _handle_validate_field(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Валидирует поле пользователя."""
         try:
-            channel_id = self._resolve_template(str(params.get("channel_id", "")), context)
-            chat_id = self._resolve_template(str(params.get("chat_id", "")), context)
-            text = self._resolve_template(str(params.get("text", "")), context)
-            buttons = params.get("buttons", [])
+            params = step.get("params", {})
+            field = params.get("field", "")
+            value = params.get("value", "")
+            validation = params.get("validation", "required")
             
-            if not channel_id:
-                raise ValueError("channel_id обязателен для channel_send_buttons")
-            if not chat_id:
-                raise ValueError("chat_id обязателен для channel_send_buttons")
-            if not text:
-                raise ValueError("text обязателен для channel_send_buttons")
-            if not buttons:
-                raise ValueError("buttons обязательны для channel_send_buttons")
+            result = {"valid": True, "error": ""}
             
-            # Получаем ChannelManager из движка
-            channel_manager = getattr(self, 'channel_manager', None)
-            if not channel_manager:
-                raise ValueError("ChannelManager не инициализирован в движке")
+            # Базовая валидация
+            if validation == "required" and not value.strip():
+                result = {"valid": False, "error": "Поле обязательно для заполнения"}
             
-            # Отправляем сообщение с кнопками через ChannelManager
-            result = await channel_manager.send_buttons(channel_id, chat_id, text, buttons)
+            elif validation == "phone":
+                import re
+                phone_pattern = r'^[\+]?[1-9][\d]{0,15}$'
+                if not re.match(phone_pattern, value.replace(" ", "").replace("-", "")):
+                    result = {"valid": False, "error": "Неверный формат номера телефона"}
             
-            # Сохраняем результат в контекст
-            output_var = params.get("output_var", "channel_send_buttons_result")
+            elif validation == "email":
+                import re
+                email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+                if not re.match(email_pattern, value):
+                    result = {"valid": False, "error": "Неверный формат email"}
+            
+            elif validation == "optional":
+                result = {"valid": True, "error": ""}
+            
+            # Сохраняем результат
+            output_var = params.get("output_var", "validation_result")
             context[output_var] = result
             
-            self.logger.info(f"✅ Сообщение с кнопками отправлено через канал {channel_id}")
+            self.logger.info(f"✅ Валидация поля {field}: {result['valid']}")
             return context
             
         except Exception as e:
-            self.logger.error(f"❌ Ошибка channel_send_buttons: {e}")
+            self.logger.error(f"❌ Ошибка validate_field: {e}")
             context["__step_error__"] = str(e)
             return context
     
-    async def _handle_channel_edit_message(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Универсальный обработчик редактирования сообщения через канал
-        
-        Параметры шага:
-        - channel_id: ID канала (обязательно)
-        - chat_id: ID чата (обязательно)
-        - message_id: ID сообщения (обязательно)
-        - text: Новый текст (обязательно)
-        - output_var: Переменная для сохранения результата (опционально)
-        """
-        params = step.get("params", {})
-        
+    async def _handle_increment(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Увеличивает значение переменной на 1."""
         try:
-            channel_id = self._resolve_template(str(params.get("channel_id", "")), context)
-            chat_id = self._resolve_template(str(params.get("chat_id", "")), context)
-            message_id = params.get("message_id")
-            text = self._resolve_template(str(params.get("text", "")), context)
+            params = step.get("params", {})
+            variable = params.get("variable", "")
             
-            if not channel_id:
-                raise ValueError("channel_id обязателен для channel_edit_message")
-            if not chat_id:
-                raise ValueError("chat_id обязателен для channel_edit_message")
-            if not message_id:
-                raise ValueError("message_id обязателен для channel_edit_message")
-            if not text:
-                raise ValueError("text обязателен для channel_edit_message")
+            if variable in context:
+                current_value = context[variable]
+                if isinstance(current_value, (int, float)):
+                    new_value = current_value + 1
+                else:
+                    new_value = 1
+            else:
+                new_value = 1
             
-            # Получаем ChannelManager из движка
-            channel_manager = getattr(self, 'channel_manager', None)
-            if not channel_manager:
-                raise ValueError("ChannelManager не инициализирован в движке")
+            context[variable] = new_value
             
-            # Редактируем сообщение через ChannelManager
-            result = await channel_manager.edit_message(channel_id, chat_id, int(message_id), text)
+            # Сохраняем результат в output_var если указан
+            output_var = params.get("output_var")
+            if output_var:
+                context[output_var] = new_value
             
-            # Сохраняем результат в контекст
-            output_var = params.get("output_var", "channel_edit_result")
-            context[output_var] = result
-            
-            self.logger.info(f"✅ Сообщение отредактировано через канал {channel_id}")
+            self.logger.info(f"✅ Переменная {variable} увеличена до {new_value}")
             return context
             
         except Exception as e:
-            self.logger.error(f"❌ Ошибка channel_edit_message: {e}")
+            self.logger.error(f"❌ Ошибка increment: {e}")
             context["__step_error__"] = str(e)
             return context
     
-    async def _handle_channel_start_polling(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Обработчик запуска polling для канала
-        
-        Параметры шага:
-        - channel_id: ID канала (обязательно)
-        - output_var: Переменная для сохранения результата (опционально)
-        """
-        params = step.get("params", {})
-        
+    async def _handle_save_to_object(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Сохраняет значение в объект."""
         try:
-            channel_id = self._resolve_template(str(params.get("channel_id", "")), context)
+            params = step.get("params", {})
+            object_name = params.get("object", "")
+            key = params.get("key", "")
+            value = params.get("value", "")
             
-            if not channel_id:
-                raise ValueError("channel_id обязателен для channel_start_polling")
+            # Инициализируем объект если его нет
+            if object_name not in context:
+                context[object_name] = {}
             
-            # Получаем ChannelManager из движка
-            channel_manager = getattr(self, 'channel_manager', None)
-            if not channel_manager:
-                raise ValueError("ChannelManager не инициализирован в движке")
+            # Сохраняем значение
+            context[object_name][key] = value
             
-            # Запускаем polling через ChannelManager
-            # Примечание: polling обычно уже запущен при инициализации
-            result = {"success": True, "message": f"Polling для канала {channel_id} активен"}
+            # Сохраняем результат в output_var если указан
+            output_var = params.get("output_var")
+            if output_var:
+                context[output_var] = {"success": True}
             
-            # Сохраняем результат в контекст
-            output_var = params.get("output_var", "channel_polling_result")
-            context[output_var] = result
-            
-            self.logger.info(f"✅ Polling активен для канала {channel_id}")
+            self.logger.info(f"✅ Значение сохранено в {object_name}.{key}")
             return context
             
         except Exception as e:
-            self.logger.error(f"❌ Ошибка channel_start_polling: {e}")
+            self.logger.error(f"❌ Ошибка save_to_object: {e}")
             context["__step_error__"] = str(e)
             return context
     
-    async def _handle_channel_update_token(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Обработчик обновления токена канала
-        
-        Параметры шага:
-        - channel_id: ID канала (обязательно)
-        - new_token: Новый токен (обязательно)
-        - output_var: Переменная для сохранения результата (опционально)
-        """
-        params = step.get("params", {})
-        
+    async def _handle_build_diagnosis_prompt(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Строит промпт для диагностики."""
         try:
-            channel_id = self._resolve_template(str(params.get("channel_id", "")), context)
-            new_token = self._resolve_template(str(params.get("new_token", "")), context)
+            params = step.get("params", {})
+            user_profile = params.get("user_profile", {})
+            diagnosis_answers = params.get("diagnosis_answers", {})
             
-            if not channel_id:
-                raise ValueError("channel_id обязателен для channel_update_token")
-            if not new_token:
-                raise ValueError("new_token обязателен для channel_update_token")
+            # Форматируем ответы
+            formatted_answers = ""
+            for answer_id, answer_data in diagnosis_answers.items():
+                if isinstance(answer_data, dict):
+                    question = answer_data.get("question", "")
+                    answer = answer_data.get("answer", "")
+                    category = answer_data.get("category", "")
+                    formatted_answers += f"\n{category.upper()}: {question}\nОтвет: {answer}\n"
             
-            # Получаем ChannelManager из движка
-            channel_manager = getattr(self, 'channel_manager', None)
-            if not channel_manager:
-                raise ValueError("ChannelManager не инициализирован в движке")
+            result = {
+                "formatted_answers": formatted_answers,
+                "user_profile": user_profile
+            }
             
-            # Обновляем токен через ChannelManager
-            result = await channel_manager.update_channel_token(channel_id, new_token)
-            
-            # Сохраняем результат в контекст
-            output_var = params.get("output_var", "channel_update_token_result")
+            # Сохраняем результат
+            output_var = params.get("output_var", "llm_prompt")
             context[output_var] = result
             
-            self.logger.info(f"✅ Токен обновлен для канала {channel_id}")
+            self.logger.info("✅ Промпт для диагностики построен")
             return context
             
         except Exception as e:
-            self.logger.error(f"❌ Ошибка channel_update_token: {e}")
+            self.logger.error(f"❌ Ошибка build_diagnosis_prompt: {e}")
             context["__step_error__"] = str(e)
             return context
     
-    async def _handle_channel_load_token(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Обработчик загрузки токена канала из БД
-        
-        Параметры шага:
-        - channel_id: ID канала (обязательно)
-        - output_var: Переменная для сохранения токена (опционально)
-        """
-        params = step.get("params", {})
-        
+    async def _handle_route_callback(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Маршрутизирует callback к соответствующему сценарию."""
         try:
-            channel_id = self._resolve_template(str(params.get("channel_id", "")), context)
+            params = step.get("params", {})
+            callback_data = params.get("callback_data", "")
+            user_id = params.get("user_id", "")
+            chat_id = params.get("chat_id", "")
             
-            if not channel_id:
-                raise ValueError("channel_id обязателен для channel_load_token")
+            # Простая маршрутизация по callback_data
+            route_map = {
+                "confirm_restart": {"scenario_id": "user_registration", "context": {"restart": True}},
+                "cancel_restart": {"scenario_id": "telegram_main_router", "context": {"action": "cancel"}},
+                "subscribe_basic": {"scenario_id": "subscription_check", "context": {"subscription_level": 1}},
+                "subscribe_premium": {"scenario_id": "subscription_check", "context": {"subscription_level": 2}},
+                "subscribe_vip": {"scenario_id": "subscription_check", "context": {"subscription_level": 3}},
+                "subscription_questions": {"scenario_id": "subscription_questions_dialog", "context": {}},
+                "subscription_later": {"scenario_id": "subscription_check", "context": {"action": "later"}},
+            }
             
-            # Получаем ChannelManager из движка
-            channel_manager = getattr(self, 'channel_manager', None)
-            if not channel_manager:
-                raise ValueError("ChannelManager не инициализирован в движке")
+            route = route_map.get(callback_data, {
+                "scenario_id": "telegram_main_router",
+                "context": {"unknown_callback": callback_data}
+            })
             
-            # Получаем информацию о канале
-            channel_info = channel_manager.get_channel_info(channel_id)
-            if not channel_info:
-                raise ValueError(f"Канал {channel_id} не найден")
+            # Сохраняем результат
+            output_var = params.get("output_var", "callback_route")
+            context[output_var] = route
             
-            # Извлекаем токен
-            token = channel_info.get("channel_config", {}).get("telegram_bot_token")
-            if not token:
-                raise ValueError(f"Токен не найден для канала {channel_id}")
-            
-            result = {"success": True, "token": token}
-            
-            # Сохраняем результат в контекст
-            output_var = params.get("output_var", "channel_token")
-            context[output_var] = result
-            
-            self.logger.info(f"✅ Токен загружен для канала {channel_id}")
+            self.logger.info(f"✅ Callback {callback_data} маршрутизирован к {route['scenario_id']}")
             return context
             
         except Exception as e:
-            self.logger.error(f"❌ Ошибка channel_load_token: {e}")
+            self.logger.error(f"❌ Ошибка route_callback: {e}")
             context["__step_error__"] = str(e)
+            return context
+
+    async def _handle_channel_action(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Универсальный обработчик действий с каналами.
+        
+        НОВАЯ АРХИТЕКТУРА: Напрямую вызывает ChannelManager!
+        
+        Поддерживаемые действия:
+        - send_message: отправка сообщения
+        - send_buttons: отправка сообщения с кнопками  
+        - edit_message: редактирование сообщения
+        
+        Пример шага:
+        {
+            "type": "channel_action",
+            "params": {
+                "action": "send_message",
+                "chat_id": "{chat_id}",
+                "text": "Привет!",
+                "parse_mode": "HTML"
+            }
+        }
+        """
+        try:
+            params = step.get("params", {})
+            action = params.get("action", "")
+            
+            if not action:
+                raise ValueError("Не указано действие (action) для channel_action")
+            
+            # Получаем channel_id из контекста
+            channel_id = context.get("channel_id")
+            if not channel_id:
+                raise ValueError("Не указан channel_id в контексте")
+            
+            # Получаем ChannelManager из глобального состояния
+            from app.simple_main import get_channel_manager
+            channel_manager = get_channel_manager()
+            
+            if not channel_manager:
+                raise ValueError("ChannelManager не инициализирован")
+            
+            # Подставляем переменные в параметры
+            resolved_params = {}
+            for key, value in params.items():
+                if key != "action":  # action не подставляем
+                    if isinstance(value, str):
+                        resolved_params[key] = self._resolve_template(value, context)
+                    else:
+                        resolved_params[key] = value
+            
+            # Выполняем действие через ChannelManager
+            result = None
+            
+            if action == "send_message":
+                chat_id = resolved_params.get("chat_id")
+                text = resolved_params.get("text")
+                if not chat_id or not text:
+                    raise ValueError("Для send_message требуются chat_id и text")
+                
+                # Подготавливаем дополнительные параметры
+                kwargs = {k: v for k, v in resolved_params.items() 
+                         if k not in ["chat_id", "text"]}
+                
+                result = await channel_manager.send_message(channel_id, chat_id, text, **kwargs)
+                
+            elif action == "send_buttons":
+                chat_id = resolved_params.get("chat_id")
+                text = resolved_params.get("text")
+                buttons = resolved_params.get("buttons")
+                if not chat_id or not text or not buttons:
+                    raise ValueError("Для send_buttons требуются chat_id, text и buttons")
+                
+                # Подготавливаем дополнительные параметры
+                kwargs = {k: v for k, v in resolved_params.items() 
+                         if k not in ["chat_id", "text", "buttons"]}
+                
+                result = await channel_manager.send_buttons(channel_id, chat_id, text, buttons, **kwargs)
+                
+            elif action == "edit_message":
+                chat_id = resolved_params.get("chat_id")
+                message_id = resolved_params.get("message_id")
+                text = resolved_params.get("text")
+                if not chat_id or not message_id or not text:
+                    raise ValueError("Для edit_message требуются chat_id, message_id и text")
+                
+                # Подготавливаем дополнительные параметры
+                kwargs = {k: v for k, v in resolved_params.items() 
+                         if k not in ["chat_id", "message_id", "text"]}
+                
+                result = await channel_manager.edit_message(channel_id, chat_id, int(message_id), text, **kwargs)
+                
+            else:
+                raise ValueError(f"Неподдерживаемое действие: {action}")
+            
+            # Сохраняем результат в контекст
+            output_var = params.get("output_var", "channel_action_result")
+            context[output_var] = result
+            
+            # Добавляем информацию об успехе
+            if result and result.get("success"):
+                context["channel_action_success"] = True
+                self.logger.info(f"✅ Действие {action} выполнено успешно через ChannelManager")
+            else:
+                context["channel_action_success"] = False
+                context["channel_action_error"] = result.get("error", "Unknown error") if result else "No result"
+                self.logger.error(f"❌ Ошибка выполнения действия {action}: {context.get('channel_action_error')}")
+            
+            return context
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка channel_action: {e}")
+            context["channel_action_success"] = False
+            context["channel_action_error"] = str(e)
             return context
 
 
@@ -1160,17 +1239,17 @@ async def create_engine() -> SimpleScenarioEngine:
     """
     Создаёт и настраивает SimpleScenarioEngine с плагинами.
     
-    Заменяет simple_dependencies.get_simple_engine() для явной инициализации.
-    Принцип: ПРОСТОТА ПРЕВЫШЕ ВСЕГО - никаких синглтонов!
+    НОВАЯ АРХИТЕКТУРА: Каждый вызов создает НОВЫЙ движок!
+    Это позволяет каждому каналу иметь свой изолированный движок.
     
     Returns:
         SimpleScenarioEngine: Настроенный движок с плагинами
     """
     from loguru import logger
     
-    logger.info("🔧 Создание SimpleScenarioEngine...")
+    logger.info("🔧 Создание нового SimpleScenarioEngine...")
     
-    # Создаем движок
+    # Создаем НОВЫЙ движок для каждого вызова
     engine = SimpleScenarioEngine()
     
     # === ИНИЦИАЛИЗАЦИЯ ПЛАГИНОВ ===
@@ -1190,19 +1269,11 @@ async def create_engine() -> SimpleScenarioEngine:
     except Exception as e:
         logger.warning(f"⚠️ MongoDB Plugin недоступен: {e}")
     
-    try:
-        # 2. Telegram Plugin - для работы с Telegram
-        logger.info("📦 Регистрация SimpleTelegram Plugin...")
-        from app.plugins.simple_telegram_plugin import SimpleTelegramPlugin
-        telegram_plugin = SimpleTelegramPlugin()
-        engine.register_plugin(telegram_plugin)
-        plugins_to_initialize.append(telegram_plugin)
-        logger.info("✅ SimpleTelegram Plugin зарегистрирован")
-    except Exception as e:
-        logger.warning(f"⚠️ SimpleTelegram Plugin недоступен: {e}")
+    # TELEGRAM ПЛАГИН УДАЛЕН - НЕ РЕГИСТРИРУЕМ АВТОМАТИЧЕСКИ!
+    # Telegram интеграция должна быть опциональной и настраиваться через API
     
     try:
-        # 3. LLM Plugin - для работы с языковыми моделями
+        # 2. LLM Plugin - для работы с языковыми моделями
         logger.info("📦 Регистрация SimpleLLM Plugin...")
         from app.plugins.simple_llm_plugin import SimpleLLMPlugin
         llm_plugin = SimpleLLMPlugin()
@@ -1213,7 +1284,7 @@ async def create_engine() -> SimpleScenarioEngine:
         logger.warning(f"⚠️ SimpleLLM Plugin недоступен: {e}")
     
     try:
-        # 4. RAG Plugin - для работы с базой знаний
+        # 3. RAG Plugin - для работы с базой знаний
         logger.info("📦 Регистрация SimpleRAG Plugin...")
         from app.plugins.simple_rag_plugin import SimpleRAGPlugin
         rag_plugin = SimpleRAGPlugin()
@@ -1224,7 +1295,7 @@ async def create_engine() -> SimpleScenarioEngine:
         logger.warning(f"⚠️ SimpleRAG Plugin недоступен: {e}")
     
     try:
-        # 5. Scheduler Plugin - для отложенного выполнения задач
+        # 4. Scheduler Plugin - для отложенного выполнения задач
         logger.info("📦 Регистрация SimpleScheduler Plugin...")
         from app.plugins.simple_scheduler_plugin import SimpleSchedulerPlugin
         scheduler_plugin = SimpleSchedulerPlugin()
@@ -1235,7 +1306,7 @@ async def create_engine() -> SimpleScenarioEngine:
         logger.warning(f"⚠️ SimpleScheduler Plugin недоступен: {e}")
     
     try:
-        # 6. HTTP Plugin - для внешних HTTP запросов
+        # 5. HTTP Plugin - для внешних HTTP запросов
         logger.info("📦 Регистрация SimpleHTTP Plugin...")
         from app.plugins.simple_http_plugin import SimpleHTTPPlugin
         http_plugin = SimpleHTTPPlugin()
@@ -1246,7 +1317,7 @@ async def create_engine() -> SimpleScenarioEngine:
         logger.warning(f"⚠️ SimpleHTTP Plugin недоступен: {e}")
     
     try:
-        # 7. AmoCRM Plugin - для интеграции с AmoCRM
+        # 6. AmoCRM Plugin - для интеграции с AmoCRM
         logger.info("📦 Регистрация SimpleAmoCRM Plugin...")
         from app.plugins.simple_amocrm_plugin import SimpleAmoCRMPlugin
         amocrm_plugin = SimpleAmoCRMPlugin()
@@ -1257,7 +1328,7 @@ async def create_engine() -> SimpleScenarioEngine:
         logger.warning(f"⚠️ SimpleAmoCRM Plugin недоступен: {e}")
     
     try:
-        # 8. AmoCRM Companies Plugin - для работы с компаниями
+        # 7. AmoCRM Companies Plugin - для работы с компаниями
         logger.info("📦 Регистрация SimpleAmoCRM Companies Plugin...")
         from app.plugins.simple_amocrm_companies import SimpleAmoCRMCompaniesPlugin
         amocrm_companies_plugin = SimpleAmoCRMCompaniesPlugin()
@@ -1268,7 +1339,7 @@ async def create_engine() -> SimpleScenarioEngine:
         logger.warning(f"⚠️ SimpleAmoCRM Companies Plugin недоступен: {e}")
     
     try:
-        # 9. AmoCRM Tasks Plugin - для работы с задачами и событиями
+        # 8. AmoCRM Tasks Plugin - для работы с задачами и событиями
         logger.info("📦 Регистрация SimpleAmoCRM Tasks Plugin...")
         from app.plugins.simple_amocrm_tasks import SimpleAmoCRMTasksPlugin
         amocrm_tasks_plugin = SimpleAmoCRMTasksPlugin()
@@ -1279,7 +1350,7 @@ async def create_engine() -> SimpleScenarioEngine:
         logger.warning(f"⚠️ SimpleAmoCRM Tasks Plugin недоступен: {e}")
     
     try:
-        # 10. AmoCRM Advanced Plugin - для продвинутых операций
+        # 9. AmoCRM Advanced Plugin - для продвинутых операций
         logger.info("📦 Регистрация SimpleAmoCRM Advanced Plugin...")
         from app.plugins.simple_amocrm_advanced import SimpleAmoCRMAdvancedPlugin
         amocrm_advanced_plugin = SimpleAmoCRMAdvancedPlugin()
@@ -1290,7 +1361,7 @@ async def create_engine() -> SimpleScenarioEngine:
         logger.warning(f"⚠️ SimpleAmoCRM Advanced Plugin недоступен: {e}")
     
     try:
-        # 11. AmoCRM Admin Plugin - для административных операций
+        # 10. AmoCRM Admin Plugin - для административных операций
         logger.info("📦 Регистрация SimpleAmoCRM Admin Plugin...")
         from app.plugins.simple_amocrm_admin import SimpleAmoCRMAdminPlugin
         amocrm_admin_plugin = SimpleAmoCRMAdminPlugin()
@@ -1311,6 +1382,10 @@ async def create_engine() -> SimpleScenarioEngine:
             logger.info(f"✅ {plugin.name} инициализирован")
         except Exception as e:
             logger.warning(f"⚠️ Ошибка инициализации {plugin.name}: {e}")
+    
+    # === ИНИЦИАЛИЗАЦИЯ CHANNEL MANAGER ===
+    
+    logger.info("🔧 Движок готов БЕЗ привязки к каналам (правильная архитектура)")
     
     # === ФИНАЛИЗАЦИЯ ===
     

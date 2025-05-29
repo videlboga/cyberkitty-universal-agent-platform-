@@ -1,0 +1,344 @@
+{
+  "scenario_id": "telegram_main_router",
+  "version": "1.0",
+  "description": "Главный роутер для Telegram бота - обработка всех входящих сообщений",
+  "author": "KittyCore Universal Agent Platform",
+  
+  "initial_context": {
+    "bot_commands": {
+      "/start": "user_registration",
+      "/help": "show_help",
+      "/profile": "show_profile",
+      "/status": "show_status",
+      "/restart": "restart_program"
+    }
+  },
+  
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "extract_telegram_data"
+    },
+    {
+      "id": "extract_telegram_data",
+      "type": "action",
+      "params": {
+        "action": "extract_telegram_context",
+        "telegram_update": "{telegram_update}",
+        "output_var": "telegram_data"
+      },
+      "next_step": "check_message_type"
+    },
+    {
+      "id": "check_message_type",
+      "type": "branch",
+      "params": {
+        "condition": "{telegram_data.type}",
+        "branches": {
+          "message": "handle_message",
+          "callback_query": "handle_callback",
+          "inline_query": "handle_inline"
+        },
+        "default_step": "unknown_update_type"
+      }
+    },
+    {
+      "id": "handle_message",
+      "type": "branch",
+      "params": {
+        "condition": "{telegram_data.text}",
+        "branches": {
+          "/start": "start_registration",
+          "/help": "show_help",
+          "/profile": "show_profile", 
+          "/status": "show_status",
+          "/restart": "restart_program"
+        },
+        "default_step": "handle_regular_message"
+      }
+    },
+    {
+      "id": "start_registration",
+      "type": "switch_scenario",
+      "params": {
+        "scenario_id": "user_registration",
+        "preserve_context": false,
+        "context": {
+          "user_id": "{telegram_data.user_id}",
+          "chat_id": "{telegram_data.chat_id}",
+          "username": "{telegram_data.username}",
+          "first_name": "{telegram_data.first_name}",
+          "last_name": "{telegram_data.last_name}",
+          "current_datetime": "{current_datetime}"
+        }
+      }
+    },
+    {
+      "id": "show_help",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{telegram_data.chat_id}",
+        "text": "🤖 <b>Помощь по боту</b>\n\n📋 <b>Доступные команды:</b>\n/start - Начать регистрацию\n/profile - Показать профиль\n/status - Текущий статус\n/restart - Перезапустить программу\n/help - Эта справка\n\n💬 <b>Как пользоваться:</b>\n1. Начните с команды /start\n2. Пройдите регистрацию\n3. Ответьте на вопросы диагностики\n4. Выберите подходящую подписку\n5. Следуйте программе развития\n\n📞 <b>Поддержка:</b>\nЕсли возникли вопросы - просто напишите мне!",
+        "parse_mode": "HTML",
+        "output_var": "help_sent"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "show_profile",
+      "type": "mongo_find_one_document",
+      "params": {
+        "collection": "users",
+        "filter": {"user_id": "{telegram_data.user_id}"},
+        "output_var": "user_profile"
+      },
+      "next_step": "check_profile_exists"
+    },
+    {
+      "id": "check_profile_exists",
+      "type": "branch",
+      "params": {
+        "condition": "{user_profile.found}",
+        "true_step": "send_profile_info",
+        "false_step": "profile_not_found"
+      }
+    },
+    {
+      "id": "send_profile_info",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{telegram_data.chat_id}",
+        "text": "👤 <b>Ваш профиль</b>\n\n📝 <b>Основная информация:</b>\n• Имя: {user_profile.document.profile.name}\n• Телефон: {user_profile.document.profile.phone}\n• Email: {user_profile.document.profile.email}\n• Должность: {user_profile.document.profile.position}\n• Компания: {user_profile.document.profile.company}\n\n📊 <b>Статус:</b>\n• Этап программы: {user_profile.document.stage}\n• Уровень подписки: {user_profile.document.subscription_level}\n• Дата регистрации: {user_profile.document.created_at}\n\n🔗 <b>AmoCRM:</b>\n• ID контакта: {user_profile.document.amocrm_contact_id}\n• ID сделки: {user_profile.document.amocrm_lead_id}",
+        "parse_mode": "HTML",
+        "output_var": "profile_sent"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "profile_not_found",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{telegram_data.chat_id}",
+        "text": "❌ Профиль не найден.\n\n🚀 Начните с команды /start для регистрации!",
+        "output_var": "not_found_sent"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "show_status",
+      "type": "mongo_find_one_document",
+      "params": {
+        "collection": "users",
+        "filter": {"user_id": "{telegram_data.user_id}"},
+        "output_var": "user_status"
+      },
+      "next_step": "check_status_exists"
+    },
+    {
+      "id": "check_status_exists",
+      "type": "branch",
+      "params": {
+        "condition": "{user_status.found}",
+        "true_step": "send_status_info",
+        "false_step": "status_not_found"
+      }
+    },
+    {
+      "id": "send_status_info",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{telegram_data.chat_id}",
+        "text": "📊 <b>Текущий статус</b>\n\n🎯 <b>Этап программы:</b> {user_status.document.stage}\n\n📋 <b>Описание этапа:</b>\n{stage_descriptions[user_status.document.stage]}\n\n💎 <b>Подписка:</b> {subscription_levels[user_status.document.subscription_level]}\n\n⏰ <b>Последнее обновление:</b>\n{user_status.document.updated_at}\n\n🚀 <b>Следующие шаги:</b>\n{next_steps[user_status.document.stage]}",
+        "parse_mode": "HTML",
+        "output_var": "status_sent"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "status_not_found",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{telegram_data.chat_id}",
+        "text": "❌ Статус не найден.\n\n🚀 Начните с команды /start для регистрации!",
+        "output_var": "status_not_found_sent"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "restart_program",
+      "type": "telegram_send_buttons",
+      "params": {
+        "chat_id": "{telegram_data.chat_id}",
+        "text": "🔄 <b>Перезапуск программы</b>\n\n⚠️ Вы уверены, что хотите перезапустить программу?\n\nЭто вернет вас к началу, но сохранит ваш профиль.",
+        "parse_mode": "HTML",
+        "buttons": [
+          [
+            {"text": "✅ Да, перезапустить", "callback_data": "confirm_restart"},
+            {"text": "❌ Отмена", "callback_data": "cancel_restart"}
+          ]
+        ],
+        "output_var": "restart_confirmation"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "handle_regular_message",
+      "type": "mongo_find_one_document",
+      "params": {
+        "collection": "users",
+        "filter": {"user_id": "{telegram_data.user_id}"},
+        "output_var": "current_user"
+      },
+      "next_step": "check_user_exists_for_message"
+    },
+    {
+      "id": "check_user_exists_for_message",
+      "type": "branch",
+      "params": {
+        "condition": "{current_user.found}",
+        "true_step": "route_by_user_stage",
+        "false_step": "suggest_registration"
+      }
+    },
+    {
+      "id": "route_by_user_stage",
+      "type": "branch",
+      "params": {
+        "condition": "{current_user.document.stage}",
+        "branches": {
+          "0": "continue_questionnaire",
+          "1": "continue_diagnosis",
+          "2": "continue_subscription_check"
+        },
+        "default_step": "handle_general_message"
+      }
+    },
+    {
+      "id": "continue_questionnaire",
+      "type": "switch_scenario",
+      "params": {
+        "scenario_id": "user_questionnaire",
+        "preserve_context": true,
+        "context": {
+          "user_id": "{telegram_data.user_id}",
+          "chat_id": "{telegram_data.chat_id}",
+          "user_message": "{telegram_data.text}"
+        }
+      }
+    },
+    {
+      "id": "continue_diagnosis",
+      "type": "switch_scenario",
+      "params": {
+        "scenario_id": "user_diagnosis",
+        "preserve_context": true,
+        "context": {
+          "user_id": "{telegram_data.user_id}",
+          "chat_id": "{telegram_data.chat_id}",
+          "user_message": "{telegram_data.text}"
+        }
+      }
+    },
+    {
+      "id": "continue_subscription_check",
+      "type": "switch_scenario",
+      "params": {
+        "scenario_id": "subscription_check",
+        "preserve_context": true,
+        "context": {
+          "user_id": "{telegram_data.user_id}",
+          "chat_id": "{telegram_data.chat_id}",
+          "user_message": "{telegram_data.text}"
+        }
+      }
+    },
+    {
+      "id": "handle_general_message",
+      "type": "llm_chat",
+      "params": {
+        "system_prompt": "Ты ассистент образовательной платформы. Пользователь написал сообщение вне контекста сценария. Отвечай дружелюбно и направляй к использованию команд бота или продолжению программы.",
+        "user_message": "{telegram_data.text}",
+        "model": "gpt-4",
+        "max_tokens": 200,
+        "output_var": "general_response"
+      },
+      "next_step": "send_general_response"
+    },
+    {
+      "id": "send_general_response",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{telegram_data.chat_id}",
+        "text": "{general_response.response}\n\n💡 Используйте /help для списка команд",
+        "output_var": "general_sent"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "suggest_registration",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{telegram_data.chat_id}",
+        "text": "👋 Привет! Я вижу, вы еще не зарегистрированы.\n\n🚀 Начните с команды /start для регистрации и прохождения программы развития!",
+        "output_var": "suggest_sent"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "handle_callback",
+      "type": "action",
+      "params": {
+        "action": "route_callback",
+        "callback_data": "{telegram_data.callback_data}",
+        "user_id": "{telegram_data.user_id}",
+        "chat_id": "{telegram_data.chat_id}",
+        "output_var": "callback_route"
+      },
+      "next_step": "execute_callback_scenario"
+    },
+    {
+      "id": "execute_callback_scenario",
+      "type": "switch_scenario",
+      "params": {
+        "scenario_id": "{callback_route.scenario_id}",
+        "preserve_context": true,
+        "context": {
+          "user_id": "{telegram_data.user_id}",
+          "chat_id": "{telegram_data.chat_id}",
+          "callback_data": "{telegram_data.callback_data}",
+          "callback_context": "{callback_route.context}"
+        }
+      }
+    },
+    {
+      "id": "handle_inline",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{telegram_data.chat_id}",
+        "text": "🔍 Inline запросы пока не поддерживаются.",
+        "output_var": "inline_sent"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "unknown_update_type",
+      "type": "log_message",
+      "params": {
+        "message": "Unknown Telegram update type: {telegram_data.type}",
+        "level": "warning"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  
+  "requirements": {
+    "plugins": ["MongoPlugin", "SimpleTelegramPlugin", "SimpleLLMPlugin"],
+    "context_variables": ["telegram_update"],
+    "collections": ["users"]
+  }
+} 

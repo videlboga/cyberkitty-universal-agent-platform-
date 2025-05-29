@@ -1,0 +1,280 @@
+{
+  "scenario_id": "subscription_check",
+  "version": "1.0",
+  "description": "Проверка уровня подписки и предложение покупки при необходимости",
+  "author": "KittyCore Universal Agent Platform",
+  
+  "initial_context": {
+    "required_subscription_level": 1,
+    "subscription_levels": {
+      "0": "Бесплатная",
+      "1": "Базовая", 
+      "2": "Премиум",
+      "3": "VIP"
+    }
+  },
+  
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "load_user_data"
+    },
+    {
+      "id": "load_user_data",
+      "type": "mongo_find_one_document",
+      "params": {
+        "collection": "users",
+        "filter": {"user_id": "{user_id}"},
+        "output_var": "user_data"
+      },
+      "next_step": "check_subscription_level"
+    },
+    {
+      "id": "check_subscription_level",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.user_data.document.subscription_level >= context.required_subscription_level",
+            "next_step_id": "subscription_sufficient"
+          }
+        ],
+        "default_next_step_id": "subscription_insufficient"
+      }
+    },
+    {
+      "id": "subscription_sufficient",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "✅ Отлично! У вас подписка уровня <b>{subscription_levels[user_data.document.subscription_level]}</b>\n\n🚀 Переходим к следующему этапу программы!",
+        "parse_mode": "HTML",
+        "output_var": "sufficient_sent"
+      },
+      "next_step": "proceed_to_next_stage"
+    },
+    {
+      "id": "subscription_insufficient",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "📊 Ваш текущий уровень: <b>{subscription_levels[user_data.document.subscription_level]}</b>\n\n🔒 Для продолжения программы требуется подписка уровня <b>{subscription_levels[required_subscription_level]}</b>\n\n💬 Давайте обсудим варианты подписки!",
+        "parse_mode": "HTML",
+        "output_var": "insufficient_sent"
+      },
+      "next_step": "start_subscription_dialog"
+    },
+    {
+      "id": "start_subscription_dialog",
+      "type": "llm_chat",
+      "params": {
+        "system_prompt": "Ты менеджер по продажам образовательных программ. Твоя задача - мягко и убедительно предложить пользователю подписку.\n\nИнформация о пользователе:\n- Имя: {user_data.document.profile.name}\n- Должность: {user_data.document.profile.position}\n- Компания: {user_data.document.profile.company}\n- Текущий уровень подписки: {subscription_levels[user_data.document.subscription_level]}\n- Требуемый уровень: {subscription_levels[required_subscription_level]}\n\nДиагностика пользователя:\n{user_data.document.diagnosis.result}\n\nТвой стиль:\n- Дружелюбный и профессиональный\n- Фокус на ценностях и результатах\n- Персонализированный подход\n- Не навязчивый, но убедительный\n\nПредложи пользователю подписку, объяснив преимущества и ценность. Спроси, есть ли у него вопросы.",
+        "user_message": "Расскажите о вариантах подписки",
+        "model": "gpt-4",
+        "max_tokens": 500,
+        "output_var": "subscription_offer"
+      },
+      "next_step": "send_subscription_offer"
+    },
+    {
+      "id": "send_subscription_offer",
+      "type": "telegram_send_buttons",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "{subscription_offer.response}\n\n━━━━━━━━━━━━━━━━━━━━\n\n💳 <b>Варианты подписки:</b>",
+        "parse_mode": "HTML",
+        "buttons": [
+          [{"text": "💎 Базовая подписка - 2990₽/мес", "callback_data": "subscribe_basic"}],
+          [{"text": "🌟 Премиум подписка - 4990₽/мес", "callback_data": "subscribe_premium"}],
+          [{"text": "👑 VIP подписка - 9990₽/мес", "callback_data": "subscribe_vip"}],
+          [{"text": "❓ У меня есть вопросы", "callback_data": "subscription_questions"}],
+          [{"text": "⏰ Подумаю позже", "callback_data": "subscription_later"}]
+        ],
+        "output_var": "offer_sent"
+      },
+      "next_step": "wait_for_subscription_choice"
+    },
+    {
+      "id": "wait_for_subscription_choice",
+      "type": "input",
+      "params": {
+        "input_type": "telegram_callback",
+        "timeout": 1800,
+        "output_var": "subscription_choice"
+      },
+      "next_step": "handle_subscription_choice"
+    },
+    {
+      "id": "handle_subscription_choice",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.subscription_choice.data == 'subscribe_basic'",
+            "next_step_id": "process_basic_subscription"
+          },
+          {
+            "condition": "context.subscription_choice.data == 'subscribe_premium'",
+            "next_step_id": "process_premium_subscription"
+          },
+          {
+            "condition": "context.subscription_choice.data == 'subscribe_vip'",
+            "next_step_id": "process_vip_subscription"
+          },
+          {
+            "condition": "context.subscription_choice.data == 'subscription_questions'",
+            "next_step_id": "handle_questions"
+          },
+          {
+            "condition": "context.subscription_choice.data == 'subscription_later'",
+            "next_step_id": "handle_later"
+          }
+        ],
+        "default_next_step_id": "unknown_choice"
+      }
+    },
+    {
+      "id": "process_basic_subscription",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "💎 <b>Базовая подписка выбрана!</b>\n\n📋 Что включено:\n• Доступ к основным материалам\n• Еженедельные вебинары\n• Чат поддержки\n• Базовые инструменты\n\n💳 Стоимость: 2990₽/месяц\n\n🔗 Ссылка для оплаты: [PAYMENT_LINK_BASIC]",
+        "parse_mode": "HTML",
+        "output_var": "basic_sent"
+      },
+      "next_step": "save_subscription_intent"
+    },
+    {
+      "id": "process_premium_subscription",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "🌟 <b>Премиум подписка выбрана!</b>\n\n📋 Что включено:\n• Все из Базовой\n• Персональные консультации\n• Расширенные материалы\n• Приоритетная поддержка\n• Дополнительные инструменты\n\n💳 Стоимость: 4990₽/месяц\n\n🔗 Ссылка для оплаты: [PAYMENT_LINK_PREMIUM]",
+        "parse_mode": "HTML",
+        "output_var": "premium_sent"
+      },
+      "next_step": "save_subscription_intent"
+    },
+    {
+      "id": "process_vip_subscription",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "👑 <b>VIP подписка выбрана!</b>\n\n📋 Что включено:\n• Все из Премиум\n• Индивидуальное сопровождение\n• Закрытые мероприятия\n• Персональный менеджер\n• Эксклюзивные материалы\n• Безлимитные консультации\n\n💳 Стоимость: 9990₽/месяц\n\n🔗 Ссылка для оплаты: [PAYMENT_LINK_VIP]",
+        "parse_mode": "HTML",
+        "output_var": "vip_sent"
+      },
+      "next_step": "save_subscription_intent"
+    },
+    {
+      "id": "handle_questions",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "❓ <b>Есть вопросы?</b>\n\nЗадавайте любые вопросы о подписке, и я отвечу на них!\n\n💬 Напишите ваш вопрос:",
+        "parse_mode": "HTML",
+        "output_var": "questions_sent"
+      },
+      "next_step": "start_questions_dialog"
+    },
+    {
+      "id": "start_questions_dialog",
+      "type": "switch_scenario",
+      "params": {
+        "scenario_id": "subscription_questions_dialog",
+        "preserve_context": true
+      }
+    },
+    {
+      "id": "handle_later",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "⏰ <b>Хорошо, подумайте!</b>\n\nВы можете вернуться к выбору подписки в любое время.\n\n📞 Если появятся вопросы - просто напишите мне!\n\n🔔 Напомню вам через 24 часа.",
+        "parse_mode": "HTML",
+        "output_var": "later_sent"
+      },
+      "next_step": "schedule_reminder"
+    },
+    {
+      "id": "save_subscription_intent",
+      "type": "mongo_update_document",
+      "params": {
+        "collection": "users",
+        "filter": {"user_id": "{user_id}"},
+        "update": {
+          "$set": {
+            "subscription_intent": {
+              "level": "{subscription_choice.data}",
+              "timestamp": "{current_datetime}",
+              "status": "pending_payment"
+            },
+            "updated_at": "{current_datetime}"
+          }
+        },
+        "output_var": "intent_saved"
+      },
+      "next_step": "update_amocrm_lead"
+    },
+    {
+      "id": "update_amocrm_lead",
+      "type": "amocrm_update_contact",
+      "params": {
+        "contact_id": "{user_data.document.amocrm_contact_id}",
+        "custom_fields": {
+          "Этап программы": "2",
+          "Статус подписки": "Ожидает оплаты",
+          "Выбранная подписка": "{subscription_choice.data}"
+        },
+        "used_fields_map": true,
+        "output_var": "amocrm_updated"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "schedule_reminder",
+      "type": "scheduler_create_task",
+      "params": {
+        "task_id": "subscription_reminder_{user_id}",
+        "scenario_id": "subscription_reminder",
+        "schedule_time": "{current_datetime + 24h}",
+        "context": {
+          "user_id": "{user_id}",
+          "chat_id": "{chat_id}",
+          "reminder_type": "subscription"
+        },
+        "output_var": "reminder_scheduled"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "proceed_to_next_stage",
+      "type": "switch_scenario",
+      "params": {
+        "scenario_id": "program_stage_3",
+        "preserve_context": true
+      }
+    },
+    {
+      "id": "unknown_choice",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "🤔 Не понял ваш выбор. Попробуйте еще раз:",
+        "output_var": "unknown_sent"
+      },
+      "next_step": "send_subscription_offer"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  
+  "requirements": {
+    "plugins": ["MongoPlugin", "SimpleTelegramPlugin", "SimpleAmoCRMPlugin", "SimpleLLMPlugin", "SimpleSchedulerPlugin"],
+    "context_variables": ["user_id", "chat_id"],
+    "collections": ["users"]
+  }
+} 

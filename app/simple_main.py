@@ -12,6 +12,8 @@ Main FastAPI application для Universal Agent Platform.
 
 import sys
 import os
+import asyncio
+from contextlib import asynccontextmanager
 
 # Добавляем корневую папку в PYTHONPATH для импортов
 sys.path.append('/app')
@@ -22,6 +24,51 @@ from loguru import logger
 
 # Импортируем API роутеры
 from app.api.simple import router as simple_router
+
+# Глобальный ChannelManager
+_channel_manager = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Управление жизненным циклом приложения.
+    
+    НОВАЯ АРХИТЕКТУРА:
+    1. ChannelManager НЕ запускается автоматически
+    2. Каналы запускаются по требованию через API
+    3. Каждый канал = отдельный экземпляр движка
+    """
+    global _channel_manager
+    
+    logger.info("🚀 Запуск Universal Agent Platform...")
+    
+    try:
+        # Создаем ChannelManager БЕЗ автоинициализации
+        logger.info("🔧 Создание ChannelManager (без автозапуска)...")
+        from app.core.channel_manager import ChannelManager
+        _channel_manager = ChannelManager()
+        logger.info("✅ ChannelManager создан (каналы запускаются по требованию)")
+        
+        logger.info("🎉 Universal Agent Platform запущена!")
+        
+        yield
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка запуска приложения: {e}")
+        raise
+    finally:
+        # Очистка ресурсов
+        logger.info("🛑 Остановка Universal Agent Platform...")
+        
+        if _channel_manager:
+            # Останавливаем все активные каналы
+            await _channel_manager.stop_all_polling()
+                
+        logger.info("✅ Universal Agent Platform остановлена")
+
+def get_channel_manager():
+    """Получить глобальный ChannelManager."""
+    return _channel_manager
 
 # Настраиваем логирование
 logger.remove()  # Убираем стандартный обработчик
@@ -42,10 +89,9 @@ logger.add(
 # Создаем FastAPI приложение
 app = FastAPI(
     title="Universal Agent Platform",
-    description="Платформа выполнения сценариев через каналы. Простота + Мощность.",
-    version="3.0.0-simple",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    description="Простая и мощная платформа для создания ИИ агентов",
+    version="1.0.0",
+    lifespan=lifespan  # Подключаем управление жизненным циклом
 )
 
 # Настраиваем CORS

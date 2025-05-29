@@ -1,0 +1,254 @@
+{
+  "scenario_id": "user_questionnaire",
+  "version": "1.0",
+  "description": "Опрос пользователя: сбор данных профиля, создание контакта и сделки в AmoCRM",
+  "author": "KittyCore Universal Agent Platform",
+  
+  "initial_context": {
+    "current_question": 0,
+    "questions": [
+      {
+        "field": "name",
+        "question": "👤 Как вас зовут? (Имя и фамилия)",
+        "validation": "required"
+      },
+      {
+        "field": "phone", 
+        "question": "📱 Укажите ваш номер телефона:",
+        "validation": "phone"
+      },
+      {
+        "field": "email",
+        "question": "📧 Укажите ваш email:",
+        "validation": "email"
+      },
+      {
+        "field": "position",
+        "question": "💼 Какая у вас должность?",
+        "validation": "optional"
+      },
+      {
+        "field": "company",
+        "question": "🏢 В какой компании вы работаете?",
+        "validation": "optional"
+      }
+    ]
+  },
+  
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "load_user_data"
+    },
+    {
+      "id": "load_user_data",
+      "type": "mongo_find_one_document",
+      "params": {
+        "collection": "users",
+        "filter": {"user_id": "{user_id}"},
+        "output_var": "user_data"
+      },
+      "next_step": "ask_next_question"
+    },
+    {
+      "id": "ask_next_question",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.current_question < 5",
+            "next_step_id": "send_question"
+          }
+        ],
+        "default_next_step_id": "questionnaire_complete"
+      }
+    },
+    {
+      "id": "send_question",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "{questions[current_question].question}",
+        "output_var": "question_sent"
+      },
+      "next_step": "wait_for_answer"
+    },
+    {
+      "id": "wait_for_answer",
+      "type": "input",
+      "params": {
+        "input_type": "telegram_message",
+        "timeout": 300,
+        "output_var": "user_answer"
+      },
+      "next_step": "validate_answer"
+    },
+    {
+      "id": "validate_answer",
+      "type": "action",
+      "params": {
+        "action": "validate_field",
+        "field": "{questions[current_question].field}",
+        "value": "{user_answer.text}",
+        "validation": "{questions[current_question].validation}",
+        "output_var": "validation_result"
+      },
+      "next_step": "check_validation"
+    },
+    {
+      "id": "check_validation",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.validation_result.valid == True",
+            "next_step_id": "save_answer"
+          }
+        ],
+        "default_next_step_id": "send_validation_error"
+      }
+    },
+    {
+      "id": "send_validation_error",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "❌ {validation_result.error}\n\nПопробуйте еще раз:",
+        "output_var": "error_sent"
+      },
+      "next_step": "wait_for_answer"
+    },
+    {
+      "id": "save_answer",
+      "type": "mongo_update_document",
+      "params": {
+        "collection": "users",
+        "filter": {"user_id": "{user_id}"},
+        "update": {
+          "$set": {
+            "profile.{questions[current_question].field}": "{user_answer.text}",
+            "updated_at": "{current_datetime}"
+          },
+          "$push": {
+            "dialog_context": {
+              "timestamp": "{current_datetime}",
+              "question": "{questions[current_question].question}",
+              "answer": "{user_answer.text}",
+              "field": "{questions[current_question].field}"
+            }
+          }
+        },
+        "output_var": "profile_updated"
+      },
+      "next_step": "increment_question"
+    },
+    {
+      "id": "increment_question",
+      "type": "action",
+      "params": {
+        "action": "increment",
+        "variable": "current_question",
+        "output_var": "next_question"
+      },
+      "next_step": "ask_next_question"
+    },
+    {
+      "id": "questionnaire_complete",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "✅ Отлично! Данные собраны.\n\n🔄 Создаю ваш профиль в системе...",
+        "output_var": "completion_sent"
+      },
+      "next_step": "load_final_profile"
+    },
+    {
+      "id": "load_final_profile",
+      "type": "mongo_find_one_document",
+      "params": {
+        "collection": "users",
+        "filter": {"user_id": "{user_id}"},
+        "output_var": "final_user_data"
+      },
+      "next_step": "create_amocrm_contact"
+    },
+    {
+      "id": "create_amocrm_contact",
+      "type": "amocrm_create_contact",
+      "params": {
+        "name": "{final_user_data.document.profile.name}",
+        "phone": "{final_user_data.document.profile.phone}",
+        "email": "{final_user_data.document.profile.email}",
+        "custom_fields": {
+          "Должность": "{final_user_data.document.profile.position}",
+          "Компания": "{final_user_data.document.profile.company}",
+          "Telegram Username": "{final_user_data.document.profile.tg_username}",
+          "User ID": "{final_user_data.document.user_id}",
+          "Этап программы": "0",
+          "Уровень подписки": "0"
+        },
+        "used_fields_map": true,
+        "output_var": "amocrm_contact"
+      },
+      "next_step": "create_amocrm_lead"
+    },
+    {
+      "id": "create_amocrm_lead",
+      "type": "amocrm_create_lead",
+      "params": {
+        "name": "Диагностика - {final_user_data.document.profile.name}",
+        "price": 0,
+        "contact_id": "{amocrm_contact.id}",
+        "output_var": "amocrm_lead"
+      },
+      "next_step": "save_amocrm_ids"
+    },
+    {
+      "id": "save_amocrm_ids",
+      "type": "mongo_update_document",
+      "params": {
+        "collection": "users",
+        "filter": {"user_id": "{user_id}"},
+        "update": {
+          "$set": {
+            "amocrm_contact_id": "{amocrm_contact.id}",
+            "amocrm_lead_id": "{amocrm_lead.id}",
+            "stage": 1,
+            "updated_at": "{current_datetime}"
+          }
+        },
+        "output_var": "ids_saved"
+      },
+      "next_step": "questionnaire_success"
+    },
+    {
+      "id": "questionnaire_success",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "🎉 Профиль создан успешно!\n\n📋 Переходим к диагностике...",
+        "output_var": "success_sent"
+      },
+      "next_step": "start_diagnosis"
+    },
+    {
+      "id": "start_diagnosis",
+      "type": "switch_scenario",
+      "params": {
+        "scenario_id": "user_diagnosis",
+        "preserve_context": true
+      }
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  
+  "requirements": {
+    "plugins": ["MongoPlugin", "SimpleTelegramPlugin", "SimpleAmoCRMPlugin"],
+    "context_variables": ["user_id", "chat_id"],
+    "collections": ["users"]
+  }
+} 

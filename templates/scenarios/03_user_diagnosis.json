@@ -1,0 +1,248 @@
+{
+  "scenario_id": "user_diagnosis",
+  "version": "1.0",
+  "description": "Диагностика пользователя: сбор ответов на диагностические вопросы и анализ через LLM",
+  "author": "KittyCore Universal Agent Platform",
+  
+  "initial_context": {
+    "current_question": 0,
+    "diagnosis_questions": [
+      {
+        "id": "goals",
+        "question": "🎯 Какие основные цели вы хотите достичь в ближайшие 6 месяцев?",
+        "category": "goals"
+      },
+      {
+        "id": "challenges",
+        "question": "🚧 С какими основными вызовами вы сталкиваетесь в работе/бизнесе?",
+        "category": "challenges"
+      },
+      {
+        "id": "experience",
+        "question": "📈 Опишите ваш опыт в области, которую хотите развивать:",
+        "category": "experience"
+      },
+      {
+        "id": "resources",
+        "question": "⏰ Сколько времени в неделю вы готовы уделять развитию?",
+        "category": "resources"
+      },
+      {
+        "id": "expectations",
+        "question": "💡 Что вы ожидаете получить от программы развития?",
+        "category": "expectations"
+      }
+    ],
+    "diagnosis_answers": {}
+  },
+  
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "load_user_data"
+    },
+    {
+      "id": "load_user_data",
+      "type": "mongo_find_one_document",
+      "params": {
+        "collection": "users",
+        "filter": {"user_id": "{user_id}"},
+        "output_var": "user_data"
+      },
+      "next_step": "start_diagnosis_intro"
+    },
+    {
+      "id": "start_diagnosis_intro",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "🔍 <b>Диагностика</b>\n\nТеперь я задам вам несколько вопросов для составления персональной диагностики.\n\nЭто поможет подобрать оптимальную программу развития именно для вас.\n\n📝 Отвечайте развернуто - чем больше информации, тем точнее будет диагностика.",
+        "parse_mode": "HTML",
+        "output_var": "intro_sent"
+      },
+      "next_step": "ask_diagnosis_question"
+    },
+    {
+      "id": "ask_diagnosis_question",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "context.current_question < 5",
+            "next_step_id": "send_diagnosis_question"
+          }
+        ],
+        "default_next_step_id": "diagnosis_complete"
+      }
+    },
+    {
+      "id": "send_diagnosis_question",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "<b>Вопрос {current_question + 1} из {diagnosis_questions.length}</b>\n\n{diagnosis_questions[current_question].question}",
+        "parse_mode": "HTML",
+        "output_var": "question_sent"
+      },
+      "next_step": "wait_for_diagnosis_answer"
+    },
+    {
+      "id": "wait_for_diagnosis_answer",
+      "type": "input",
+      "params": {
+        "input_type": "telegram_message",
+        "timeout": 600,
+        "output_var": "diagnosis_answer"
+      },
+      "next_step": "save_diagnosis_answer"
+    },
+    {
+      "id": "save_diagnosis_answer",
+      "type": "action",
+      "params": {
+        "action": "save_to_object",
+        "object": "diagnosis_answers",
+        "key": "{diagnosis_questions[current_question].id}",
+        "value": {
+          "question": "{diagnosis_questions[current_question].question}",
+          "answer": "{diagnosis_answer.text}",
+          "category": "{diagnosis_questions[current_question].category}",
+          "timestamp": "{current_datetime}"
+        },
+        "output_var": "answer_saved"
+      },
+      "next_step": "update_user_context"
+    },
+    {
+      "id": "update_user_context",
+      "type": "mongo_update_document",
+      "params": {
+        "collection": "users",
+        "filter": {"user_id": "{user_id}"},
+        "update": {
+          "$push": {
+            "dialog_context": {
+              "timestamp": "{current_datetime}",
+              "type": "diagnosis",
+              "question": "{diagnosis_questions[current_question].question}",
+              "answer": "{diagnosis_answer.text}",
+              "category": "{diagnosis_questions[current_question].category}"
+            }
+          },
+          "$set": {
+            "updated_at": "{current_datetime}"
+          }
+        },
+        "output_var": "context_updated"
+      },
+      "next_step": "increment_diagnosis_question"
+    },
+    {
+      "id": "increment_diagnosis_question",
+      "type": "action",
+      "params": {
+        "action": "increment",
+        "variable": "current_question",
+        "output_var": "next_question"
+      },
+      "next_step": "ask_diagnosis_question"
+    },
+    {
+      "id": "diagnosis_complete",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "✅ Отлично! Все вопросы пройдены.\n\n🤖 Анализирую ваши ответы и составляю персональную диагностику...",
+        "output_var": "analysis_start"
+      },
+      "next_step": "prepare_llm_prompt"
+    },
+    {
+      "id": "prepare_llm_prompt",
+      "type": "action",
+      "params": {
+        "action": "build_diagnosis_prompt",
+        "user_profile": "{user_data.document.profile}",
+        "diagnosis_answers": "{diagnosis_answers}",
+        "output_var": "llm_prompt"
+      },
+      "next_step": "get_llm_diagnosis"
+    },
+    {
+      "id": "get_llm_diagnosis",
+      "type": "llm_query",
+      "params": {
+        "prompt": "Ты эксперт по персональному развитию и бизнес-коучингу. Проанализируй данные пользователя и составь персональную диагностику.\n\nДанные пользователя:\nИмя: {user_data.document.profile.name}\nДолжность: {user_data.document.profile.position}\nКомпания: {user_data.document.profile.company}\n\nОтветы на диагностические вопросы:\n{llm_prompt.formatted_answers}\n\nСоставь диагностику в следующем формате:\n\n🎯 АНАЛИЗ ЦЕЛЕЙ:\n[анализ целей пользователя]\n\n🚧 ВЫЯВЛЕННЫЕ ВЫЗОВЫ:\n[основные проблемы и препятствия]\n\n📊 ОЦЕНКА ТЕКУЩЕГО УРОВНЯ:\n[оценка опыта и навыков]\n\n💡 РЕКОМЕНДАЦИИ:\n[конкретные рекомендации по развитию]\n\n🎯 ПОДХОДЯЩИЕ ПРОГРАММЫ:\n[какие программы/направления подойдут]\n\n⭐ ПРИОРИТЕТЫ:\n[что важно развивать в первую очередь]\n\nОтвет должен быть персональным, конкретным и мотивирующим. Объем 300-500 слов.",
+        "model": "gpt-4",
+        "max_tokens": 1000,
+        "output_var": "diagnosis_result"
+      },
+      "next_step": "send_diagnosis"
+    },
+    {
+      "id": "send_diagnosis",
+      "type": "telegram_send_message",
+      "params": {
+        "chat_id": "{chat_id}",
+        "text": "🔍 <b>ПЕРСОНАЛЬНАЯ ДИАГНОСТИКА</b>\n\n{diagnosis_result.response}\n\n━━━━━━━━━━━━━━━━━━━━\n\n🚀 Готовы начать развитие? Переходим к выбору программы!",
+        "parse_mode": "HTML",
+        "output_var": "diagnosis_sent"
+      },
+      "next_step": "save_diagnosis"
+    },
+    {
+      "id": "save_diagnosis",
+      "type": "mongo_update_document",
+      "params": {
+        "collection": "users",
+        "filter": {"user_id": "{user_id}"},
+        "update": {
+          "$set": {
+            "diagnosis": {
+              "result": "{diagnosis_result.response}",
+              "answers": "{diagnosis_answers}",
+              "created_at": "{current_datetime}"
+            },
+            "stage": 2,
+            "updated_at": "{current_datetime}"
+          }
+        },
+        "output_var": "diagnosis_saved"
+      },
+      "next_step": "update_amocrm_contact"
+    },
+    {
+      "id": "update_amocrm_contact",
+      "type": "amocrm_update_contact",
+      "params": {
+        "contact_id": "{user_data.document.amocrm_contact_id}",
+        "custom_fields": {
+          "Этап программы": "2",
+          "Диагностика": "Завершена"
+        },
+        "used_fields_map": true,
+        "output_var": "contact_updated"
+      },
+      "next_step": "start_subscription_check"
+    },
+    {
+      "id": "start_subscription_check",
+      "type": "switch_scenario",
+      "params": {
+        "scenario_id": "subscription_check",
+        "preserve_context": true
+      }
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  
+  "requirements": {
+    "plugins": ["MongoPlugin", "SimpleTelegramPlugin", "SimpleAmoCRMPlugin", "SimpleLLMPlugin"],
+    "context_variables": ["user_id", "chat_id"],
+    "collections": ["users"]
+  }
+} 

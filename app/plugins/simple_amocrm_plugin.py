@@ -100,6 +100,7 @@ class SimpleAmoCRMPlugin(BasePlugin):
             # === КОНТАКТЫ ===
             "amocrm_find_contact": self._handle_find_contact,
             "amocrm_create_contact": self._handle_create_contact,
+            "amocrm_update_contact": self._handle_update_contact,
             
             # === СДЕЛКИ ===
             "amocrm_find_lead": self._handle_find_lead,
@@ -473,6 +474,69 @@ class SimpleAmoCRMPlugin(BasePlugin):
         except Exception as e:
             logger.error(f"❌ Ошибка создания сделки: {e}")
             context["__step_error__"] = f"AmoCRM создание сделки: {str(e)}"
+
+    async def _handle_update_contact(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> None:
+        """Обновление контакта в AmoCRM"""
+        # Обеспечиваем актуальные настройки
+        await self._ensure_fresh_settings()
+        
+        params = step_data.get("params", {})
+        
+        try:
+            contact_id = self._resolve_value(params.get("contact_id", ""), context)
+            output_var = params.get("output_var", "updated_contact")
+            
+            if not contact_id:
+                context[output_var] = {"success": False, "error": "Не указан contact_id"}
+                return
+            
+            # Формируем данные для обновления
+            contact_data = {"id": int(contact_id)}
+            
+            # Основные поля
+            if "name" in params:
+                contact_data["name"] = self._resolve_value(params["name"], context)
+            
+            # Кастомные поля
+            custom_fields = params.get("custom_fields", {})
+            used_fields_map = params.get("used_fields_map", False)
+            
+            if custom_fields:
+                if used_fields_map and self.fields_map:
+                    # Используем карту полей для преобразования
+                    contact_data["custom_fields_values"] = self._prepare_custom_fields(custom_fields)
+                else:
+                    # Прямое указание полей
+                    contact_data["custom_fields_values"] = []
+                    for field_id, value in custom_fields.items():
+                        if isinstance(value, dict):
+                            contact_data["custom_fields_values"].append(value)
+                        else:
+                            contact_data["custom_fields_values"].append({
+                                "field_id": int(field_id),
+                                "values": [{"value": str(value)}]
+                            })
+            
+            # Обновляем контакт
+            endpoint = f"/api/v4/contacts/{contact_id}"
+            result = await self._make_request("PATCH", endpoint, json=contact_data)
+            
+            if result["success"]:
+                contact = result["data"]
+                context[output_var] = {
+                    "success": True,
+                    "contact": contact,
+                    "contact_id": contact.get("id", contact_id),
+                    "updated_fields": list(custom_fields.keys()) if custom_fields else []
+                }
+                logger.info(f"✅ Контакт обновлен: {contact_id}")
+            else:
+                context[output_var] = result
+                logger.error(f"❌ Ошибка обновления контакта: {result.get('error')}")
+                
+        except Exception as e:
+            logger.error(f"❌ Ошибка обновления контакта: {e}")
+            context["__step_error__"] = f"AmoCRM обновление контакта: {str(e)}"
 
     async def _handle_add_note(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> None:
         """Добавление заметки к сущности в AmoCRM"""

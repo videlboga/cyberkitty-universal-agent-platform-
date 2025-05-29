@@ -39,15 +39,11 @@ class SimpleTelegramPlugin(BasePlugin):
         self.application: Optional[Application] = None
         self._polling_task: Optional[asyncio.Task] = None
         
-        # Маппинг команд на сценарии
-        self._command_scenarios = {
-            "/start": "registration",
-            "/help": "help", 
-            "/menu": "main_menu"
-        }
+        # Маппинг команд на сценарии - загружается динамически из БД
+        self._command_scenarios = {}
         
-        # Дефолтный сценарий для неизвестных команд
-        self._default_scenario = "main_menu"
+        # Дефолтный сценарий - загружается из маппинга канала
+        self._default_scenario = None
         
         # Callbacks (оставляем для совместимости)
         self.command_callback: Optional[Callable] = None

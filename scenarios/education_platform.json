@@ -1,0 +1,222 @@
+{
+  "collection": "scenarios",
+  "scenario_id": "education_platform",
+  "document": {
+    "scenario_id": "education_platform",
+    "version": "1.0",
+    "description": "Образовательная платформа - регистрация, диагностика, подписка",
+    "author": "KittyCore Universal Agent Platform",
+    "steps": [
+      {
+        "id": "start",
+        "type": "start",
+        "next_step": "check_user_exists"
+      },
+      {
+        "id": "check_user_exists",
+        "type": "mongo_find_one_document",
+        "params": {
+          "collection": "users",
+          "filter": {"user_id": "{user_id}"},
+          "output_var": "existing_user"
+        },
+        "next_step": "branch_user_exists"
+      },
+      {
+        "id": "branch_user_exists",
+        "type": "branch",
+        "params": {
+          "conditions": [
+            {
+              "condition": "context.existing_user.found == True",
+              "next_step_id": "welcome_back"
+            }
+          ],
+          "default_next_step_id": "create_new_user"
+        }
+      },
+      {
+        "id": "welcome_back",
+        "type": "telegram_send_message",
+        "params": {
+          "chat_id": "{chat_id}",
+          "text": "👋 С возвращением! Ваш текущий этап: {existing_user.document.stage}",
+          "output_var": "welcome_sent"
+        },
+        "next_step": "route_by_stage"
+      },
+      {
+        "id": "create_new_user",
+        "type": "mongo_insert_document",
+        "params": {
+          "collection": "users",
+          "document": {
+            "user_id": "{user_id}",
+            "chat_id": "{chat_id}",
+            "stage": 0,
+            "subscription_level": 0,
+            "profile": {
+              "name": "",
+              "phone": "",
+              "email": ""
+            },
+            "created_at": "2024-12-28T12:00:00Z",
+            "updated_at": "2024-12-28T12:00:00Z"
+          },
+          "output_var": "created_user"
+        },
+        "next_step": "welcome_new_user"
+      },
+      {
+        "id": "welcome_new_user",
+        "type": "telegram_send_message",
+        "params": {
+          "chat_id": "{chat_id}",
+          "text": "🎉 Добро пожаловать в образовательную платформу!\n\nДавайте знакомиться. Как вас зовут?",
+          "output_var": "welcome_sent"
+        },
+        "next_step": "wait_for_name"
+      },
+      {
+        "id": "wait_for_name",
+        "type": "input",
+        "params": {
+          "input_type": "telegram_message",
+          "timeout": 300,
+          "output_var": "user_name_input"
+        },
+        "next_step": "save_name"
+      },
+      {
+        "id": "save_name",
+        "type": "mongo_update_document",
+        "params": {
+          "collection": "users",
+          "filter": {"user_id": "{user_id}"},
+          "update": {
+            "$set": {
+              "profile.name": "{user_name_input.text}",
+              "stage": 1,
+              "updated_at": "2024-12-28T12:00:00Z"
+            }
+          },
+          "output_var": "name_saved"
+        },
+        "next_step": "ask_goals"
+      },
+      {
+        "id": "ask_goals",
+        "type": "telegram_send_message",
+        "params": {
+          "chat_id": "{chat_id}",
+          "text": "Отлично, {user_name_input.text}! Теперь расскажите о ваших целях в развитии:",
+          "output_var": "goals_question_sent"
+        },
+        "next_step": "wait_for_goals"
+      },
+      {
+        "id": "wait_for_goals",
+        "type": "input",
+        "params": {
+          "input_type": "telegram_message",
+          "timeout": 600,
+          "output_var": "user_goals_input"
+        },
+        "next_step": "analyze_goals"
+      },
+      {
+        "id": "analyze_goals",
+        "type": "llm_query",
+        "params": {
+          "prompt": "Пользователь указал свои цели: '{user_goals_input.text}'. Проанализируй их и дай краткую персональную рекомендацию по развитию (максимум 200 слов).",
+          "model": "gpt-4",
+          "max_tokens": 300,
+          "output_var": "goals_analysis"
+        },
+        "next_step": "save_diagnosis"
+      },
+      {
+        "id": "save_diagnosis",
+        "type": "mongo_update_document",
+        "params": {
+          "collection": "users",
+          "filter": {"user_id": "{user_id}"},
+          "update": {
+            "$set": {
+              "diagnosis": {
+                "goals": "{user_goals_input.text}",
+                "analysis": "{goals_analysis.response}",
+                "created_at": "2024-12-28T12:00:00Z"
+              },
+              "stage": 2,
+              "updated_at": "2024-12-28T12:00:00Z"
+            }
+          },
+          "output_var": "diagnosis_saved"
+        },
+        "next_step": "send_diagnosis"
+      },
+      {
+        "id": "send_diagnosis",
+        "type": "telegram_send_message",
+        "params": {
+          "chat_id": "{chat_id}",
+          "text": "🔍 Персональная диагностика:\n\n{goals_analysis.response}\n\n💎 Для продолжения программы рекомендуем подписку.",
+          "output_var": "diagnosis_sent"
+        },
+        "next_step": "offer_subscription"
+      },
+      {
+        "id": "offer_subscription",
+        "type": "telegram_send_buttons",
+        "params": {
+          "chat_id": "{chat_id}",
+          "text": "Выберите подписку:",
+          "buttons": [
+            [{"text": "💎 Базовая - 2990₽", "callback_data": "sub_basic"}],
+            [{"text": "🌟 Премиум - 4990₽", "callback_data": "sub_premium"}],
+            [{"text": "👑 VIP - 9990₽", "callback_data": "sub_vip"}],
+            [{"text": "⏰ Позже", "callback_data": "sub_later"}]
+          ],
+          "output_var": "subscription_offer_sent"
+        },
+        "next_step": "end"
+      },
+      {
+        "id": "route_by_stage",
+        "type": "branch",
+        "params": {
+          "conditions": [
+            {
+              "condition": "context.existing_user.document.stage == 0",
+              "next_step_id": "welcome_new_user"
+            },
+            {
+              "condition": "context.existing_user.document.stage == 1",
+              "next_step_id": "ask_goals"
+            },
+            {
+              "condition": "context.existing_user.document.stage == 2",
+              "next_step_id": "offer_subscription"
+            }
+          ],
+          "default_next_step_id": "advanced_features"
+        }
+      },
+      {
+        "id": "advanced_features",
+        "type": "telegram_send_message",
+        "params": {
+          "chat_id": "{chat_id}",
+          "text": "🚀 Вы на продвинутом этапе! Доступны все возможности платформы.",
+          "output_var": "advanced_sent"
+        },
+        "next_step": "end"
+      },
+      {
+        "id": "end",
+        "type": "end"
+      }
+    ]
+  }
+} 

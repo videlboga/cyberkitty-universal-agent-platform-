@@ -8,14 +8,15 @@
 import os
 import asyncio
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from loguru import logger
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.simple_dependencies import get_global_engine
 from app.core.simple_engine import SimpleScenarioEngine
+from app.core.scenario_logger import get_scenario_logger
 
 
 def safe_serialize_context(context: Dict[str, Any]) -> Dict[str, Any]:
@@ -408,6 +409,7 @@ class MongoResponse(BaseModel):
     success: bool = Field(description="Успешно ли выполнена операция")
     data: Optional[Any] = Field(None, description="Данные результата")
     error: Optional[str] = Field(None, description="Ошибка, если произошла")
+    warnings: Optional[List[str]] = Field(None, description="Предупреждения от валидатора")
 
 
 @router.post("/mongo/find", response_model=MongoResponse)
@@ -435,7 +437,8 @@ async def mongo_find(
         return MongoResponse(
             success=result.get("success", False),
             data=result.get("documents", []),
-            error=result.get("error")
+            error=result.get("error"),
+            warnings=result.get("warnings", [])
         )
     except Exception as e:
         logger.error(f"Ошибка mongo_find: {e}")
@@ -467,7 +470,8 @@ async def mongo_insert(
         return MongoResponse(
             success=result.get("success", False),
             data=result.get("inserted_id"),
-            error=result.get("error")
+            error=result.get("error"),
+            warnings=result.get("warnings", [])
         )
     except Exception as e:
         logger.error(f"Ошибка mongo_insert: {e}")
@@ -503,7 +507,8 @@ async def mongo_update(
                 "modified_count": result.get("modified_count", 0),
                 "matched_count": result.get("matched_count", 0)
             },
-            error=result.get("error")
+            error=result.get("error"),
+            warnings=result.get("warnings", [])
         )
     except Exception as e:
         logger.error(f"Ошибка mongo_update: {e}")
@@ -535,7 +540,8 @@ async def mongo_delete(
         return MongoResponse(
             success=result.get("success", False),
             data={"deleted_count": result.get("deleted_count", 0)},
-            error=result.get("error")
+            error=result.get("error"),
+            warnings=result.get("warnings", [])
         )
     except Exception as e:
         logger.error(f"Ошибка mongo_delete: {e}")
@@ -547,12 +553,14 @@ async def mongo_save_scenario(
     request: MongoRequest,
     engine: SimpleScenarioEngine = Depends(get_global_engine)
 ):
-    """Сохранение сценария в MongoDB."""
+    """Сохранение сценария в MongoDB без валидации."""
     try:
         if not request.document:
             raise ValueError("document с данными сценария обязателен")
             
         scenario_data = request.document
+        
+        logger.info(f"💾 Сохраняем сценарий {scenario_data.get('scenario_id', 'unknown')} без валидации")
         
         # Создаем step для обработчика
         step = {
@@ -565,11 +573,14 @@ async def mongo_save_scenario(
         context = {}
         result_context = await engine.execute_step(step, context)
         
+        logger.info(f"✅ Сценарий сохранён успешно")
+        
         # Обработчик выполнился успешно, если мы дошли до этой точки
         return MongoResponse(
             success=True,
             data={"scenario_id": scenario_data.get("scenario_id")},
-            error=None
+            error=None,
+            warnings=None
         )
     except Exception as e:
         logger.error(f"Ошибка mongo_save_scenario: {e}")
@@ -707,7 +718,12 @@ async def restart_channel(channel_id: str):
 
 @router.get("/channels")
 async def list_channels():
-    """Возвращает список всех каналов."""
+    """
+    Получает список всех каналов.
+    
+    Returns:
+        Dict: Список каналов с их статусами
+    """
     try:
         from app.simple_main import get_channel_manager
         channel_manager = get_channel_manager()
@@ -715,29 +731,156 @@ async def list_channels():
         if not channel_manager:
             return {"success": False, "error": "ChannelManager не инициализирован"}
         
-        # Загружаем все каналы из БД
-        await channel_manager._load_channels_from_db()
-        
         channels_info = []
         for channel_id, channel_data in channel_manager.channels.items():
-            is_active = channel_id in channel_manager.polling_tasks
             channels_info.append({
                 "channel_id": channel_id,
-                "channel_type": channel_data.get("channel_type"),
-                "start_scenario_id": channel_data.get("start_scenario_id"),
-                "is_active": is_active,
-                "description": channel_data.get("settings", {}).get("description", "")
+                "type": channel_data.get("channel_type", "unknown"),
+                "status": "active" if channel_id in channel_manager.active_channels else "inactive",
+                "description": channel_data.get("description", ""),
+                "config": channel_data.get("config", {})
             })
         
         return {
             "success": True,
             "channels": channels_info,
-            "total": len(channels_info),
-            "active": len(channel_manager.polling_tasks)
+            "total": len(channels_info)
         }
         
     except Exception as e:
-        logger.error(f"❌ Ошибка получения списка каналов: {e}")
+        logger.error(f"Ошибка получения списка каналов: {e}")
+        return {"success": False, "error": str(e)}
+
+@router.post("/channels/reload")
+async def reload_channels():
+    """
+    Динамически перезагружает все каналы из базы данных.
+    
+    Returns:
+        Dict: Результат перезагрузки каналов
+    """
+    try:
+        from app.simple_main import get_channel_manager
+        channel_manager = get_channel_manager()
+        
+        if not channel_manager:
+            return {"success": False, "error": "ChannelManager не инициализирован"}
+        
+        logger.info("🔄 Начинаю динамическую перезагрузку каналов...")
+        
+        # Останавливаем все активные каналы
+        stopped_channels = []
+        for channel_id in list(channel_manager.active_channels.keys()):
+            try:
+                await channel_manager.stop_channel(channel_id)
+                stopped_channels.append(channel_id)
+                logger.info(f"⏹️ Канал {channel_id} остановлен")
+            except Exception as e:
+                logger.error(f"Ошибка остановки канала {channel_id}: {e}")
+        
+        # Очищаем кэш каналов
+        channel_manager.channels.clear()
+        channel_manager.active_channels.clear()
+        
+        # Перезагружаем каналы из БД
+        await channel_manager._load_channels_from_db()
+        
+        # Запускаем поллинг для всех каналов
+        started_channels = []
+        for channel_id, channel_data in channel_manager.channels.items():
+            try:
+                await channel_manager._start_channel_polling(channel_id, channel_data)
+                started_channels.append(channel_id)
+                logger.info(f"🚀 Канал {channel_id} запущен")
+            except Exception as e:
+                logger.error(f"Ошибка запуска канала {channel_id}: {e}")
+        
+        logger.info(f"✅ Перезагрузка каналов завершена. Остановлено: {len(stopped_channels)}, Запущено: {len(started_channels)}")
+        
+        return {
+            "success": True,
+            "message": "Каналы успешно перезагружены",
+            "stopped_channels": stopped_channels,
+            "started_channels": started_channels,
+            "total_channels": len(channel_manager.channels)
+        }
+        
+    except Exception as e:
+        logger.error(f"Ошибка перезагрузки каналов: {e}")
+        return {"success": False, "error": str(e)}
+
+@router.post("/channels/{channel_id}/reload")
+async def reload_specific_channel(channel_id: str):
+    """
+    Динамически перезагружает конкретный канал из базы данных.
+    
+    Args:
+        channel_id: ID канала для перезагрузки
+        
+    Returns:
+        Dict: Результат перезагрузки канала
+    """
+    try:
+        from app.simple_main import get_channel_manager
+        channel_manager = get_channel_manager()
+        
+        if not channel_manager:
+            return {"success": False, "error": "ChannelManager не инициализирован"}
+        
+        logger.info(f"🔄 Начинаю перезагрузку канала {channel_id}...")
+        
+        # Останавливаем канал если он активен
+        if channel_id in channel_manager.active_channels:
+            try:
+                await channel_manager.stop_channel(channel_id)
+                logger.info(f"⏹️ Канал {channel_id} остановлен")
+            except Exception as e:
+                logger.error(f"Ошибка остановки канала {channel_id}: {e}")
+        
+        # Удаляем из кэша
+        if channel_id in channel_manager.channels:
+            del channel_manager.channels[channel_id]
+        
+        # Перезагружаем канал из БД
+        success = await channel_manager._load_specific_channel(channel_id)
+        
+        if not success:
+            return {
+                "success": False, 
+                "error": f"Канал {channel_id} не найден в базе данных"
+            }
+        
+        # Запускаем канал
+        channel_data = channel_manager.channels.get(channel_id)
+        if channel_data:
+            try:
+                await channel_manager._start_channel_polling(channel_id, channel_data)
+                logger.info(f"🚀 Канал {channel_id} запущен")
+                
+                return {
+                    "success": True,
+                    "message": f"Канал {channel_id} успешно перезагружен",
+                    "channel_data": {
+                        "channel_id": channel_id,
+                        "type": channel_data.get("channel_type", "unknown"),
+                        "status": "active",
+                        "description": channel_data.get("description", "")
+                    }
+                }
+            except Exception as e:
+                logger.error(f"Ошибка запуска канала {channel_id}: {e}")
+                return {
+                    "success": False,
+                    "error": f"Канал загружен, но не удалось запустить: {str(e)}"
+                }
+        else:
+            return {
+                "success": False,
+                "error": f"Канал {channel_id} загружен, но данные недоступны"
+            }
+        
+    except Exception as e:
+        logger.error(f"Ошибка перезагрузки канала {channel_id}: {e}")
         return {"success": False, "error": str(e)}
 
 @router.post("/api/v1/simple/amocrm/setup")
@@ -1002,4 +1145,202 @@ async def get_amocrm_status() -> Dict[str, Any]:
         return {
             "success": False,
             "error": f"Ошибка получения статуса: {str(e)}"
+        }
+
+@router.get("/scenario-logs/active")
+async def get_active_scenario_logs():
+    """Получение списка активных выполнений сценариев."""
+    try:
+        scenario_logger = get_scenario_logger()
+        active_scenarios = scenario_logger.get_active_scenarios()
+        
+        # Конвертируем в сериализуемый формат
+        result = []
+        for scenario_log in active_scenarios:
+            result.append({
+                "execution_id": scenario_log.execution_id,
+                "scenario_id": scenario_log.scenario_id,
+                "user_id": scenario_log.user_id,
+                "chat_id": scenario_log.chat_id,
+                "channel_id": scenario_log.channel_id,
+                "status": scenario_log.status,
+                "started_at": scenario_log.started_at.isoformat(),
+                "duration_ms": (datetime.now(timezone.utc) - scenario_log.started_at).total_seconds() * 1000,
+                "total_steps": scenario_log.total_steps,
+                "completed_steps": scenario_log.completed_steps,
+                "current_step": scenario_log.steps[-1].step_id if scenario_log.steps else None
+            })
+        
+        return {
+            "success": True,
+            "active_scenarios": result,
+            "count": len(result)
+        }
+        
+    except Exception as e:
+        logger.error(f"Ошибка получения активных логов сценариев: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "active_scenarios": [],
+            "count": 0
+        }
+
+@router.get("/scenario-logs/{execution_id}")
+async def get_scenario_log_details(execution_id: str):
+    """Получение детальной информации о выполнении сценария."""
+    try:
+        scenario_logger = get_scenario_logger()
+        status = scenario_logger.get_scenario_status(execution_id)
+        
+        if not status:
+            return {
+                "success": False,
+                "error": f"Выполнение {execution_id} не найдено или завершено",
+                "log": None
+            }
+        
+        # Получаем полный лог из активных сценариев
+        active_scenarios = scenario_logger.get_active_scenarios()
+        scenario_log = None
+        
+        for log in active_scenarios:
+            if log.execution_id == execution_id:
+                scenario_log = log
+                break
+        
+        if not scenario_log:
+            return {
+                "success": False,
+                "error": f"Детали выполнения {execution_id} не найдены",
+                "log": None
+            }
+        
+        # Конвертируем в сериализуемый формат
+        steps_data = []
+        for step in scenario_log.steps:
+            step_data = {
+                "step_id": step.step_id,
+                "step_type": step.step_type,
+                "started_at": step.started_at.isoformat(),
+                "finished_at": step.finished_at.isoformat() if step.finished_at else None,
+                "duration_ms": step.duration_ms,
+                "status": step.status,
+                "error_message": step.error_message
+            }
+            
+            # Добавляем детали если есть
+            if step.step_params:
+                step_data["params"] = step.step_params
+            if step.context_changes:
+                step_data["context_changes"] = step.context_changes
+                
+            steps_data.append(step_data)
+        
+        result = {
+            "execution_id": scenario_log.execution_id,
+            "scenario_id": scenario_log.scenario_id,
+            "user_id": scenario_log.user_id,
+            "chat_id": scenario_log.chat_id,
+            "channel_id": scenario_log.channel_id,
+            "status": scenario_log.status,
+            "started_at": scenario_log.started_at.isoformat(),
+            "finished_at": scenario_log.finished_at.isoformat() if scenario_log.finished_at else None,
+            "duration_ms": scenario_log.duration_ms,
+            "total_steps": scenario_log.total_steps,
+            "completed_steps": scenario_log.completed_steps,
+            "initial_context": scenario_log.initial_context,
+            "final_context": scenario_log.final_context,
+            "steps": steps_data,
+            "performance_metrics": scenario_log.performance_metrics
+        }
+        
+        return {
+            "success": True,
+            "log": result
+        }
+        
+    except Exception as e:
+        logger.error(f"Ошибка получения деталей лога сценария: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "log": None
+        }
+
+@router.get("/scenario-logs/history")
+async def get_scenario_logs_history(
+    limit: int = 50,
+    scenario_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+    engine: SimpleScenarioEngine = Depends(get_global_engine)
+):
+    """Получение истории выполнения сценариев из MongoDB."""
+    try:
+        mongo_plugin = engine.plugins.get("mongo")
+        if not mongo_plugin:
+            return {
+                "success": False,
+                "error": "MongoDB плагин недоступен",
+                "logs": []
+            }
+        
+        # Формируем фильтр
+        filter_query = {}
+        if scenario_id:
+            filter_query["scenario_id"] = scenario_id
+        if user_id:
+            filter_query["user_id"] = user_id
+        
+        # Запрашиваем логи из MongoDB
+        context = {
+            "collection": "scenario_execution_logs",
+            "filter": filter_query,
+            "limit": limit,
+            "sort": {"started_at": -1}  # Сортировка по убыванию даты
+        }
+        
+        result = await mongo_plugin.find_documents(context)
+        
+        if result.get("success"):
+            logs = result.get("documents", [])
+            
+            # Обрабатываем логи для удобного отображения
+            processed_logs = []
+            for log in logs:
+                processed_log = {
+                    "execution_id": log.get("execution_id"),
+                    "scenario_id": log.get("scenario_id"),
+                    "user_id": log.get("user_id"),
+                    "chat_id": log.get("chat_id"),
+                    "channel_id": log.get("channel_id"),
+                    "status": log.get("status"),
+                    "started_at": log.get("started_at"),
+                    "finished_at": log.get("finished_at"),
+                    "duration_ms": log.get("duration_ms"),
+                    "total_steps": log.get("total_steps"),
+                    "completed_steps": log.get("completed_steps"),
+                    "performance_metrics": log.get("performance_metrics", {})
+                }
+                processed_logs.append(processed_log)
+            
+            return {
+                "success": True,
+                "logs": processed_logs,
+                "count": len(processed_logs),
+                "filter": filter_query
+            }
+        else:
+            return {
+                "success": False,
+                "error": result.get("error", "Ошибка запроса к MongoDB"),
+                "logs": []
+            }
+        
+    except Exception as e:
+        logger.error(f"Ошибка получения истории логов сценариев: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "logs": []
         } 

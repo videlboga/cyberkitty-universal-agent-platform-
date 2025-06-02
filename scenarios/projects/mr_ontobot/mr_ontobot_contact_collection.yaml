@@ -1,0 +1,222 @@
+scenario_id: "mr_ontobot_contact_collection"
+name: "Сбор Контактов"
+description: "Сценарий для сбора номера телефона пользователя с системой напоминаний"
+
+initial_context:
+  contact_request_sent: false
+  contact_provided: false
+  phone_number: null
+
+steps:
+  - id: start
+    type: start
+    next_step: request_contact
+
+  - id: request_contact
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        📞 **Для получения результатов диагностики поделитесь контактом**
+        
+        Нажмите кнопку ниже, чтобы поделиться номером телефона:
+      reply_markup:
+        keyboard:
+          - - text: "📱 Поделиться контактом"
+              request_contact: true
+        resize_keyboard: true
+        one_time_keyboard: true
+    next_step: update_request_sent
+
+  - id: update_request_sent
+    type: action
+    params:
+      action_type: "update_context"
+      updates:
+        contact_request_sent: "{current_timestamp}"
+    next_step: schedule_contact_reminders
+
+  - id: schedule_contact_reminders
+    type: scheduler_create_task
+    params:
+      task_type: "send_push_reminder"
+      delay_minutes: 30
+      task_data:
+        user_id: "{user_id}"
+        chat_id: "{chat_id}"
+        reminder_type: "contact_push_1"
+    next_step: schedule_reminder_2
+
+  - id: schedule_reminder_2
+    type: scheduler_create_task
+    params:
+      task_type: "send_push_reminder"
+      delay_minutes: 60
+      task_data:
+        user_id: "{user_id}"
+        chat_id: "{chat_id}"
+        reminder_type: "contact_push_2"
+    next_step: schedule_reminder_3
+
+  - id: schedule_reminder_3
+    type: scheduler_create_task
+    params:
+      task_type: "send_push_reminder"
+      delay_minutes: 90
+      task_data:
+        user_id: "{user_id}"
+        chat_id: "{chat_id}"
+        reminder_type: "contact_push_3"
+    next_step: wait_for_contact
+
+  - id: wait_for_contact
+    type: input_text
+    params:
+      variable: "contact_data"
+      prompt: "Отправь свой контакт или номер телефона:"
+      timeout_seconds: 7200  # 2 часа ожидания
+    next_step: process_contact
+
+  - id: process_contact
+    type: action
+    params:
+      action_type: "update_context"
+      updates:
+        contact_provided: true
+        phone_number: "{contact_data}"
+    next_step: save_contact
+
+  - id: save_contact
+    type: mongo_insert_document
+    params:
+      collection: "user_contacts"
+      document:
+        user_id: "{user_id}"
+        chat_id: "{chat_id}"
+        phone_number: "{phone_number}"
+        provided_at: "{current_timestamp}"
+        session_id: "{session_id}"
+    next_step: update_amocrm_contact
+
+  - id: update_amocrm_contact
+    type: amocrm_update_contact
+    params:
+      contact_id: "{amocrm_contact.contact_id}"
+      custom_fields:
+        PHONE: "{phone_number}"
+        CONTACT_PROVIDED: "true"
+        CONTACT_PROVIDED_AT: "{current_timestamp}"
+        CURRENT_STAGE: "waiting_dossier"
+      output_var: "amocrm_update_result"
+    next_step: add_contact_note
+
+  - id: add_contact_note
+    type: amocrm_add_note
+    params:
+      entity_type: "contacts"
+      entity_id: "{amocrm_contact.contact_id}"
+      note_type: "common"
+      text: |
+        📞 Контакт получен!
+        
+        📅 Дата: {current_timestamp}
+        📱 Телефон: {phone_number}
+        
+        Статус: Ожидание генерации досье
+    next_step: thank_for_contact
+
+  - id: thank_for_contact
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        Славно! А теперь, пока ты ожидаешь досье, скажи, у тебя есть наверняка родные и близкие люди, которым тоже будет интересно получить досье и сэкономить ресурсы. 
+        
+        Если да, то жми кнопку «Поделиться ДОБРОМ» и отправляй ссылку своему окружению. А также, попроси их написать, что они от тебя 😊
+    next_step: offer_sharing
+
+  - id: offer_sharing
+    type: channel_action
+    params:
+      action: send_buttons
+      chat_id: "{chat_id}"
+      text: "Поделись возможностью получить бесплатную диагностику с близкими:"
+      buttons:
+        - - text: "Поделиться ДОБРОМ"
+            callback_data: "share_bot"
+            switch_inline_query: "Привет! Получи бесплатную диагностику мыслевирусов от @mr_ontobot - это очень интересно! Сказал, что от меня 😊"
+    next_step: update_stage_and_wait
+
+  - id: update_stage_and_wait
+    type: action
+    params:
+      action_type: "update_context"
+      updates:
+        current_stage: "waiting_dossier"
+    next_step: wait_for_dossier_ready
+
+  - id: wait_for_dossier_ready
+    type: input_text
+    params:
+      variable: "system_event"
+      prompt: "Ожидание готовности досье..."
+      timeout_seconds: 7200  # 2 часа максимум на генерацию
+    next_step: switch_to_dossier_feedback
+
+  - id: switch_to_dossier_feedback
+    type: switch_scenario
+    params:
+      scenario_id: "mr_ontobot_dossier_feedback"
+      preserve_context: true
+    next_step: end
+
+  # Обработка push-напоминаний
+  - id: send_contact_push_1
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        Я уже формирую для тебя досье. Скорее отправляй контакт, чтобы я смог отправить тебе файл.
+      reply_markup:
+        keyboard:
+          - - text: "📱 Поделиться контактом"
+              request_contact: true
+        resize_keyboard: true
+        one_time_keyboard: true
+    next_step: wait_for_contact
+
+  - id: send_contact_push_2
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        Досье почти в пути. Осталось только нажать кнопку «Отправить контакт».
+      reply_markup:
+        keyboard:
+          - - text: "📱 Поделиться контактом"
+              request_contact: true
+        resize_keyboard: true
+        one_time_keyboard: true
+    next_step: wait_for_contact
+
+  - id: send_contact_push_3
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        Важное досье о себе почти готово. Осталось совсем немного для его получения. Жми «Отправить контакт».
+      reply_markup:
+        keyboard:
+          - - text: "📱 Поделиться контактом"
+              request_contact: true
+        resize_keyboard: true
+        one_time_keyboard: true
+    next_step: wait_for_contact
+
+  - id: end
+    type: end 

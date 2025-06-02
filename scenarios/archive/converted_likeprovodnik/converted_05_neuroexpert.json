@@ -1,0 +1,235 @@
+{
+  "scenario_id": "neuroexpert_flow",
+  "name": "НейроЭксперт",
+  "description": "Решение сложных задач с пошаговым анализом и персонализацией",
+  "version": "1.0",
+  "initial_context": {},
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "load_user_context"
+    },
+    {
+      "id": "load_user_context",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_mongo_find_data",
+        "preserve_context": true
+      },
+      "next_step": "log_task"
+    },
+    {
+      "id": "log_task",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_log_message",
+        "preserve_context": true
+      },
+      "next_step": "analyze_task_complexity"
+    },
+    {
+      "id": "analyze_task_complexity",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "preserve_context": true
+      },
+      "next_step": "search_similar_solutions"
+    },
+    {
+      "id": "search_similar_solutions",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_rag_search",
+        "preserve_context": true
+      },
+      "next_step": "check_user_level"
+    },
+    {
+      "id": "check_user_level",
+      "type": "branch",
+      "params": {
+        "condition": "exists({user_profile})",
+        "true_step": "generate_personalized_solution",
+        "false_step": "generate_generic_solution"
+      }
+    },
+    {
+      "id": "generate_personalized_solution",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "preserve_context": true
+      },
+      "next_step": "save_solution"
+    },
+    {
+      "id": "generate_generic_solution",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "preserve_context": true
+      },
+      "next_step": "save_solution"
+    },
+    {
+      "id": "save_solution",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_mongo_save_data",
+        "preserve_context": true
+      },
+      "next_step": "send_solution"
+    },
+    {
+      "id": "send_solution",
+      "type": "channel_action",
+      "params": {
+        "action": "send_message",
+        "chat_id": "{chat_id}",
+        "text": "🧠 <b>Решение от НейроЭксперта:</b>\n\n{expert_solution}",
+        "parse_mode": "HTML"
+      },
+      "next_step": "offer_clarification"
+    },
+    {
+      "id": "offer_clarification",
+      "type": "channel_action",
+      "params": {
+        "action": "send_buttons",
+        "chat_id": "{chat_id}",
+        "text": "🤔 <b>Нужны уточнения?</b>",
+        "buttons": [
+          [
+            {
+              "text": "💡 Объяснить подробнее",
+              "callback_data": "explain_more"
+            }
+          ],
+          [
+            {
+              "text": "🔄 Альтернативное решение",
+              "callback_data": "alternative_solution"
+            }
+          ],
+          [
+            {
+              "text": "📝 Практический пример",
+              "callback_data": "practical_example"
+            }
+          ],
+          [
+            {
+              "text": "✅ Все понятно",
+              "callback_data": "expert_done"
+            }
+          ]
+        ],
+        "parse_mode": "HTML"
+      },
+      "next_step": "wait_clarification_choice"
+    },
+    {
+      "id": "wait_clarification_choice",
+      "type": "input",
+      "params": {
+        "input_type": "callback_query",
+        "timeout_seconds": 180,
+        "output_var": "clarification_choice"
+      },
+      "next_step": "handle_clarification"
+    },
+    {
+      "id": "handle_clarification",
+      "type": "branch",
+      "params": {
+        "condition": "{clarification_choice} == 'explain_more'",
+        "true_step": "detailed_explanation",
+        "false_step": "check_alternative"
+      }
+    },
+    {
+      "id": "check_alternative",
+      "type": "branch",
+      "params": {
+        "condition": "{clarification_choice} == 'alternative_solution'",
+        "true_step": "alternative_solution",
+        "false_step": "check_example"
+      }
+    },
+    {
+      "id": "check_example",
+      "type": "branch",
+      "params": {
+        "condition": "{clarification_choice} == 'practical_example'",
+        "true_step": "practical_example",
+        "false_step": "end"
+      }
+    },
+    {
+      "id": "detailed_explanation",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "preserve_context": true
+      },
+      "next_step": "send_detailed_explanation"
+    },
+    {
+      "id": "send_detailed_explanation",
+      "type": "channel_action",
+      "params": {
+        "action": "send_message",
+        "chat_id": "{chat_id}",
+        "text": "📖 <b>Подробное объяснение:</b>\n\n{detailed_explanation_text}",
+        "parse_mode": "HTML"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "alternative_solution",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "preserve_context": true
+      },
+      "next_step": "send_alternative_solution"
+    },
+    {
+      "id": "send_alternative_solution",
+      "type": "channel_action",
+      "params": {
+        "action": "send_message",
+        "chat_id": "{chat_id}",
+        "text": "🔄 <b>Альтернативное решение:</b>\n\n{alternative_solution_text}",
+        "parse_mode": "HTML"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "practical_example",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "preserve_context": true
+      },
+      "next_step": "send_practical_example"
+    },
+    {
+      "id": "send_practical_example",
+      "type": "channel_action",
+      "params": {
+        "action": "send_message",
+        "chat_id": "{chat_id}",
+        "text": "💻 <b>Практический пример:</b>\n\n{practical_example_text}",
+        "parse_mode": "HTML"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ]
+}

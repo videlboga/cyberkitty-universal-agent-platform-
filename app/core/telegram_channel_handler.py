@@ -94,7 +94,11 @@ class TelegramChannelHandler:
     
     async def send_buttons(self, chat_id: str, text: str, buttons: List[List[Dict[str, str]]], **kwargs) -> Dict[str, Any]:
         """
-        Отправка сообщения с inline кнопками
+        Отправка сообщения с кнопками
+        
+        Автоматически определяет тип клавиатуры:
+        - Если есть request_contact/request_location -> ReplyKeyboardMarkup
+        - Иначе -> InlineKeyboardMarkup
         
         Args:
             chat_id: ID чата
@@ -105,9 +109,30 @@ class TelegramChannelHandler:
         Returns:
             Dict с результатом API вызова
         """
+        # Проверяем, есть ли в кнопках request_contact или request_location
+        has_special_request = False
+        for row in buttons:
+            for button in row:
+                if button.get('request_contact') or button.get('request_location'):
+                    has_special_request = True
+                    break
+            if has_special_request:
+                break
+        
+        if has_special_request:
+            # Используем ReplyKeyboardMarkup для кнопок с запросом контакта/геолокации
+            reply_markup = {
+                "keyboard": buttons,
+                "one_time_keyboard": True,
+                "resize_keyboard": True
+            }
+            logger.info(f"📱 Отправляю ReplyKeyboard с запросом контакта в чат {chat_id}")
+        else:
+            # Используем InlineKeyboardMarkup для обычных кнопок
         reply_markup = {
             "inline_keyboard": buttons
         }
+            logger.info(f"💬 Отправляю InlineKeyboard в чат {chat_id}")
         
         return await self.send_message(
             chat_id=chat_id,
@@ -257,3 +282,26 @@ class TelegramChannelHandler:
         except Exception as e:
             logger.error(f"❌ Healthcheck ERROR для канала {self.channel_id}: {e}")
             return False 
+    
+    async def remove_keyboard(self, chat_id: str, text: str, **kwargs) -> Dict[str, Any]:
+        """
+        Отправка сообщения с удалением reply keyboard
+        
+        Args:
+            chat_id: ID чата
+            text: Текст сообщения
+            **kwargs: Дополнительные параметры
+        
+        Returns:
+            Dict с результатом API вызова
+        """
+        reply_markup = {
+            "remove_keyboard": True
+        }
+        
+        return await self.send_message(
+            chat_id=chat_id,
+            text=text,
+            reply_markup=reply_markup,
+            **kwargs
+        ) 

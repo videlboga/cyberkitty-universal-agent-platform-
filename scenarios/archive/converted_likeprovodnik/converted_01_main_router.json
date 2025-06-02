@@ -1,0 +1,93 @@
+{
+  "scenario_id": "likeprovodnik_main_router",
+  "name": "ЛайкПроводник - Главный роутер",
+  "description": "Основной сценарий маршрутизации пользователей по модулям",
+  "version": "1.0",
+  "initial_context": {
+    "system_name": "ЛайкПроводник",
+    "version": "1.0"
+  },
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "load_user_profile"
+    },
+    {
+      "id": "load_user_profile",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_user_profile_load",
+        "preserve_context": true
+      },
+      "next_step": "check_new_user"
+    },
+    {
+      "id": "check_new_user",
+      "type": "branch",
+      "params": {
+        "condition": "{is_new_user} == true || {needs_onboarding} == true",
+        "false_step": "detect_intent",
+        "true_scenario": "ai_path_onboarding_flow"
+      }
+    },
+    {
+      "id": "detect_intent",
+      "type": "branch",
+      "params": {
+        "condition": "contains(lower({message_text}), 'лайфхак') || contains(lower({message_text}), 'совет')",
+        "false_step": "check_mentor",
+        "true_scenario": "lifehack_generator_flow"
+      }
+    },
+    {
+      "id": "check_mentor",
+      "type": "branch",
+      "params": {
+        "condition": "contains(lower({message_text}), 'наставник') || contains(lower({message_text}), 'урок') || contains(lower({message_text}), 'материал')",
+        "false_step": "check_expert",
+        "true_scenario": "ai_mentor_flow"
+      }
+    },
+    {
+      "id": "check_expert",
+      "type": "branch",
+      "params": {
+        "condition": "contains(lower({message_text}), 'задача') || contains(lower({message_text}), 'решение') || contains(lower({message_text}), 'эксперт')",
+        "false_step": "check_coach",
+        "true_scenario": "neuroexpert_flow"
+      }
+    },
+    {
+      "id": "check_coach",
+      "type": "branch",
+      "params": {
+        "condition": "contains(lower({message_text}), 'цель') || contains(lower({message_text}), 'коуч') || contains(lower({message_text}), 'рефлексия')",
+        "false_step": "check_digest",
+        "true_scenario": "ai_coach_flow"
+      }
+    },
+    {
+      "id": "check_digest",
+      "type": "branch",
+      "params": {
+        "condition": "contains(lower({message_text}), 'новости') || contains(lower({message_text}), 'дайджест') || contains(lower({message_text}), 'аи')",
+        "false_step": "default_lifehack",
+        "true_scenario": "idigest_flow"
+      }
+    },
+    {
+      "id": "default_lifehack",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "lifehack_generator_flow",
+        "preserve_context": true
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ]
+}

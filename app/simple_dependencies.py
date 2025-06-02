@@ -12,6 +12,7 @@ from typing import Optional
 from loguru import logger
 
 from app.core.simple_engine import SimpleScenarioEngine, create_engine
+from app.core.scenario_logger import initialize_scenario_logger, LogLevel
 
 # === ЛОГИРОВАНИЕ ===
 logger.add(
@@ -44,8 +45,19 @@ async def initialize_global_engine():
     global _global_engine
     if _global_engine is None:
         logger.info("🚀 Создание ГЛОБАЛЬНОГО движка...")
+        
+        # Инициализируем логгер сценариев
+        log_level = LogLevel.DETAILED if os.getenv("DEBUG") == "true" else LogLevel.BASIC
+        logger.info(f"🔍 Инициализация ScenarioLogger с уровнем {log_level.value}")
+        
         _global_engine = await create_engine()
+        
+        # Инициализируем логгер сценариев с MongoDB плагином
+        mongo_plugin = _global_engine.plugins.get("mongo")
+        initialize_scenario_logger(log_level=log_level, mongo_plugin=mongo_plugin)
+        
         logger.info("✅ ГЛОБАЛЬНЫЙ движок создан и готов к работе")
+        logger.info("✅ ScenarioLogger инициализирован")
     else:
         logger.info("⚠️ ГЛОБАЛЬНЫЙ движок уже инициализирован")
 

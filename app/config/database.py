@@ -25,6 +25,7 @@ class DatabaseConfig:
         
         # Приоритет переменных окружения
         uri = (
+            os.getenv("MONGO_URL") or
             os.getenv("MONGODB_URI") or 
             os.getenv("MONGO_URI") or 
             os.getenv("MONGODB_URL") or 
@@ -32,6 +33,7 @@ class DatabaseConfig:
         )
         
         database_name = (
+            os.getenv("MONGO_DB") or
             os.getenv("MONGODB_DATABASE_NAME") or
             os.getenv("MONGODB_DATABASE") or
             os.getenv("MONGO_DATABASE") or

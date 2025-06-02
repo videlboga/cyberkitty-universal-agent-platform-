@@ -1,0 +1,101 @@
+{
+  "scenario_id": "likeprovodnik_init",
+  "name": "ЛайкПроводник - Инициализация",
+  "description": "Главный сценарий инициализации: проверка пользователя и маршрутизация",
+  "version": "1.0",
+  "initial_context": {
+    "system_name": "ЛайкПроводник",
+    "version": "1.0"
+  },
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "welcome_message"
+    },
+    {
+      "id": "welcome_message",
+      "type": "channel_action",
+      "params": {
+        "action": "send_message",
+        "chat_id": "{chat_id}",
+        "text": "🤖 Привет! Я ЛайкПроводник — твой AI-помощник в мире бизнеса и технологий!\n\n✨ Что я умею:\n🎯 <b>AI-Путь</b> — создаю персональный план обучения\n💡 <b>Лайфхаки</b> — генерирую бизнес-советы с ИИ\n👨‍🏫 <b>Наставник</b> — отвечаю на вопросы по курсам\n🧠 <b>НейроЭксперт</b> — решаю сложные задачи пошагово\n🧘 <b>AI-Коуч</b> — помогаю с мотивацией и рефлексией\n📰 <b>iДайджест</b> — новости ИИ за неделю\n\n💬 Просто напиши что тебя интересует!",
+        "parse_mode": "HTML"
+      },
+      "next_step": "load_user_profile"
+    },
+    {
+      "id": "load_user_profile",
+      "type": "mongo_find_one_document",
+      "params": {
+        "collection": "users",
+        "filter": {
+          "user_id": "{user_id}"
+        },
+        "output_var": "user_profile"
+      },
+      "next_step": "check_user_exists"
+    },
+    {
+      "id": "check_user_exists",
+      "type": "branch",
+      "params": {
+        "conditions": [
+          {
+            "condition": "not context.get('user_profile') or not context.get('user_profile', {}).get('onboarding_completed')",
+            "next_step": "start_onboarding"
+          }
+        ],
+        "default_next_step": "go_to_router"
+      }
+    },
+    {
+      "id": "start_onboarding",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "ai_path_onboarding_flow",
+        "preserve_context": true
+      },
+      "next_step": "mark_onboarding_complete"
+    },
+    {
+      "id": "mark_onboarding_complete",
+      "type": "mongo_upsert_document",
+      "params": {
+        "collection": "users",
+        "filter": {
+          "user_id": "{user_id}"
+        },
+        "document": {
+          "user_id": "{user_id}",
+          "chat_id": "{chat_id}",
+          "onboarding_completed": true,
+          "onboarding_date": "{current_timestamp}",
+          "user_niche": "{user_niche}",
+          "user_income_a": "{user_income_a}",
+          "user_income_b": "{user_income_b}",
+          "user_time": "{user_time}",
+          "user_barriers": "{user_barriers}",
+          "user_ai_tasks": "{user_ai_tasks}",
+          "user_it_level": "{user_it_level}",
+          "user_results": "{user_results}",
+          "learning_plan": "{learning_plan}"
+        }
+      },
+      "next_step": "go_to_router"
+    },
+    {
+      "id": "go_to_router",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "likeprovodnik_main_router",
+        "preserve_context": true
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ]
+} 

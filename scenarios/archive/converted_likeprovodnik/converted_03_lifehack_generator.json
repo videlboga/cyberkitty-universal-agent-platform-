@@ -1,0 +1,101 @@
+{
+  "scenario_id": "lifehack_generator_flow",
+  "name": "Генератор лайфхаков",
+  "description": "Генерация бизнес-лайфхаков с ИИ по нише пользователя и по запросу",
+  "version": "2.1",
+  "initial_context": {},
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "load_user_context"
+    },
+    {
+      "id": "load_user_context",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_mongo_find_data",
+        "preserve_context": true
+      },
+      "next_step": "log_request"
+    },
+    {
+      "id": "log_request",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_log_message",
+        "preserve_context": true
+      },
+      "next_step": "check_user_profile"
+    },
+    {
+      "id": "check_user_profile",
+      "type": "branch",
+      "params": {
+        "condition": "exists({user_profile})",
+        "true_step": "check_daily_trigger",
+        "false_step": "generate_generic_lifehack"
+      }
+    },
+    {
+      "id": "check_daily_trigger",
+      "type": "branch",
+      "params": {
+        "condition": "{trigger_type} == 'daily'",
+        "true_step": "generate_daily_lifehack",
+        "false_step": "generate_personalized_lifehack"
+      }
+    },
+    {
+      "id": "generate_daily_lifehack",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "preserve_context": true
+      },
+      "next_step": "send_response"
+    },
+    {
+      "id": "generate_personalized_lifehack",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "preserve_context": true
+      },
+      "next_step": "save_to_history"
+    },
+    {
+      "id": "generate_generic_lifehack",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "preserve_context": true
+      },
+      "next_step": "save_to_history"
+    },
+    {
+      "id": "save_to_history",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_mongo_save_data",
+        "preserve_context": true
+      },
+      "next_step": "send_response"
+    },
+    {
+      "id": "send_response",
+      "type": "channel_action",
+      "params": {
+        "action": "send_message",
+        "chat_id": "{chat_id}",
+        "text": "{lifehack_text}",
+        "parse_mode": "HTML"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ]
+}

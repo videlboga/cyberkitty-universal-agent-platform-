@@ -1,0 +1,215 @@
+scenario_id: "mr_ontobot_diagnostic_ya_ya"
+name: "Диагностика Я-Я"
+description: "Первый этап диагностики мыслевирусов - сфера отношения к себе"
+
+initial_context:
+  current_diagnostic_stage: "ya_ya"
+  ya_ya_response: null
+  examples_viewed: false
+
+steps:
+  - id: start
+    type: start
+    next_step: send_ya_ya_video
+
+  - id: send_ya_ya_video
+    type: channel_action
+    params:
+      action: forward_message
+      chat_id: "{chat_id}"
+      from_chat_id: "-1002614708769"
+      message_id: 3  # ID видео "Задание Я-Я" - второе видео в канале
+    next_step: show_ya_ya_options
+
+  - id: show_ya_ya_options
+    type: channel_action
+    params:
+      action: send_buttons
+      chat_id: "{chat_id}"
+      text: "Посмотри видео и выполни задание"
+      buttons:
+        - text: "Посмотреть примеры мыслевирусов"
+          callback_data: "view_ya_ya_examples"
+        - text: "Написать мыслевирусы «Я-Я»"
+          callback_data: "write_ya_ya_viruses"
+    next_step: wait_for_choice
+
+  - id: wait_for_choice
+    type: input_button
+    params:
+      variable: "user_choice"
+      timeout_seconds: 3600
+    next_step: process_choice
+
+  - id: process_choice
+    type: branch
+    params:
+      conditions:
+        - condition: "{callback_data} == 'view_ya_ya_examples'"
+          next_step: show_examples
+        - condition: "{callback_data} == 'write_ya_ya_viruses'"
+          next_step: provide_instructions
+      default_next_step: show_examples
+
+  - id: show_examples
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: "📊 Примеры мыслевирусов «Я-Я»"
+      # TODO: Добавить отправку инфографики когда будет предоставлена
+    next_step: update_examples_viewed
+
+  - id: update_examples_viewed
+    type: action
+    params:
+      action_type: "update_context"
+      updates:
+        examples_viewed: true
+    next_step: offer_writing_after_examples
+
+  - id: offer_writing_after_examples
+    type: channel_action
+    params:
+      action: send_buttons
+      chat_id: "{chat_id}"
+      text: "Теперь можешь приступить к написанию своих мыслевирусов"
+      buttons:
+        - text: "Написать мыслевирусы «Я-Я»"
+          callback_data: "write_ya_ya_viruses"
+    next_step: wait_for_writing_choice
+
+  - id: wait_for_writing_choice
+    type: input_button
+    params:
+      variable: "user_choice"
+      timeout_seconds: 3600
+    next_step: provide_instructions
+
+  - id: provide_instructions
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        Как писать мыслевирусы "Я и Я":
+
+        🎯 **Сосредоточьтесь на себе:** Подумайте о своем отношении к себе, о своих качествах, способностях, внешности, характере, ценности как личности.
+
+        🔍 **Ловите самокритику:** Записывайте любые негативные, осуждающие или ограничивающие мысли о себе. Это могут быть фразы, которые часто крутятся в голове.
+
+        ❓ **Фиксируйте сомнения:** Любые мысли, выражающие неуверенность в себе, своих силах, праве на счастье или успех.
+
+        📉 **Описывайте ощущения "недостаточности":** Если чувствуете, что вы "недостаточно хороши/умны/красивы/достойны" – запишите это.
+
+        💯 **Будьте честны:** Не бойтесь "неправильных" или "стыдных" мыслей. Чем откровеннее, тем точнее будет диагностика.
+
+        **Примеры для старта:**
+        • "Я всегда все порчу"
+        • "Я недостаточно умный(ая)"
+        • "Меня сложно любить"
+        • "Я никогда не смогу измениться"
+        • "Я не заслуживаю успеха"
+
+        Главное – записывайте те мысли, которые вызывают у вас внутренний дискомфорт или ограничивают вас.
+    next_step: request_ya_ya_input
+
+  - id: request_ya_ya_input
+    type: channel_action
+    params:
+      action: send_buttons
+      chat_id: "{chat_id}"
+      text: "Теперь напиши свои мыслевирусы в сфере «Я-Я». Будь максимально честен с собой."
+      buttons:
+        - text: "Написать мыслевирусы «Я-Я»"
+          callback_data: "ready_to_write"
+    next_step: wait_for_ready_signal
+
+  - id: wait_for_ready_signal
+    type: input_button
+    params:
+      variable: "user_choice"
+      timeout_seconds: 3600
+    next_step: collect_ya_ya_response
+
+  - id: collect_ya_ya_response
+    type: input_text
+    params:
+      variable: "ya_ya_response"
+      prompt: "Напиши свои мыслевирусы «Я-Я»:"
+      timeout_seconds: 3600  # 1 час на ответ
+    next_step: save_ya_ya_response
+
+  - id: save_ya_ya_response
+    type: action
+    params:
+      action_type: "update_context"
+      updates:
+        ya_ya_response: "{ya_ya_response}"
+    next_step: save_to_database
+
+  - id: save_to_database
+    type: mongo_insert_document
+    params:
+      collection: "diagnostic_responses"
+      document:
+        user_id: "{user_id}"
+        chat_id: "{chat_id}"
+        stage: "ya_ya"
+        response: "{ya_ya_response}"
+        timestamp: "{current_timestamp}"
+        session_id: "{session_id}"
+    next_step: update_amocrm_contact
+
+  - id: update_amocrm_contact
+    type: amocrm_update_contact
+    params:
+      contact_id: "{amocrm_contact.contact_id}"
+      custom_fields:
+        DIAGNOSTIC_STAGE: "ya_ya_completed"
+        YA_YA_RESPONSE: "{ya_ya_response}"
+        YA_YA_COMPLETED_AT: "{current_timestamp}"
+      output_var: "amocrm_update_result"
+    next_step: add_ya_ya_note
+
+  - id: add_ya_ya_note
+    type: amocrm_add_note
+    params:
+      entity_type: "contacts"
+      entity_id: "{amocrm_contact.contact_id}"
+      note_type: "common"
+      text: |
+        ✅ Диагностика "Я-Я" завершена
+        
+        📅 Дата: {current_timestamp}
+        📝 Ответ пользователя:
+        {ya_ya_response}
+        
+        Следующий этап: Диагностика "Я-Дело"
+    next_step: confirm_and_proceed
+
+  - id: confirm_and_proceed
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: "Благодарю, теперь смотри следующее видео и выполни задание."
+    next_step: update_stage_and_switch
+
+  - id: update_stage_and_switch
+    type: action
+    params:
+      action_type: "update_context"
+      updates:
+        current_stage: "diagnostic_ya_delo"
+    next_step: switch_to_ya_delo
+
+  - id: switch_to_ya_delo
+    type: switch_scenario
+    params:
+      scenario_id: "mr_ontobot_diagnostic_ya_delo"
+      preserve_context: true
+    next_step: end
+
+  - id: end
+    type: end 

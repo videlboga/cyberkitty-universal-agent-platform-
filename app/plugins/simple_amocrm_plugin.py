@@ -12,8 +12,13 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 from loguru import logger
 import httpx
+import asyncio
+import hashlib
+import aiohttp
+from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.core.base_plugin import BasePlugin
+from app.core.template_resolver import template_resolver
 
 
 class SimpleAmoCRMPlugin(BasePlugin):
@@ -87,8 +92,8 @@ class SimpleAmoCRMPlugin(BasePlugin):
                 
             mongo_plugin = self.engine.plugins['mongo']
             
-            # Загружаем карту полей из коллекции settings (УПРОЩЕНО!)
-            fields_result = await mongo_plugin._find_one("settings", {"plugin": "simple_amocrm_fields"})
+            # Загружаем карту полей из коллекции settings (ИСПРАВЛЕНО!)
+            fields_result = await mongo_plugin._find_one("settings", {"plugin": "simple_amocrm_fields_contacts"})
             
             if fields_result and fields_result.get("success") and fields_result.get("document"):
                 self.fields_map = fields_result["document"].get("contact_fields", {})
@@ -150,6 +155,26 @@ class SimpleAmoCRMPlugin(BasePlugin):
         except Exception as e:
             logger.error(f"❌ Ошибка динамической загрузки настроек AmoCRM: {e}")
 
+    async def _ensure_fresh_fields(self):
+        """Динамически загружает актуальную карту полей из БД"""
+        try:
+            if not self.engine or not hasattr(self.engine, 'plugins') or 'mongo' not in self.engine.plugins:
+                return
+                
+            mongo_plugin = self.engine.plugins['mongo']
+            fields_result = await mongo_plugin._find_one("settings", {"plugin": "simple_amocrm_fields_contacts"})
+            
+            if fields_result and fields_result.get("success") and fields_result.get("document"):
+                new_fields_map = fields_result["document"].get("contact_fields", {})
+                
+                # Обновляем карту полей если она изменилась
+                if len(new_fields_map) != len(self.fields_map) or new_fields_map != self.fields_map:
+                    self.fields_map = new_fields_map
+                    logger.info(f"✅ Карта полей AmoCRM обновлена: {len(self.fields_map)} полей")
+                    
+        except Exception as e:
+            logger.error(f"❌ Ошибка динамической загрузки карты полей AmoCRM: {e}")
+
     async def _make_request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
         """Выполняет HTTP запрос к AmoCRM API"""
         
@@ -203,11 +228,12 @@ class SimpleAmoCRMPlugin(BasePlugin):
             }
     
     def _resolve_value(self, value: Any, context: Dict[str, Any]) -> Any:
-        """Подстановка переменных из контекста"""
+        """Подстановка переменных из контекста с поддержкой вложенных объектов"""
         if isinstance(value, str) and "{" in value and "}" in value:
             try:
-                return value.format(**context)
-            except (KeyError, ValueError) as e:
+                # Используем глобальный template_resolver
+                return template_resolver.resolve(value, context)
+            except Exception as e:
                 logger.warning(f"Не удалось разрешить '{value}': {e}")
                 return value
         return value
@@ -422,7 +448,7 @@ class SimpleAmoCRMPlugin(BasePlugin):
             
             # Дополнительные кастомные поля через карту полей
             if custom_fields_data and self.fields_map:
-                mapped_fields = self._prepare_custom_fields(custom_fields_data)
+                mapped_fields = await self._prepare_custom_fields(custom_fields_data, context)
                 custom_fields.extend(mapped_fields)
             
             if custom_fields:
@@ -530,6 +556,9 @@ class SimpleAmoCRMPlugin(BasePlugin):
         # Обеспечиваем актуальные настройки
         await self._ensure_fresh_settings()
         
+        # КРИТИЧНО: Обеспечиваем актуальную карту полей 
+        await self._ensure_fresh_fields()
+        
         params = step_data.get("params", {})
         
         try:
@@ -549,23 +578,25 @@ class SimpleAmoCRMPlugin(BasePlugin):
             
             # Кастомные поля
             custom_fields = params.get("custom_fields", {})
-            used_fields_map = params.get("used_fields_map", False)
             
             if custom_fields:
-                if used_fields_map and self.fields_map:
-                    # Используем карту полей для преобразования
-                    contact_data["custom_fields_values"] = self._prepare_custom_fields(custom_fields)
+                # ВСЕГДА используем карту полей для преобразования имен полей
+                if self.fields_map:
+                    contact_data["custom_fields_values"] = await self._prepare_custom_fields(custom_fields, context)
                 else:
-                    # Прямое указание полей
+                    logger.warning("⚠️ Карта полей недоступна - пропускаем обновление custom_fields")
+                    # Прямое указание полей как fallback (только если это числовые ID)
                     contact_data["custom_fields_values"] = []
                     for field_id, value in custom_fields.items():
                         if isinstance(value, dict):
                             contact_data["custom_fields_values"].append(value)
-                        else:
+                        elif field_id.isdigit():  # Только если это числовой ID
                             contact_data["custom_fields_values"].append({
                                 "field_id": int(field_id),
                                 "values": [{"value": str(value)}]
                             })
+                        else:
+                            logger.warning(f"⚠️ Поле '{field_id}' не найдено в карте полей и не является числовым ID")
             
             # Обновляем контакт
             endpoint = f"/api/v4/contacts/{contact_id}"
@@ -742,11 +773,20 @@ class SimpleAmoCRMPlugin(BasePlugin):
             logger.error(f"❌ Ошибка получения карты полей: {e}")
             context["__step_error__"] = f"AmoCRM получение карты полей: {str(e)}"
 
-    def _prepare_custom_fields(self, data: Dict[str, Any]) -> list:
+    async def _prepare_custom_fields(self, data: Dict[str, Any], context: Dict[str, Any]) -> list:
         """Подготавливает кастомные поля для AmoCRM API используя карту полей"""
+        
+        # Динамически загружаем актуальную карту полей из БД
+        await self._ensure_fresh_fields()
+        
         custom_fields = []
         
+        # ВАЖНО: Разрешаем переменные в значениях полей от caller context
+        resolved_data = {}
         for field_name, value in data.items():
+            resolved_data[field_name] = self._resolve_value(value, context)
+        
+        for field_name, value in resolved_data.items():
             field = self.fields_map.get(field_name)
             if not field:
                 logger.warning(f"Поле '{field_name}' не найдено в карте полей")

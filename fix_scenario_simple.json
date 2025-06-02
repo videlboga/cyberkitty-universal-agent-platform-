@@ -1,0 +1,138 @@
+{
+  "collection": "scenarios",
+  "filter": {"scenario_id": "mr_ontobot_diagnostic_ya_ya"},
+  "document": {
+    "steps": [
+      {
+        "id": "start",
+        "type": "start",
+        "next_step": "send_ya_ya_video"
+      },
+      {
+        "id": "send_ya_ya_video", 
+        "type": "channel_action",
+        "params": {
+          "action": "copy_message",
+          "chat_id": "{chat_id}",
+          "from_chat_id": "-1002614708769",
+          "message_id": 4,
+          "disable_notification": true
+        },
+        "next_step": "show_ya_ya_options"
+      },
+      {
+        "id": "show_ya_ya_options",
+        "type": "channel_action", 
+        "params": {
+          "action": "send_message",
+          "chat_id": "{chat_id}",
+          "text": "📝 **После просмотра видео выберите действие:**",
+          "reply_markup": {
+            "inline_keyboard": [
+              [{"text": "👁️ Посмотреть примеры мыслевирусов", "callback_data": "view_ya_ya_examples"}],
+              [{"text": "✍️ Написать свои мыслевирусы", "callback_data": "write_ya_ya_viruses"}]
+            ]
+          }
+        },
+        "next_step": "wait_for_ya_ya_choice"
+      },
+      {
+        "id": "wait_for_ya_ya_choice",
+        "type": "input",
+        "params": {
+          "waiting_for": "callback_query",
+          "expected_values": ["view_ya_ya_examples", "write_ya_ya_viruses"]
+        },
+        "next_step": "process_choice"
+      },
+      {
+        "id": "process_choice",
+        "type": "branch",
+        "params": {
+          "conditions": [
+            {"condition": "callback_data == \"view_ya_ya_examples\"", "next_step": "show_examples"},
+            {"condition": "callback_data == \"write_ya_ya_viruses\"", "next_step": "provide_instructions"}
+          ],
+          "default_next_step": "show_examples"
+        }
+      },
+      {
+        "id": "show_examples",
+        "type": "channel_action",
+        "params": {
+          "action": "send_message", 
+          "chat_id": "{chat_id}",
+          "text": "📊 **Примеры мыслевирусов «Я-Я»:**\n\n• \"Я недостаточно умный\"\n• \"Я не заслуживаю успеха\"\n• \"Я всегда делаю ошибки\"\n• \"Я не могу изменить свою жизнь\"\n• \"Я хуже других\"\n• \"Мне не везет в жизни\"\n• \"Я слишком старый/молодой для этого\"\n• \"У меня нет таланта\"\n\nТеперь попробуй найти свои мыслевирусы!",
+          "reply_markup": {
+            "inline_keyboard": [
+              [{"text": "✍️ Написать свои мыслевирусы", "callback_data": "write_ya_ya_viruses"}]
+            ]
+          }
+        },
+        "next_step": "wait_write_ya_ya"
+      },
+      {
+        "id": "wait_write_ya_ya",
+        "type": "input",
+        "params": {
+          "waiting_for": "callback_query",
+          "expected_values": ["write_ya_ya_viruses"]
+        },
+        "next_step": "provide_instructions"
+      },
+      {
+        "id": "provide_instructions",
+        "type": "channel_action",
+        "params": {
+          "action": "send_message",
+          "chat_id": "{chat_id}",
+          "text": "📝 **Задание «Я-Я»**\n\nНапиши 5-10 своих мыслевирусов о себе - негативные убеждения, которые ограничивают тебя.\n\nЭто могут быть мысли о:\n• Твоих способностях\n• Внешности\n• Характере\n• Достоинствах/недостатках\n• Возможностях\n\nБудь максимально честным - это поможет создать точную диагностику.\n\nНапиши свой ответ одним сообщением:"
+        },
+        "next_step": "wait_for_response"
+      },
+      {
+        "id": "wait_for_response",
+        "type": "input",
+        "params": {
+          "waiting_for": "text",
+          "timeout_seconds": 3600,
+          "variable": "response_text"
+        },
+        "next_step": "save_ya_ya_response"
+      },
+      {
+        "id": "save_ya_ya_response",
+        "type": "mongo_upsert_document",
+        "params": {
+          "collection": "ontobot_responses",
+          "filter": {"user_id": "{user_id}"},
+          "document": {
+            "user_id": "{user_id}",
+            "chat_id": "{chat_id}",
+            "response_type": "ya_ya",
+            "response_text": "{response_text}",
+            "completed_at": "{current_timestamp}"
+          }
+        },
+        "next_step": "switch_to_ya_delo"
+      },
+      {
+        "id": "switch_to_ya_delo",
+        "type": "switch_scenario",
+        "params": {
+          "scenario_id": "mr_ontobot_diagnostic_ya_delo",
+          "context": {
+            "ya_ya_response": "{response_text}",
+            "user_id": "{user_id}",
+            "chat_id": "{chat_id}"
+          }
+        },
+        "next_step": "end"
+      },
+      {
+        "id": "end",
+        "type": "end"
+      }
+    ]
+  }
+} 

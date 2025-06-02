@@ -38,11 +38,15 @@ pytest==7.4.3
 pytest-asyncio==0.21.1
 pytest-cov==4.1.0
 
+# Background Tasks & Queue
 celery
 redis
-pytest
+
+# Code Quality
 flake8
 isort
+
+# Various Utils
 email-validator
 asgi-lifespan
 requests
@@ -50,4 +54,53 @@ pytz
 tenacity
 passlib[bcrypt]
 python-jose[cryptography]
+
+# Task Scheduling
 apscheduler
+
+# PDF Generation
+pdfkit
+weasyprint
+reportlab
+
+# Document Processing
+markdown
+beautifulsoup4
+lxml
+
+# Image Processing
+Pillow
+
+# File Format Support
+openpyxl  # Excel files
+python-docx  # Word documents
+
+# Data Processing
+pandas
+numpy
+
+# Template Engine
+jinja2
+
+# Encryption & Security
+cryptography
+
+# Network & URL handling
+validators
+urllib3
+
+# JSON Web Tokens
+pyjwt
+
+# Text Processing
+bleach
+python-slugify
+
+# HTTP Client with advanced features
+requests-oauthlib
+
+# Additional PDF tools
+xhtml2pdf
+
+# File type detection
+python-magic

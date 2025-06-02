@@ -1,0 +1,67 @@
+scenario_id: mr_ontobot_main_router
+name: OntoBot Главный Роутер
+description: Главный сценарий для диагностики мыслевирусов OntoBot
+initial_context:
+  bot_name: mr_ontobot
+  channel_id: ontobot_main
+steps:
+- id: start
+  type: start
+  params:
+    message: 🎯 **Добро пожаловать в OntoBot!**
+  next_step: send_intro_video
+- id: send_intro_video
+  type: channel_action
+  params:
+    action: copy_message
+    chat_id: '{chat_id}'
+    from_chat_id: '-1002614708769'
+    message_id: 2
+    disable_notification: true
+  next_step: show_start_diagnostic
+- id: show_start_diagnostic
+  type: channel_action
+  params:
+    action: send_message
+    chat_id: '{chat_id}'
+    text: '🧠 **Готовы к диагностике мыслевирусов?**
+
+
+      Это займет около 15-20 минут. Вы узнаете:
+
+
+      ✅ Какие мыслевирусы блокируют ваш успех
+
+      ✅ Как они влияют на вашу жизнь
+
+      ✅ Конкретные шаги для их устранения'
+    reply_markup:
+      inline_keyboard:
+      - - text: 🚀 Начать диагностику
+          callback_data: start_diagnostic
+  next_step: wait_for_diagnostic_start
+- id: wait_for_diagnostic_start
+  type: input
+  params:
+    input_type: callback_query
+    expected_callbacks:
+    - start_diagnostic
+    timeout: 3600
+  next_step: grant_access
+- id: grant_access
+  type: action
+  params:
+    access_timer_hours: 24
+    access_granted_at: '{current_datetime}'
+    diagnostic_started: true
+  next_step: switch_to_ya_ya
+- id: switch_to_ya_ya
+  type: switch_scenario
+  params:
+    scenario_id: mr_ontobot_diagnostic_ya_ya
+    context_merge: true
+  next_step: end
+- id: end
+  type: end
+  params:
+    message: Диагностика завершена

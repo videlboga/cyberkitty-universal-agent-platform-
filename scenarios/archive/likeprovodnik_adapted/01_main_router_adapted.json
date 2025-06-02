@@ -1,0 +1,117 @@
+{
+  "scenario_id": "likeprovodnik_main_router_v2",
+  "name": "ЛайкПроводник - Главный роутер v2.0",
+  "description": "Основной сценарий маршрутизации пользователей по модулям (адаптация под Universal Agent Platform)",
+  "version": "2.0",
+  
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "welcome_message"
+    },
+    {
+      "id": "welcome_message",
+      "type": "channel_action",
+      "params": {
+        "action": "send_message",
+        "chat_id": "{chat_id}",
+        "text": "🤖 Привет! Я ЛайкПроводник — твой AI-помощник в мире бизнеса и технологий!\n\n✨ Что я умею:\n🎯 <b>AI-Путь</b> — создаю персональный план обучения\n💡 <b>Лайфхаки</b> — генерирую бизнес-советы с ИИ\n👨‍🏫 <b>Наставник</b> — отвечаю на вопросы по курсам\n🧠 <b>НейроЭксперт</b> — решаю сложные задачи пошагово\n🧘 <b>AI-Коуч</b> — помогаю с мотивацией и рефлексией\n📰 <b>iДайджест</b> — новости ИИ за неделю\n\n💬 Просто напиши что тебя интересует!",
+        "parse_mode": "HTML"
+      },
+      "next_step": "load_user_profile"
+    },
+    {
+      "id": "load_user_profile",
+      "type": "mongo_find_one_document",
+      "params": {
+        "collection": "users",
+        "filter": {"user_id": "{user_id}"},
+        "output_var": "user_profile"
+      },
+      "next_step": "check_new_user"
+    },
+    {
+      "id": "check_new_user",
+      "type": "branch",
+      "params": {
+        "condition": "not exists({user_profile}) or get({user_profile}, 'onboarding_completed', false) == false",
+        "true_scenario": "ai_path_onboarding_flow_v2",
+        "false_step": "detect_intent"
+      }
+    },
+    {
+      "id": "detect_intent",
+      "type": "branch",
+      "params": {
+        "condition": "contains(lower({message_text}), 'лайфхак') or contains(lower({message_text}), 'совет')",
+        "true_scenario": "lifehack_generator_flow_v2",
+        "false_step": "check_mentor"
+      }
+    },
+    {
+      "id": "check_mentor",
+      "type": "branch",
+      "params": {
+        "condition": "contains(lower({message_text}), 'наставник') or contains(lower({message_text}), 'урок') or contains(lower({message_text}), 'материал') or contains(lower({message_text}), 'курс')",
+        "true_scenario": "ai_mentor_flow_v2",
+        "false_step": "check_expert"
+      }
+    },
+    {
+      "id": "check_expert",
+      "type": "branch",
+      "params": {
+        "condition": "contains(lower({message_text}), 'задача') or contains(lower({message_text}), 'решение') or contains(lower({message_text}), 'эксперт') or contains(lower({message_text}), 'проблема')",
+        "true_scenario": "neuroexpert_flow_v2",
+        "false_step": "check_coach"
+      }
+    },
+    {
+      "id": "check_coach",
+      "type": "branch",
+      "params": {
+        "condition": "contains(lower({message_text}), 'цель') or contains(lower({message_text}), 'коуч') or contains(lower({message_text}), 'рефлексия') or contains(lower({message_text}), 'мотивация')",
+        "true_scenario": "ai_coach_flow_v2",
+        "false_step": "check_digest"
+      }
+    },
+    {
+      "id": "check_digest",
+      "type": "branch",
+      "params": {
+        "condition": "contains(lower({message_text}), 'новости') or contains(lower({message_text}), 'дайджест') or contains(lower({message_text}), 'ии') or contains(lower({message_text}), 'ai')",
+        "true_scenario": "idigest_flow_v2",
+        "false_step": "check_plan"
+      }
+    },
+    {
+      "id": "check_plan",
+      "type": "branch",
+      "params": {
+        "condition": "contains(lower({message_text}), 'план') or contains(lower({message_text}), 'обучение') or contains(lower({message_text}), 'путь')",
+        "true_scenario": "ai_path_onboarding_flow_v2",
+        "false_step": "default_lifehack"
+      }
+    },
+    {
+      "id": "default_lifehack",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "lifehack_generator_flow_v2",
+        "preserve_context": true
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ],
+  
+  "initial_context": {
+    "system_name": "ЛайкПроводник v2.0",
+    "version": "2.0",
+    "platform": "Universal Agent Platform"
+  }
+} 

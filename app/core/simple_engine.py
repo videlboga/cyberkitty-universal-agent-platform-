@@ -169,21 +169,22 @@ class SimpleScenarioEngine:
             "start": self._handle_start,
             "end": self._handle_end,
             "action": self._handle_action,
+            "input_text": self._handle_input_text,
+            "input_button": self._handle_input_button,
             "input": self._handle_input,
-            "branch": self._handle_branch,  # Современные условные переходы
-            "switch_scenario": self._handle_switch_scenario,  # Переключение сценариев
-            "log_message": self._handle_log_message,  # Логирование сообщений
+            "branch": self._handle_branch,
+            "conditional_execute": self._handle_conditional_execute,
+            "switch_scenario": self._handle_switch_scenario,
+            "log_message": self._handle_log_message,
             
-            # === УНИВЕРСАЛЬНЫЙ ХЕНДЛЕР КАНАЛОВ ===
-            "channel_action": self._handle_channel_action,  # Универсальные действия с каналами
-            
-            # === СПЕЦИФИЧНЫЕ ХЕНДЛЕРЫ ДЛЯ СИСТЕМЫ ПОЛЬЗОВАТЕЛЕЙ ===
+            # === TELEGRAM ИНТЕГРАЦИЯ ===
+            "channel_action": self._handle_channel_action,
             "extract_telegram_context": self._handle_extract_telegram_context,
+            
+            # === ВАЛИДАЦИЯ И УТИЛИТЫ ===
             "validate_field": self._handle_validate_field,
             "increment": self._handle_increment,
             "save_to_object": self._handle_save_to_object,
-            "build_diagnosis_prompt": self._handle_build_diagnosis_prompt,
-            "route_callback": self._handle_route_callback,
         })
         self.logger.info("Зарегистрированы современные обработчики", handlers=list(self.step_handlers.keys()))
         
@@ -397,7 +398,49 @@ class SimpleScenarioEngine:
         # Создаем копию шага с разрешенными параметрами
         resolved_step = step.copy()
         if "params" in resolved_step:
-            resolved_step["params"] = template_resolver.resolve_deep(resolved_step["params"], context)
+            original_params = resolved_step["params"]
+            
+            # МАКСИМАЛЬНО ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ
+            logger.info(f"🔍 НАЧИНАЮ ПОДСТАНОВКУ для шага {step_id} (тип: {step_type})")
+            logger.info(f"🔍 original_params: {original_params}")
+            logger.info(f"🔍 template_resolver объект: {template_resolver}")
+            logger.info(f"🔍 контекст ключи: {list(context.keys())}")
+            
+            # СПЕЦИАЛЬНОЕ ЛОГИРОВАНИЕ для contact переменной
+            contact_value = context.get('contact')
+            if contact_value:
+                logger.info(f"🔍 CONTACT В КОНТЕКСТЕ: {contact_value}")
+            else:
+                logger.info(f"🔍 CONTACT НЕ НАЙДЕН В КОНТЕКСТЕ!")
+            
+            try:
+                resolved_step["params"] = template_resolver.resolve_deep(resolved_step["params"], context)
+                logger.info(f"🔍 resolve_deep ВЫПОЛНЕН успешно")
+                logger.info(f"🔍 resolved_params: {resolved_step['params']}")
+            except Exception as e:
+                logger.error(f"🚨 ОШИБКА в resolve_deep: {e}")
+                logger.error(f"🚨 Тип ошибки: {type(e).__name__}")
+                import traceback
+                logger.error(f"🚨 Stack trace: {traceback.format_exc()}")
+            
+            # ОТЛАДОЧНОЕ ЛОГИРОВАНИЕ для диагностики подстановки переменных  
+            # ВРЕМЕННО: логируем ВСЕ шаги для диагностики
+            if original_params != resolved_step['params']:
+                logger.info(f"🔍 ОТЛАДКА подстановки переменных в шаге {step_id} (тип: {step_type}):")
+                logger.info(f"   До:     {original_params}")
+                logger.info(f"   После:  {resolved_step['params']}")
+                logger.info(f"   Контекст доступен: telegram_first_name={context.get('telegram_first_name')}, contact.phone_number={context.get('contact', {}).get('phone_number')}")
+                logger.info(f"   ПОЛНЫЙ КОНТЕКСТ CONTACT: {context.get('contact')}")
+                logger.info(f"   ВСЕ КЛЮЧИ КОНТЕКСТА: {list(context.keys())}")
+                logger.info(f"   💾 ЕСТЬ ЛИ contact В КОРНЕ? {'contact' in context}")
+                logger.info(f"   💾 ТИП context: {type(context)}")
+                logger.info(f"   💾 LEN context: {len(context)}")
+                # Проверим каждый ключ содержащий contact
+                contact_related_keys = [k for k in context.keys() if 'contact' in str(k).lower()]
+                logger.info(f"   💾 КЛЮЧИ С contact: {contact_related_keys}")
+                logger.info(f"   Равны:  {original_params == resolved_step['params']}")
+            else:
+                logger.info(f"🔍 Параметры НЕ ИЗМЕНИЛИСЬ в шаге {step_id}")
             
         self.logger.debug(
             f"Параметры шага {step_id} после подстановки",
@@ -488,6 +531,14 @@ class SimpleScenarioEngine:
     async def _handle_end(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Обработчик шага 'end'.""" 
         self.logger.info("Обрабатываю шаг end", step_id=step.get("id"))
+        
+        # Очищаем данные ввода в конце сценария
+        context.pop("callback_data", None)
+        context.pop("user_input", None)
+        context.pop("waiting_for_input", None)
+        context.pop("input_step_id", None)
+        self.logger.info("🧹 Очистил данные ввода в конце сценария")
+        
         context["execution_completed"] = True
         return context
         
@@ -573,20 +624,237 @@ class SimpleScenarioEngine:
         
         return context
         
+    async def _handle_input_text(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Обработчик шага 'input_text' - ожидание ТЕКСТОВОГО ввода пользователя.
+        
+        КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Сначала проверяем данные, потом очищаем!
+        """
+        self.logger.info("Обрабатываю шаг input_text (только текст)", step_id=step.get("id"))
+        
+        params = step.get("params", {})
+        variable = params.get("variable")  # Переменная для сохранения ввода
+        current_step_id = step.get("id")
+        
+        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Сначала ищем текстовые данные БЕЗ очистки
+        text_input = None
+        
+        # Проверяем user_input (приоритет)
+        if context.get("user_input") and not context["user_input"].startswith("/"):
+            text_input = context["user_input"]
+            self.logger.info(f"✅ Найден user_input: {text_input}")
+        
+        # Проверяем message_text (если нет user_input)
+        elif (context.get("message_text") and 
+              not context["message_text"].startswith("/") and
+              context["message_text"] != "/start"):
+            text_input = context["message_text"]
+            self.logger.info(f"✅ Найден message_text: {text_input}")
+        
+        if text_input:
+            # ЕСТЬ ТЕКСТОВЫЕ ДАННЫЕ - обрабатываем
+            # Сохраняем текст в переменную
+            if variable:
+                context[variable] = text_input
+                self.logger.info(f"💾 Сохранил текст в {variable}: {text_input}")
+            
+            # Теперь очищаем использованные данные
+            context.pop("user_input", None)
+            context.pop("message_text", None)
+            context["waiting_for_input"] = False
+            context.pop("input_step_id", None)
+            
+            self.logger.info(f"✅ input_text шаг {current_step_id} завершен с текстом: {text_input}")
+            return context
+        else:
+            # НЕТ ТЕКСТОВЫХ ДАННЫХ - ждём ввода
+            # Очищаем старые данные только если это ДРУГОЙ шаг
+            current_input_step = context.get("input_step_id")
+            if current_input_step and current_input_step != current_step_id:
+                self.logger.info(f"🧹 Переключение с шага {current_input_step} на {current_step_id} - очищаю старые данные")
+                context.pop("user_input", None)
+                context.pop("callback_data", None)
+                context.pop("message_text", None)
+            
+            self.logger.info(f"⏱️ input_text ждёт текстовый ввод на шаге {current_step_id}")
+            
+            context["waiting_for_input"] = True
+            context["input_step_id"] = current_step_id
+            
+            raise StopExecution(f"Ожидание текстового ввода на шаге {current_step_id}")
+        
+    async def _handle_input_button(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Обработчик шага 'input_button' - ожидание нажатия кнопки (callback_query).
+        """
+        self.logger.info("Обрабатываю шаг input_button (только кнопки)", step_id=step.get("id"))
+        
+        params = step.get("params", {})
+        variable = params.get("variable")  # Переменная для сохранения ввода
+        
+        # 🔍 ОТЛАДОЧНОЕ ЛОГИРОВАНИЕ КОНТЕКСТА
+        self.logger.info(f"🔍 ПОЛНЫЙ КОНТЕКСТ input_button: {context}")
+        self.logger.info(f"🔍 CALLBACK_DATA в контексте: {context.get('callback_data')}")
+        self.logger.info(f"🔍 EVENT_TYPE в контексте: {context.get('event_type')}")
+        
+        # ИСПРАВЛЕНО: Не очищаем данные если у нас уже есть callback_data для этого шага
+        current_input_step = context.get("input_step_id")
+        step_id = step.get("id")
+        has_callback_data = context.get("callback_data")
+        
+        # Очищаем старые данные ТОЛЬКО если это действительно новый шаг И нет актуальных данных
+        if current_input_step != step_id and not has_callback_data:
+            self.logger.info(f"🧹 Новый input_button шаг - очищаю данные")
+            context.pop("user_input", None)
+            context.pop("callback_data", None)
+            context.pop("message_text", None)
+        
+        # Ищем ТОЛЬКО callback_data
+        button_data = context.get("callback_data")
+        
+        if button_data:
+            # Сохраняем данные кнопки в переменную
+            if variable:
+                context[variable] = button_data
+                self.logger.info(f"💾 Сохранил callback_data в {variable}: {button_data}")
+            
+            # Очищаем использованные данные
+            context.pop("callback_data", None)
+            context["waiting_for_input"] = False
+            context.pop("input_step_id", None)
+            
+            self.logger.info(f"✅ input_button шаг {step_id} завершен с кнопкой: {button_data}")
+            return context
+        else:
+            # Нет данных кнопки - ждём
+            self.logger.info(f"⏱️ input_button ждёт нажатие кнопки на шаге {step_id}")
+            
+            context["waiting_for_input"] = True
+            context["input_step_id"] = step_id
+            
+            raise StopExecution(f"Ожидание нажатия кнопки на шаге {step_id}")
+        
     async def _handle_input(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """
         Обработчик шага 'input' - ожидание ввода пользователя.
         
-        При достижении input шага выполнение останавливается.
-        Продолжение происходит через callback или новый запрос.
+        КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Проверка данных ДО их очистки!
         """
-        self.logger.info("Обрабатываю шаг input - останавливаю выполнение", step_id=step.get("id"))
+        self.logger.info("Обрабатываю шаг input", step_id=step.get("id"))
         
-        context["waiting_for_input"] = True
-        context["input_step_id"] = step.get("id")
+        params = step.get("params", {})
+        waiting_for = params.get("waiting_for", "any")
+        expected_values = params.get("expected_values", [])  # для валидации callback
+        variable = params.get("variable")  # Переменная для сохранения ввода
         
-        # Останавливаем выполнение - следующий шаг будет выполнен при получении ввода
-        raise StopExecution(f"Ожидание ввода на шаге {step.get('id')}")
+        # 🔍 ОТЛАДОЧНОЕ ЛОГИРОВАНИЕ КОНТЕКСТА
+        self.logger.info(f"🔍 ПОЛНЫЙ КОНТЕКСТ: {context}")
+        self.logger.info(f"🔍 WAITING_FOR: {waiting_for}")
+        self.logger.info(f"🔍 EXPECTED_VALUES: {expected_values}")
+        self.logger.info(f"🔍 CALLBACK_DATA в контексте: {context.get('callback_data')}")
+        self.logger.info(f"🔍 EVENT_TYPE в контексте: {context.get('event_type')}")
+        
+        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: СНАЧАЛА проверяем есть ли актуальные данные для этого шага
+        has_callback = "callback_data" in context and context["callback_data"]
+        has_message = "user_input" in context and context["user_input"]
+        # ИСПРАВЛЕНИЕ: /start НЕ является валидным вводом для input шагов
+        has_text = ("message_text" in context and context["message_text"] and 
+                   context["message_text"] != "/start" and 
+                   not context["message_text"].startswith("/"))
+        has_contact = "contact" in context and context["contact"]
+        
+        input_available = False
+        input_value = None
+        
+        if waiting_for == "callback_query" and has_callback:
+            callback_value = context["callback_data"]
+            # Проверяем expected_values если указаны
+            if expected_values and callback_value not in expected_values:
+                self.logger.info(f"⚠️ Callback {callback_value} не в списке ожидаемых {expected_values}")
+                # Если callback не подходит, продолжаем ожидание
+            else:
+                input_available = True
+                input_value = callback_value
+                self.logger.info(f"✅ Callback данные доступны: {input_value}")
+        elif waiting_for == "contact" and has_contact:
+            input_available = True
+            input_value = context["contact"]
+            self.logger.info(f"✅ Контакт доступен: {input_value}")
+        elif waiting_for == "text" and (has_message or has_text):
+            input_available = True
+            input_value = context.get("user_input") or context.get("message_text")
+            self.logger.info(f"✅ Текстовые данные доступны: {input_value}")
+        elif waiting_for == "message" and (has_message or has_text):
+            input_available = True
+            input_value = context.get("user_input") or context.get("message_text")
+            self.logger.info(f"✅ Текстовые данные доступны: {input_value}")
+        elif waiting_for == "any" and (has_callback or has_message or has_text or has_contact):
+            input_available = True
+            input_value = context.get("callback_data") or context.get("user_input") or context.get("message_text") or context.get("contact")
+            self.logger.info(f"✅ Входные данные доступны: {input_value}")
+        
+        if input_available and input_value and (not isinstance(input_value, str) or not input_value.startswith("/")):
+            # ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА: команды не являются валидным вводом (только для строк)
+            # Сохраняем ввод в указанную переменную
+            if variable:
+                context[variable] = input_value
+                self.logger.info(f"💾 Сохранил ввод в переменную {variable}: {input_value}")
+            
+            # ИСПРАВЛЕНИЕ: НЕ удаляем callback_data сразу - он может понадобиться для branch шагов
+            # Очищаем только некритичные данные ввода
+            context.pop("user_input", None)
+            # НЕ удаляем callback_data! context.pop("callback_data", None) 
+            
+            # КРИТИЧНО: ВСЕГДА сохраняем contact данные если они есть!
+            # ОТЛАДОЧНОЕ ЛОГИРОВАНИЕ
+            self.logger.info(f"🔍 WAITING_FOR ПАРАМЕТР: {waiting_for}")
+            self.logger.info(f"🔍 INPUT_VALUE ТИП: {type(input_value)}")
+            self.logger.info(f"🔍 INPUT_VALUE: {input_value}")
+            
+            if waiting_for == "contact" and isinstance(input_value, dict) and "contact" in context:
+                # Сохраняем contact в корневом контексте для доступа через {contact.phone_number}
+                contact_data = context["contact"]
+                # НЕ удаляем! context.pop("contact", None)
+                self.logger.info(f"💾 УСЛОВИЕ waiting_for=contact ВЫПОЛНЕНО - сохраняю contact: {contact_data}")
+            elif isinstance(input_value, dict) and input_value.get("phone_number"):
+                # ИСПРАВЛЕНИЕ: Если input_value сам является контактом, сохраняем его как contact
+                context["contact"] = input_value
+                self.logger.info(f"💾 СОХРАНЯЮ input_value как contact: {input_value}")
+            
+            if context.get("message_text") != "/start":
+                context.pop("message_text", None)
+            
+            context["waiting_for_input"] = False
+            context.pop("input_step_id", None)
+            
+            self.logger.info(f"✅ Input шаг {step.get('id')} завершен с вводом: {input_value}")
+            self.logger.info(f"🔍 callback_data сохранён для последующих шагов: {context.get('callback_data')}")
+            if "contact" in context:
+                self.logger.info(f"🔍 contact сохранён в контексте: {context.get('contact')}")
+            else:
+                self.logger.info(f"🚨 contact НЕ НАЙДЕН в контексте после обработки!")
+            return context
+        else:
+            # Данных нет - очищаем старые данные ТОЛЬКО если это новый input шаг
+            current_input_step = context.get("input_step_id")
+            if current_input_step != step.get("id"):
+                # Это новый input шаг - очищаем старые данные
+                self.logger.info(f"🧹 Очищаю старые данные ввода для нового шага {step.get('id')}")
+                context.pop("user_input", None)
+                # НЕ удаляем callback_data! context.pop("callback_data", None)
+                context.pop("contact", None)
+                # ИСПРАВЛЕНИЕ: /start НЕ является валидным вводом для input шагов
+                if context.get("message_text") != "/start":
+                    context.pop("message_text", None)
+            
+            # Останавливаем выполнение для ожидания ввода
+            self.logger.info(f"⏱️ Останавливаю выполнение - ожидание ввода на шаге {step.get('id')}")
+            self.logger.info(f"🔍 Доступные данные: callback={has_callback}, message={has_message}, text={has_text}, contact={has_contact}")
+            
+            context["waiting_for_input"] = True
+            context["input_step_id"] = step.get("id")
+            
+            raise StopExecution(f"Ожидание ввода на шаге {step.get('id')}")
         
     async def _handle_branch(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -601,12 +869,22 @@ class SimpleScenarioEngine:
         """
         params = step.get("params", {})
         conditions = params.get("conditions", [])
-        default_next_step_id = params.get("default_next_step_id")
+        default_next_step_id = params.get("default_next_step")
+        
+        # 🔍 ОТЛАДОЧНОЕ ЛОГИРОВАНИЕ ВСЕГО МАССИВА
+        self.logger.info(f"🔍 ВЕСЬ МАССИВ CONDITIONS: {conditions}")
+        self.logger.info(f"🔍 КОЛИЧЕСТВО CONDITIONS: {len(conditions)}")
+        self.logger.info(f"🔍 DEFAULT_NEXT_STEP: {default_next_step_id}")
         
         # Проверяем условия по порядку
         for condition_data in conditions:
             condition = condition_data.get("condition", "")
-            next_step_id = condition_data.get("next_step_id")
+            next_step_id = condition_data.get("next_step")
+            
+            # 🔍 ОТЛАДОЧНОЕ ЛОГИРОВАНИЕ
+            self.logger.info(f"🔍 УСЛОВИЕ: {condition}")
+            self.logger.info(f"🔍 NEXT_STEP: {next_step_id}")
+            self.logger.info(f"🔍 RAW_CONDITION_DATA: {condition_data}")
             
             try:
                 # Простая оценка условия
@@ -630,7 +908,7 @@ class SimpleScenarioEngine:
         Оценивает условие для branch шага.
         
         Args:
-            condition: Условие для оценки (например: "context.counter > 10")
+            condition: Условие для оценки (например: "callback_data == 'value'" или "context.counter > 10")
             context: Контекст выполнения
             
         Returns:
@@ -640,59 +918,75 @@ class SimpleScenarioEngine:
             return False
         
         try:
-            # Заменяем context.field на значения из контекста
+            # ОТЛАДКА: Логируем исходные данные
+            self.logger.info(f"🔍 EVALUATE CONDITION: {condition}")
+            self.logger.info(f"🔍 CONTEXT KEYS: {list(context.keys())}")
+            if "callback_data" in context:
+                self.logger.info(f"🔍 CALLBACK_DATA VALUE: {context['callback_data']}")
+            
+            # Заменяем переменные на значения из контекста
             resolved_condition = condition
             
-            # Простая замена context.field на значения
+            # 1. Сначала заменяем context.field на значения
             import re
-            context_refs = re.findall(r'context\.(\w+)', condition)
+            context_refs = re.findall(r'context\\.(\w+)', condition)
             for field in context_refs:
                 if field in context:
                     value = context[field]
                     if isinstance(value, str):
-                        resolved_condition = resolved_condition.replace(f"context.{field}", f"'{value}'")
+                        resolved_condition = resolved_condition.replace(f'context.{field}', f"'{value}'")
                     else:
-                        resolved_condition = resolved_condition.replace(f"context.{field}", str(value))
-                else:
-                    # Если поле не найдено, заменяем на None
-                    resolved_condition = resolved_condition.replace(f"context.{field}", "None")
+                        resolved_condition = resolved_condition.replace(f'context.{field}', str(value))
             
-            # Выполняем условие
-            result = eval(resolved_condition)
+            # 2. ИСПРАВЛЕНИЕ: Заменяем простые переменные (например callback_data, user_input)
+            # Находим все простые идентификаторы (не context.field)
+            simple_vars = re.findall(r'\b([a-zA-Z_][a-zA-Z0-9_]*)\b', resolved_condition)
+            self.logger.info(f"🔍 SIMPLE VARS FOUND: {simple_vars}")
+            
+            for var in simple_vars:
+                # Пропускаем служебные слова Python
+                if var in ['True', 'False', 'None', 'and', 'or', 'not', 'in', 'is']:
+                    continue
+                    
+                # Заменяем на значение из контекста
+                if var in context:
+                    value = context[var]
+                    self.logger.info(f"🔍 REPLACING {var} WITH {repr(value)}")
+                    if isinstance(value, str):
+                        # Используем repr для корректного экранирования кавычек
+                        resolved_condition = re.sub(rf'\b{var}\b', repr(value), resolved_condition)
+                    else:
+                        resolved_condition = re.sub(rf'\b{var}\b', str(value), resolved_condition)
+                else:
+                    self.logger.warning(f"🔍 VARIABLE {var} NOT FOUND IN CONTEXT")
+            
+            self.logger.info(f"🔍 RESOLVED CONDITION: {resolved_condition}")
+            
+            # ИСПРАВЛЕНИЕ: Выполняем условие БЕЗ дополнительных переменных
+            # Все переменные уже заменены на литеральные значения
+            result = eval(resolved_condition, {"__builtins__": {}}, {})
             self.logger.debug(f"Условие '{condition}' -> '{resolved_condition}' -> {result}")
+            self.logger.info(f"🔍 CONDITION RESULT: {result}")
             return bool(result)
             
         except Exception as e:
             self.logger.error(f"Ошибка оценки условия '{condition}': {e}")
             return False
-        
+    
     async def _handle_switch_scenario(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """
         Обработчик переключения сценариев.
         
-        ВАЖНО: Только переключает контекст на новый сценарий,
-        НЕ выполняет новый сценарий синхронно!
-        
-        Пример шага:
-        {
-            "id": "switch1",
-            "type": "switch_scenario",
-            "params": {
-                "scenario_id": "new_scenario",
-                "context_mapping": {
-                    "user_id": "{user_id}",
-                    "chat_id": "{chat_id}"
-                }
-            }
-        }
+        ИСПРАВЛЕНО: Реально выполняет новый сценарий!
         """
         self.logger.info("Обрабатываю переключение сценария", step_id=step.get("id"))
         
-        resolved_scenario_id = None  # Инициализируем переменную
+        resolved_scenario_id = None
         
         try:
             params = step.get("params", {})
             scenario_id = params.get("scenario_id")
+            preserve_context = params.get("preserve_context", True)
             context_mapping = params.get("context_mapping", {})
             
             if not scenario_id:
@@ -701,15 +995,31 @@ class SimpleScenarioEngine:
             # Подставляем переменные в scenario_id
             resolved_scenario_id = self._resolve_template(scenario_id, context)
             
-            # Подготавливаем контекст для нового сценария
-            new_context = {}
+            self.logger.info(f"🔄 Переключаю на сценарий: {resolved_scenario_id}")
             
-            # Копируем базовые поля (включая None значения)
-            base_fields = ["user_id", "chat_id", "agent_id", "channel_id"]
-            for field in base_fields:
-                if field in context:
-                    new_context[field] = context[field]
-                    
+            # Подготавливаем контекст для нового сценария
+            if preserve_context:
+                # СОХРАНЯЕМ ВЕСЬ КОНТЕКСТ
+                new_context = context.copy()
+                
+                # КРИТИЧНО: Очищаем старые данные ввода при переключении сценария
+                new_context.pop("user_input", None)
+                new_context.pop("callback_data", None)
+                new_context.pop("waiting_for_input", None)
+                new_context.pop("input_step_id", None)
+                # ИСПРАВЛЕНИЕ: /start НЕ является валидным вводом для input шагов
+                if new_context.get("message_text") != "/start":
+                    new_context.pop("message_text", None)
+                
+                self.logger.info("🧹 Очистил старые данные ввода при переключении сценария")
+            else:
+                # Копируем только базовые поля
+                new_context = {}
+                base_fields = ["user_id", "chat_id", "agent_id", "channel_id"]
+                for field in base_fields:
+                    if field in context:
+                        new_context[field] = context[field]
+            
             # Если user_id отсутствует, но есть chat_id, используем chat_id как user_id
             if "user_id" not in new_context or new_context.get("user_id") is None:
                 if "chat_id" in new_context and new_context["chat_id"] is not None:
@@ -723,27 +1033,22 @@ class SimpleScenarioEngine:
             # Добавляем информацию о переключении
             new_context.update({
                 "switched_from_scenario": context.get("scenario_id"),
-                "switch_reason": "engine_switch"
-            })
-            
-            self.logger.info(f"✅ Переключен контекст на сценарий: {resolved_scenario_id}")
-            
-            # КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: Просто обновляем контекст для переключения
-            # НЕ выполняем новый сценарий синхронно!
-            context.update(new_context)
-            context.update({
-                "scenario_id": resolved_scenario_id,
+                "switch_reason": "engine_switch",
                 "scenario_switched": True,
                 "switched_to": resolved_scenario_id,
                 "switch_successful": True,
-                # Сбрасываем step_id чтобы начать с начала нового сценария
-                "current_step_id": None
             })
             
-            return context
+            # 🔥 КРИТИЧНО: РЕАЛЬНО ВЫПОЛНЯЕМ НОВЫЙ СЦЕНАРИЙ!
+            self.logger.info(f"🚀 ЗАПУСКАЮ НОВЫЙ СЦЕНАРИЙ: {resolved_scenario_id}")
+            final_context = await self.execute_scenario(resolved_scenario_id, new_context)
+            
+            self.logger.info(f"✅ Сценарий {resolved_scenario_id} выполнен после переключения")
+            
+            return final_context
             
         except Exception as e:
-            self.logger.error(f"❌ Ошибка переключения сценария: {e}")
+            self.logger.error(f"❌ Ошибка переключения сценария на {resolved_scenario_id}: {e}")
             context.update({
                 "scenario_switched": False,
                 "switch_error": str(e),
@@ -1006,75 +1311,6 @@ class SimpleScenarioEngine:
             self.logger.error(f"❌ Ошибка save_to_object: {e}")
             context["__step_error__"] = str(e)
             return context
-    
-    async def _handle_build_diagnosis_prompt(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Строит промпт для диагностики."""
-        try:
-            params = step.get("params", {})
-            user_profile = params.get("user_profile", {})
-            diagnosis_answers = params.get("diagnosis_answers", {})
-            
-            # Форматируем ответы
-            formatted_answers = ""
-            for answer_id, answer_data in diagnosis_answers.items():
-                if isinstance(answer_data, dict):
-                    question = answer_data.get("question", "")
-                    answer = answer_data.get("answer", "")
-                    category = answer_data.get("category", "")
-                    formatted_answers += f"\n{category.upper()}: {question}\nОтвет: {answer}\n"
-            
-            result = {
-                "formatted_answers": formatted_answers,
-                "user_profile": user_profile
-            }
-            
-            # Сохраняем результат
-            output_var = params.get("output_var", "llm_prompt")
-            context[output_var] = result
-            
-            self.logger.info("✅ Промпт для диагностики построен")
-            return context
-            
-        except Exception as e:
-            self.logger.error(f"❌ Ошибка build_diagnosis_prompt: {e}")
-            context["__step_error__"] = str(e)
-            return context
-    
-    async def _handle_route_callback(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Маршрутизирует callback к соответствующему сценарию."""
-        try:
-            params = step.get("params", {})
-            callback_data = params.get("callback_data", "")
-            user_id = params.get("user_id", "")
-            chat_id = params.get("chat_id", "")
-            
-            # Простая маршрутизация по callback_data
-            route_map = {
-                "confirm_restart": {"scenario_id": "user_registration", "context": {"restart": True}},
-                "cancel_restart": {"scenario_id": "telegram_main_router", "context": {"action": "cancel"}},
-                "subscribe_basic": {"scenario_id": "subscription_check", "context": {"subscription_level": 1}},
-                "subscribe_premium": {"scenario_id": "subscription_check", "context": {"subscription_level": 2}},
-                "subscribe_vip": {"scenario_id": "subscription_check", "context": {"subscription_level": 3}},
-                "subscription_questions": {"scenario_id": "subscription_questions_dialog", "context": {}},
-                "subscription_later": {"scenario_id": "subscription_check", "context": {"action": "later"}},
-            }
-            
-            route = route_map.get(callback_data, {
-                "scenario_id": "telegram_main_router",
-                "context": {"unknown_callback": callback_data}
-            })
-            
-            # Сохраняем результат
-            output_var = params.get("output_var", "callback_route")
-            context[output_var] = route
-            
-            self.logger.info(f"✅ Callback {callback_data} маршрутизирован к {route['scenario_id']}")
-            return context
-            
-        except Exception as e:
-            self.logger.error(f"❌ Ошибка route_callback: {e}")
-            context["__step_error__"] = str(e)
-            return context
 
     async def _handle_channel_action(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -1139,6 +1375,7 @@ class SimpleScenarioEngine:
                 kwargs = {k: v for k, v in resolved_params.items() 
                          if k not in ["chat_id", "text"]}
                 
+                # Используем обычный метод - паузы теперь автоматические
                 result = await channel_manager.send_message(channel_id, chat_id, text, **kwargs)
                 
             elif action == "send_buttons":
@@ -1152,6 +1389,7 @@ class SimpleScenarioEngine:
                 kwargs = {k: v for k, v in resolved_params.items() 
                          if k not in ["chat_id", "text", "buttons"]}
                 
+                # Используем обычный метод - паузы теперь автоматические
                 result = await channel_manager.send_buttons(channel_id, chat_id, text, buttons, **kwargs)
                 
             elif action == "edit_message":
@@ -1167,28 +1405,130 @@ class SimpleScenarioEngine:
                 
                 result = await channel_manager.edit_message(channel_id, chat_id, int(message_id), text, **kwargs)
                 
+            elif action == "forward_message":
+                from_chat_id = resolved_params.get("from_chat_id")
+                to_chat_id = resolved_params.get("to_chat_id") or resolved_params.get("chat_id")
+                message_id = resolved_params.get("message_id")
+                if not from_chat_id or not to_chat_id or not message_id:
+                    raise ValueError("Для forward_message требуются from_chat_id, to_chat_id и message_id")
+                
+                # Подготавливаем дополнительные параметры
+                kwargs = {k: v for k, v in resolved_params.items() 
+                         if k not in ["from_chat_id", "to_chat_id", "chat_id", "message_id"]}
+                
+                result = await channel_manager.forward_message(channel_id, to_chat_id, from_chat_id, int(message_id), **kwargs)
+                
+            elif action == "copy_message":
+                from_chat_id = resolved_params.get("from_chat_id")
+                to_chat_id = resolved_params.get("to_chat_id") or resolved_params.get("chat_id")
+                message_id = resolved_params.get("message_id")
+                if not from_chat_id or not to_chat_id or not message_id:
+                    raise ValueError("Для copy_message требуются from_chat_id, to_chat_id и message_id")
+                
+                # Подготавливаем дополнительные параметры
+                kwargs = {k: v for k, v in resolved_params.items() 
+                         if k not in ["from_chat_id", "to_chat_id", "chat_id", "message_id"]}
+                
+                # Используем метод с автоматической паузой для лучшего UX (особенно важно для видео)
+                delay_seconds = kwargs.pop("delay_seconds", 1.0)  # по умолчанию 1 секунда для видео  
+                result = await channel_manager.copy_message(channel_id, to_chat_id, from_chat_id, message_id, **kwargs)
+                
+            elif action == "send_document":
+                chat_id = resolved_params.get("chat_id")
+                document_path = resolved_params.get("document_path")
+                if not chat_id or not document_path:
+                    raise ValueError("Для send_document требуются chat_id и document_path")
+                
+                # Подготавливаем дополнительные параметры
+                kwargs = {k: v for k, v in resolved_params.items() 
+                         if k not in ["chat_id", "document_path"]}
+                
+                result = await channel_manager.send_document(channel_id, chat_id, document_path, **kwargs)
+                
+            elif action == "edit_message":
+                chat_id = resolved_params.get("chat_id")
+                message_id = resolved_params.get("message_id")
+                text = resolved_params.get("text")
+                if not chat_id or not message_id or not text:
+                    raise ValueError("Для edit_message требуются chat_id, message_id и text")
+                
+                # Подготавливаем дополнительные параметры
+                kwargs = {k: v for k, v in resolved_params.items() 
+                         if k not in ["chat_id", "message_id", "text"]}
+                
+                result = await channel_manager.edit_message(channel_id, chat_id, message_id, text, **kwargs)
+            
             else:
                 raise ValueError(f"Неподдерживаемое действие: {action}")
             
             # Сохраняем результат в контекст
-            output_var = params.get("output_var", "channel_action_result")
-            context[output_var] = result
-            
-            # Добавляем информацию об успехе
-            if result and result.get("success"):
-                context["channel_action_success"] = True
-                self.logger.info(f"✅ Действие {action} выполнено успешно через ChannelManager")
-            else:
-                context["channel_action_success"] = False
-                context["channel_action_error"] = result.get("error", "Unknown error") if result else "No result"
-                self.logger.error(f"❌ Ошибка выполнения действия {action}: {context.get('channel_action_error')}")
+            context["channel_action_result"] = result
+            context["channel_action_success"] = result.get("success", False)
             
             return context
-            
+
         except Exception as e:
-            self.logger.error(f"❌ Ошибка channel_action: {e}")
+            logger.error(f"❌ Ошибка выполнения channel_action: {e}")
+            context["channel_action_result"] = {"success": False, "error": str(e)}
             context["channel_action_success"] = False
-            context["channel_action_error"] = str(e)
+            return context
+
+    async def _handle_conditional_execute(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Условное выполнение шага на основе заданных условий.
+        
+        Args:
+            step: Данные шага с параметрами:
+                - condition: Условие для проверки
+                - true_action: Шаг для выполнения если условие истинно
+                - false_action: Шаг для выполнения если условие ложно
+            context: Контекст выполнения
+            
+        Returns:
+            Dict[str, Any]: Результат выполнения выбранного действия
+        """
+        params = step.get("params", {})
+        condition = params.get("condition", "")
+        true_action = params.get("true_action")
+        false_action = params.get("false_action")
+        
+        # Оцениваем условие
+        condition_result = self._evaluate_branch_condition(condition, context)
+        self.logger.info(f"🔍 Условие '{condition}' = {condition_result}")
+        
+        # Выбираем действие для выполнения
+        if condition_result and true_action:
+            self.logger.info("✅ Выполняю действие для истинного условия")
+            selected_action = true_action
+        elif not condition_result and false_action:
+            self.logger.info("❌ Выполняю действие для ложного условия")
+            selected_action = false_action
+        else:
+            self.logger.warning("⚠️ Нет подходящего действия для условия")
+            return context
+        
+        # Выполняем выбранное действие
+        if isinstance(selected_action, dict):
+            # Выполняем встроенный шаг
+            return await self.execute_step(selected_action, context)
+        elif isinstance(selected_action, str):
+            # Ищем шаг по ID
+            scenario_data = context.get("_scenario_data", {})
+            steps = scenario_data.get("steps", [])
+            
+            target_step = None
+            for s in steps:
+                if s.get("id") == selected_action:
+                    target_step = s
+                    break
+                    
+            if target_step:
+                return await self.execute_step(target_step, context)
+            else:
+                self.logger.error(f"❌ Шаг '{selected_action}' не найден")
+                return context
+        else:
+            self.logger.error(f"❌ Неверный формат действия: {selected_action}")
             return context
 
 
@@ -1432,6 +1772,28 @@ async def create_engine() -> SimpleScenarioEngine:
         logger.info("✅ SimpleAmoCRM Admin Plugin зарегистрирован")
     except Exception as e:
         logger.warning(f"⚠️ SimpleAmoCRM Admin Plugin недоступен: {e}")
+    
+    try:
+        # 11. PDF Plugin - для генерации PDF документов
+        logger.info("📦 Регистрация SimplePDF Plugin...")
+        from app.plugins.simple_pdf_plugin import SimplePDFPlugin
+        pdf_plugin = SimplePDFPlugin()
+        engine.register_plugin(pdf_plugin)
+        plugins_to_initialize.append(pdf_plugin)
+        logger.info("✅ SimplePDF Plugin зарегистрирован")
+    except Exception as e:
+        logger.warning(f"⚠️ SimplePDF Plugin недоступен: {e}")
+    
+    try:
+        # 12. Routing Plugin - для универсальной маршрутизации
+        logger.info("📦 Регистрация SimpleRouting Plugin...")
+        from app.plugins.simple_routing_plugin import SimpleRoutingPlugin
+        routing_plugin = SimpleRoutingPlugin()
+        engine.register_plugin(routing_plugin)
+        plugins_to_initialize.append(routing_plugin)
+        logger.info("✅ SimpleRouting Plugin зарегистрирован")
+    except Exception as e:
+        logger.warning(f"⚠️ SimpleRouting Plugin недоступен: {e}")
     
     # === ИНИЦИАЛИЗАЦИЯ ПЛАГИНОВ (ПОСЛЕ РЕГИСТРАЦИИ) ===
     

@@ -42,7 +42,7 @@ class SimpleLLMPlugin(BasePlugin):
             logger.info(f"✅ SimpleLLMPlugin готов к работе с моделью: {self.default_model}")
         else:
             logger.warning("⚠️ SimpleLLMPlugin работает в ограниченном режиме - API ключи не найдены в БД")
-            logger.info("💡 Для настройки используйте: POST /admin/plugins/llm/settings")
+            logger.info("💡 Для настройки добавьте настройки в коллекцию settings с plugin_name: 'llm'")
     
     async def _load_settings_from_db(self):
         """Загружает настройки LLM из MongoDB"""
@@ -53,22 +53,48 @@ class SimpleLLMPlugin(BasePlugin):
                 
             mongo_plugin = self.engine.plugins['mongo']
             
-            # Загружаем настройки LLM из коллекции settings
+            # Пробуем найти настройки по разным вариантам plugin_name
+            settings_result = None
+            
+            # Сначала ищем по "llm"
             settings_result = await mongo_plugin._find_one("settings", {"plugin_name": "llm"})
+            
+            # Если не найдено, ищем по "simple_llm"
+            if not (settings_result and settings_result.get("success") and settings_result.get("document")):
+                settings_result = await mongo_plugin._find_one("settings", {"plugin_name": "simple_llm"})
+            
+            # Если не найдено, ищем по полю "plugin"
+            if not (settings_result and settings_result.get("success") and settings_result.get("document")):
+                settings_result = await mongo_plugin._find_one("settings", {"plugin": "simple_llm"})
+            
+            logger.info(f"🔍 ОТЛАДКА settings_result: {settings_result}")
             
             if settings_result and settings_result.get("success") and settings_result.get("document"):
                 settings = settings_result["document"]
-                self.api_key = settings.get("openrouter_api_key")  # Для обратной совместимости
+                logger.info(f"🔍 ОТЛАДКА document: {settings}")
+                
+                # Загружаем API ключи из разных полей
+                self.api_key = (settings.get("openrouter_api_key") or 
+                               settings.get("api_key") or 
+                               settings.get("openai_api_key"))  # Для обратной совместимости
+                               
                 self.openai_api_key = settings.get("openai_api_key")
                 self.anthropic_api_key = settings.get("anthropic_api_key")
                 self.default_model = settings.get("default_model", self.default_model)
                 
-                logger.info("✅ Настройки LLM загружены из БД")
+                if self.api_key:
+                    logger.info("✅ Настройки LLM загружены из БД - API ключ найден")
+                else:
+                    logger.warning("⚠️ Настройки LLM найдены в БД, но API ключ не установлен")
             else:
                 logger.info("⚠️ Настройки LLM не найдены в БД")
                 
         except Exception as e:
             logger.error(f"❌ Ошибка загрузки настроек LLM из БД: {e}")
+
+    async def _ensure_fresh_settings(self):
+        """Обновляет настройки из БД перед каждым запросом"""
+        await self._load_settings_from_db()
     
     # === МЕТОДЫ ДЛЯ НАСТРОЙКИ ЧЕРЕЗ API ===
     
@@ -83,7 +109,9 @@ class SimpleLLMPlugin(BasePlugin):
             
             settings_doc = {
                 "plugin_name": "llm",
+                "plugin": "simple_llm",  # Добавляем для совместимости
                 "openrouter_api_key": openrouter_api_key,
+                "api_key": openrouter_api_key,  # Дублируем для совместимости  
                 "openai_api_key": openai_api_key,
                 "anthropic_api_key": anthropic_api_key,
                 "default_model": default_model or self.default_model,
@@ -135,7 +163,8 @@ class SimpleLLMPlugin(BasePlugin):
         """Регистрация обработчиков шагов"""
         return {
             "llm_query": self._handle_llm_query,
-            "llm_chat": self._handle_llm_chat
+            "llm_chat": self._handle_llm_chat,
+            "build_prompt": self._handle_build_prompt  # Универсальный конструктор промптов
         }
     
     async def _handle_llm_query(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
@@ -150,6 +179,9 @@ class SimpleLLMPlugin(BasePlugin):
         - max_tokens: максимум токенов (опционально, по умолчанию 500)
         - output_var: переменная для сохранения ответа (по умолчанию "llm_response")
         """
+        # Загружаем свежие настройки из БД
+        await self._ensure_fresh_settings()
+        
         params = step_data.get("params", {})
         
         # Извлекаем параметры с подстановкой из контекста
@@ -195,6 +227,9 @@ class SimpleLLMPlugin(BasePlugin):
         - max_tokens: максимум токенов (опционально)
         - output_var: переменная для сохранения ответа (по умолчанию "llm_response")
         """
+        # Загружаем свежие настройки из БД
+        await self._ensure_fresh_settings()
+        
         params = step_data.get("params", {})
         
         messages = params.get("messages", [])
@@ -235,6 +270,90 @@ class SimpleLLMPlugin(BasePlugin):
         
         return context
     
+    async def _handle_build_prompt(self, step_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Универсальный обработчик для конструирования промптов из шаблонов и данных.
+        
+        Параметры:
+        - template: шаблон промпта с плейсхолдерами (обязательно)
+        - variables: словарь переменных для подстановки (опционально)
+        - format_type: тип форматирования ("simple", "json", "list") (опционально)
+        - output_var: переменная для сохранения результата (по умолчанию "built_prompt")
+        
+        Пример:
+        {
+            "type": "build_prompt",
+            "params": {
+                "template": "Проанализируй данные пользователя:\nИмя: {name}\nОтветы: {answers}",
+                "variables": {
+                    "name": "{user_profile.name}",
+                    "answers": "{diagnosis_answers}"
+                },
+                "format_type": "simple",
+                "output_var": "analysis_prompt"
+            }
+        }
+        """
+        params = step_data.get("params", {})
+        
+        # Извлекаем параметры
+        template = params.get("template", "")
+        variables = params.get("variables", {})
+        format_type = params.get("format_type", "simple")
+        output_var = params.get("output_var", "built_prompt")
+        
+        if not template:
+            logger.error("build_prompt: template не указан")
+            context[output_var] = {"error": "Template не указан"}
+            return context
+        
+        try:
+            # Подставляем переменные из контекста
+            resolved_variables = {}
+            for key, value in variables.items():
+                resolved_variables[key] = self._resolve_value(value, context)
+            
+            # Конструируем промпт в зависимости от типа
+            if format_type == "json":
+                # JSON формат с правильными кавычками
+                built_prompt = template.format(**{
+                    k: json.dumps(v, ensure_ascii=False) if isinstance(v, (dict, list)) else str(v)
+                    for k, v in resolved_variables.items()
+                })
+            elif format_type == "list":
+                # Список формат
+                built_prompt = template.format(**{
+                    k: '\n'.join([f"- {item}" for item in v]) if isinstance(v, list) else str(v)
+                    for k, v in resolved_variables.items()
+                })
+            else:  # simple
+                # Простая подстановка строк
+                built_prompt = template.format(**{
+                    k: str(v) for k, v in resolved_variables.items()
+                })
+            
+            # Сохраняем результат
+            context[output_var] = {
+                "success": True,
+                "template": template,
+                "variables": resolved_variables,
+                "built_prompt": built_prompt,
+                "format_type": format_type
+            }
+            
+            logger.info(f"✅ Промпт построен успешно: {len(built_prompt)} символов")
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка конструирования промпта: {e}")
+            context[output_var] = {
+                "success": False,
+                "error": str(e),
+                "template": template,
+                "variables": variables
+            }
+        
+        return context
+    
     async def _make_llm_request(self, prompt: str = None, messages: list = None, 
                                model: str = None, system_prompt: str = None,
                                temperature: float = 0.7, max_tokens: int = 500) -> Dict[str, Any]:
@@ -242,6 +361,9 @@ class SimpleLLMPlugin(BasePlugin):
         
         # Выбираем подходящий API ключ
         api_key = self.api_key or self.openai_api_key or self.anthropic_api_key
+        
+        logger.info(f"🔍 ОТЛАДКА API ключей: api_key={'***' if self.api_key else None}, openai_api_key={'***' if self.openai_api_key else None}, anthropic_api_key={'***' if self.anthropic_api_key else None}")
+        logger.info(f"🔍 ОТЛАДКА выбранный api_key: {'***' + api_key[-10:] if api_key and len(api_key) > 10 else api_key}")
         
         if not api_key:
             return {"success": False, "error": "API ключ не настроен"}
@@ -265,20 +387,28 @@ class SimpleLLMPlugin(BasePlugin):
             "max_tokens": max_tokens
         }
         
+        logger.info(f"🔍 ОТЛАДКА payload: model={payload['model']}, messages_count={len(request_messages)}")
+        
         # Выполняем HTTP запрос
         try:
             async with httpx.AsyncClient() as client:
+                headers = {
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://universal-agent-platform.local",
+                    "X-Title": "Universal Agent Platform"
+                }
+                
+                logger.info(f"🔍 ОТЛАДКА headers Authorization: {'Bearer ' + api_key[:20] + '***' if api_key else 'None'}")
+                
                 response = await client.post(
                     self.base_url,
                     json=payload,
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json",
-                        "HTTP-Referer": "https://universal-agent-platform.local",
-                        "X-Title": "Universal Agent Platform"
-                    },
+                    headers=headers,
                     timeout=30.0
                 )
+                
+                logger.info(f"🔍 ОТЛАДКА response status: {response.status_code}")
                 
                 if response.status_code == 200:
                     data = response.json()

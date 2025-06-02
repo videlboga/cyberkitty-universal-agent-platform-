@@ -1,0 +1,50 @@
+# ШАБЛОН для добавления в каждый модуль
+# Добавить эти шаги в конец каждого сценария модуля
+
+# Шаг завершения модуля с кнопкой возврата
+  - id: module_complete
+    type: channel_action
+    params:
+      action: send_buttons
+      chat_id: "{chat_id}"
+      text: |
+        ✅ **Модуль завершен!**
+        
+        Что дальше?
+      buttons:
+        - - text: "🏠 Вернуться в главное меню"
+            callback_data: "return_to_router"
+          - text: "🔄 Повторить модуль"
+            callback_data: "restart_module"
+        - - text: "❓ Объяснить другие модули"
+            callback_data: "explain_modules"
+    next_step: handle_return_choice
+
+  - id: handle_return_choice
+    type: input
+    params:
+      waiting_for: callback_query
+      timeout_seconds: 300
+      timeout_step: module_complete
+    next_step: process_return_choice
+
+  - id: process_return_choice
+    type: branch
+    params:
+      conditions:
+        - condition: "context.get('callback_data') == 'return_to_router'"
+          next_step: go_to_router
+        - condition: "context.get('callback_data') == 'restart_module'"
+          next_step: start  # Перезапуск текущего модуля
+        - condition: "context.get('callback_data') == 'explain_modules'"
+          next_step: go_to_router
+      default_next_step: go_to_router
+
+  - id: go_to_router
+    type: switch_scenario
+    params:
+      target_scenario: likeprovodnik_main_router_new
+      preserve_context: true
+    next_step: end
+
+# ТАКЖЕ добавить в каждый модуль кнопку "🏠 Главное меню" в интерактивных шагах 

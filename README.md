@@ -8,32 +8,37 @@
 
 ```
 SimpleScenarioEngine (единственный движок)
-├── Базовые обработчики (start, end, action, input, conditional_execute)
-└── Плагин-специфичные обработчики:
-    ├── SimpleTelegramPlugin (telegram_send_message, telegram_send_buttons, telegram_edit_message)
-    ├── MongoPlugin (mongo_save, mongo_get, mongo_get_scenario, mongo_save_scenario)
-    ├── SimpleLLMPlugin (llm_chat, llm_generate)
-    ├── SimpleRAGPlugin (rag_search, rag_index)
-    ├── SimpleSchedulerPlugin (schedule_task, cancel_task)
-    ├── SimpleHTTPPlugin (http_get, http_post, http_request)
-    └── SimpleAmoCRMPlugin (amocrm_find_contact, amocrm_create_contact, amocrm_create_lead)
+├── Базовые обработчики (start, end, action, input, branch, switch_scenario, log_message)
+├── ChannelManager (управление каналами и полингом)
+└── Плагин-специфичные обработчики (102+ handlers):
+    ├── MongoPlugin (mongo_insert_document, mongo_find_documents, mongo_update_document, etc.)
+    ├── SimpleLLMPlugin (llm_query, llm_chat)
+    ├── SimpleRAGPlugin (rag_search, rag_answer)
+    ├── SimpleSchedulerPlugin (scheduler_create_task, scheduler_list_tasks, etc.)
+    ├── SimpleHTTPPlugin (http_get, http_post, http_put, http_delete, http_request)
+    ├── SimpleAmoCRMPlugin (amocrm_find_contact, amocrm_create_contact, amocrm_create_lead, etc.)
+    └── ChannelActions (channel_action для Telegram операций)
 
-Simple API (app/api/simple.py)
-├── POST /simple/channels/{channel_id}/execute (основной endpoint)
-├── GET /simple/health (проверка здоровья)
-├── GET /simple/info (информация о системе)
-├── POST /simple/mongo/* (MongoDB операции)
-└── POST /simple/execute (выполнение отдельного шага)
+Simple API (app/api/simple.py) - Порт 8085
+├── POST /api/v1/simple/channels/{channel_id}/execute (основной endpoint)
+├── GET /health (быстрая проверка)
+├── GET /api/v1/simple/health (полная проверка здоровья)
+├── GET /api/v1/simple/info (информация о системе и плагинах)
+├── GET /api/v1/simple/channels (список каналов)
+├── POST /api/v1/simple/channels/{channel_id}/start (запуск канала)
+├── POST /api/v1/simple/mongo/* (MongoDB операции)
+└── POST /api/v1/simple/execute (выполнение отдельного шага)
 ```
 
 ## 🎯 Принципы архитектуры
 
 1. ✅ **Один движок** - `SimpleScenarioEngine` вместо множества
-2. ✅ **Простая система плагинов** - все наследуют `BasePlugin`
-3. ✅ **Минимум API endpoints** - основной функционал через один endpoint
-4. ✅ **Минимум зависимостей** - только необходимые библиотеки
-5. ✅ **Явная передача контекста** - контекст передается между компонентами
-6. ✅ **Разделение ответственности** - движок универсален, плагины специализированы
+2. ✅ **ChannelManager** - автоматическое управление каналами и полингом
+3. ✅ **Простая система плагинов** - все наследуют `BasePlugin`
+4. ✅ **Минимум API endpoints** - основной функционал через один endpoint
+5. ✅ **YAML сценарии** - поддержка современного YAML формата
+6. ✅ **Явная передача контекста** - контекст передается между компонентами
+7. ✅ **Разделение ответственности** - движок универсален, плагины специализированы
 
 ## 📁 Структура проекта
 
@@ -100,7 +105,7 @@ LOG_LEVEL=INFO
 
 # API конфигурация
 HOST=0.0.0.0
-PORT=8000
+PORT=8085
 ```
 
 ### 3. Запуск системы
@@ -120,7 +125,7 @@ docker-compose -f docker-compose.simple.yml up
 
 ### Основной endpoint
 
-**POST /simple/channels/{channel_id}/execute**
+**POST /api/v1/simple/channels/{channel_id}/execute**
 
 Выполняет сценарий для указанного канала.
 
@@ -148,12 +153,13 @@ docker-compose -f docker-compose.simple.yml up
 
 ### Служебные endpoints
 
-- **GET /simple/health** - Проверка здоровья системы
-- **GET /simple/info** - Информация о системе и плагинах
-- **POST /simple/execute** - Выполнение отдельного шага
-- **POST /simple/mongo/find** - Поиск в MongoDB
-- **POST /simple/mongo/insert** - Вставка в MongoDB
-- **POST /simple/mongo/save-scenario** - Сохранение сценария
+- **GET /health** - Быстрая проверка
+- **GET /api/v1/simple/health** - Полная проверка здоровья системы
+- **GET /api/v1/simple/info** - Информация о системе и плагинах
+- **GET /api/v1/simple/channels** - Список каналов
+- **POST /api/v1/simple/channels/{channel_id}/start** - Запуск канала
+- **POST /api/v1/simple/mongo/*** - MongoDB операции
+- **POST /api/v1/simple/execute** - Выполнение отдельного шага
 
 ## 🎬 Типы шагов сценариев
 
@@ -162,37 +168,39 @@ docker-compose -f docker-compose.simple.yml up
 - `end` - Завершение сценария  
 - `action` - Выполнение действий
 - `input` - Ожидание ввода пользователя
-- `conditional_execute` - Условная логика
+- `branch` - Условная логика с ветвлением
+- `switch_scenario` - Переключение на другой сценарий
+- `log_message` - Логирование сообщений
 
-### Telegram (SimpleTelegramPlugin):
-- `telegram_send_message` - Отправка сообщений
-- `telegram_send_buttons` - Отправка inline кнопок
-- `telegram_edit_message` - Редактирование сообщений
-- `telegram_delete_message` - Удаление сообщений
-- `telegram_send_photo` - Отправка фото
-- `telegram_send_document` - Отправка документов
+### Каналы (ChannelManager):
+- `channel_action` - Универсальное действие канала:
+  - `action: send_message` - Отправка сообщений
+  - `action: send_buttons` - Отправка inline кнопок  
+  - `action: edit_message` - Редактирование сообщений
 
 ### MongoDB (MongoPlugin):
-- `mongo_save` - Сохранение данных
-- `mongo_get` - Получение данных
-- `mongo_update` - Обновление данных
-- `mongo_delete` - Удаление данных
+- `mongo_insert_document` - Вставка документа
+- `mongo_upsert_document` - Вставка или обновление
+- `mongo_find_documents` - Поиск документов
+- `mongo_find_one_document` - Поиск одного документа
+- `mongo_update_document` - Обновление документа
+- `mongo_delete_document` - Удаление документа
 - `mongo_save_scenario` - Сохранение сценария
-- `mongo_get_scenario` - Получение сценария
 
 ### LLM (SimpleLLMPlugin):
+- `llm_query` - Запрос к LLM
 - `llm_chat` - Чат с LLM
-- `llm_generate` - Генерация текста
-- `llm_analyze` - Анализ текста
 
 ### RAG (SimpleRAGPlugin):
 - `rag_search` - Поиск в базе знаний
-- `rag_index` - Индексация документов
+- `rag_answer` - Ответ на основе RAG поиска
 
 ### Планировщик (SimpleSchedulerPlugin):
-- `schedule_task` - Планирование задачи
-- `cancel_task` - Отмена задачи
-- `list_tasks` - Список задач
+- `scheduler_create_task` - Создание задачи
+- `scheduler_list_tasks` - Список задач
+- `scheduler_get_task` - Получение задачи
+- `scheduler_cancel_task` - Отмена задачи
+- `scheduler_get_stats` - Статистика планировщика
 
 ### HTTP клиент (SimpleHTTPPlugin):
 - `http_get` - GET запрос к внешнему API
@@ -202,73 +210,150 @@ docker-compose -f docker-compose.simple.yml up
 - `http_request` - Универсальный HTTP запрос
 
 ### AmoCRM (SimpleAmoCRMPlugin):
-- `amocrm_find_contact` - Поиск контакта по различным критериям
-- `amocrm_create_contact` - Создание нового контакта
-- `amocrm_update_contact` - Обновление существующего контакта
+- `amocrm_find_contact` - Поиск контакта
+- `amocrm_create_contact` - Создание контакта
+- `amocrm_update_contact` - Обновление контакта
 - `amocrm_find_lead` - Поиск сделки
-- `amocrm_create_lead` - Создание новой сделки
-- `amocrm_add_note` - Добавление заметки к сущности
-- `amocrm_search` - Универсальный поиск по AmoCRM
+- `amocrm_create_lead` - Создание сделки
+- `amocrm_add_note` - Добавление заметки
+- `amocrm_search` - Универсальный поиск
+- И множество других AmoCRM операций (companies, tasks, advanced, admin)
 
-## 📝 Пример сценария
+## 📝 Пример YAML сценария
 
-```json
-{
-  "scenario_id": "simple_demo",
-  "description": "Демонстрационный сценарий",
-  "initial_context": {
-    "demo_mode": true
-  },
-  "steps": [
-    {
-      "id": "start",
-      "type": "start",
-      "params": {
-        "message": "Начинаем демо-сценарий"
+```yaml
+scenario_id: likeprovodnik_init
+description: "ЛайкПроводник - Главный сценарий инициализации"
+version: "1.0"
+
+initial_context:
+  system_name: "ЛайкПроводник"
+  version: "1.0"
+
+steps:
+  - id: start
+    type: start
+    next_step: welcome_message
+
+  - id: welcome_message
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        🤖 **Привет! Я ЛайкПроводник** — твой AI-помощник!
+        
+        ✨ **Что я умею:**
+        🎯 **AI-Путь** — создаю персональный план обучения
+        💡 **Лайфхаки** — генерирую бизнес-советы с ИИ
+        
+        💬 **Просто напиши что тебя интересует!**
+      parse_mode: HTML
+    next_step: load_user_profile
+
+  - id: load_user_profile
+    type: mongo_find_one_document
+    params:
+      collection: users
+      filter:
+        user_id: "{user_id}"
+      output_var: user_profile
+    next_step: check_user_exists
+
+  - id: check_user_exists
+    type: branch
+    params:
+      conditions:
+        - condition: "not context.get('user_profile') or not context.get('user_profile', {}).get('onboarding_completed')"
+          next_step: start_onboarding
+      default_next_step: go_to_router
+
+  - id: start_onboarding
+    type: switch_scenario
+    params:
+      target_scenario: ai_path_onboarding_flow
+      preserve_context: true
+    next_step: end
+
+  - id: go_to_router
+    type: switch_scenario
+    params:
+      target_scenario: likeprovodnik_main_router
+      preserve_context: true
+    next_step: end
+
+  - id: end
+    type: end
+```
+
+## 📡 Управление каналами
+
+### Создание канала
+
+```bash
+# Создание Telegram канала
+curl -X POST http://localhost:8085/api/v1/simple/mongo/insert \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "collection": "channels",
+    "document": {
+      "channel_id": "my_telegram_bot",
+      "channel_type": "telegram",
+      "name": "Мой Telegram Bot",
+      "description": "Описание бота",
+      "telegram_bot_token": "YOUR_BOT_TOKEN",
+      "start_scenario_id": "my_init_scenario",
+      "config": {
+        "bot_token": "YOUR_BOT_TOKEN",
+        "polling_enabled": true,
+        "webhook_enabled": false
       },
-      "next_step": "welcome"
-    },
-    {
-      "id": "welcome", 
-      "type": "telegram_send_message",
-      "params": {
-        "chat_id": "{chat_id}",
-        "text": "Привет, {user_name}! Это демо-сценарий.",
-        "parse_mode": "HTML"
-      },
-      "next_step": "check_role"
-    },
-    {
-      "id": "check_role",
-      "type": "conditional_execute",
-      "params": {
-        "condition": "user_role == 'admin'",
-        "true_step": "admin_menu",
-        "false_step": "user_menu"
-      }
-    },
-    {
-      "id": "user_menu",
-      "type": "telegram_send_buttons",
-      "params": {
-        "chat_id": "{chat_id}",
-        "text": "Выберите действие:",
-        "buttons": [
-          [{"text": "🚀 Запустить", "callback_data": "run"}],
-          [{"text": "❓ Помощь", "callback_data": "help"}]
-        ]
-      },
-      "next_step": "end"
-    },
-    {
-      "id": "end",
-      "type": "end",
-      "params": {
-        "message": "Сценарий завершен"
-      }
+      "status": "active"
     }
-  ]
+  }'
+```
+
+### Запуск канала
+
+```bash
+# Запуск канала (автоматически запускает полинг)
+curl -X POST http://localhost:8085/api/v1/simple/channels/my_telegram_bot/start
+
+# Список всех каналов
+curl http://localhost:8085/api/v1/simple/channels
+
+# Выполнение сценария в канале
+curl -X POST http://localhost:8085/api/v1/simple/channels/my_telegram_bot/execute \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "user_id": "123456789",
+    "chat_id": "987654321",
+    "context": {
+      "message_text": "/start"
+    }
+  }'
+```
+
+### Загрузка YAML сценариев
+
+```python
+#!/usr/bin/env python3
+import requests
+import yaml
+
+# Загрузка YAML сценария
+with open('scenarios/yaml/my_scenario.yaml', 'r', encoding='utf-8') as f:
+    scenario = yaml.safe_load(f)
+
+url = 'http://localhost:8085/api/v1/simple/mongo/save-scenario'
+payload = {
+    'collection': 'scenarios',
+    'scenario_id': scenario['scenario_id'],
+    'document': scenario
 }
+
+response = requests.post(url, json=payload)
+print("✅ Сценарий загружен" if response.json().get('success') else "❌ Ошибка")
 ```
 
 ## 🧪 Тестирование
@@ -281,10 +366,13 @@ pytest tests/
 pytest tests/test_simple_engine.py
 
 # Проверка здоровья системы
-curl http://localhost:8000/simple/health
+curl http://localhost:8085/health
 
 # Информация о системе
-curl http://localhost:8000/simple/info
+curl http://localhost:8085/api/v1/simple/info
+
+# Список каналов
+curl http://localhost:8085/api/v1/simple/channels
 ```
 
 ## 📊 Логирование
@@ -320,7 +408,7 @@ docker-compose up
 
 # Только API
 docker build -t kittycore .
-docker run -p 8000:8000 kittycore
+docker run -p 8085:8085 kittycore
 ```
 
 ## 🚫 Что НЕ нужно восстанавливать
@@ -341,4 +429,4 @@ docker run -p 8000:8000 kittycore
 
 ---
 
-**Помните: Простота превыше всего!** 🎯 
+**Помните: Простота превыше всего!** 🎯

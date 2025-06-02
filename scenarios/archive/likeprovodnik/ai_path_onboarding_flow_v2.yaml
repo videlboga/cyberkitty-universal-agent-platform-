@@ -1,0 +1,229 @@
+scenario_id: ai_path_onboarding_flow_v2
+description: "AI-Путь - Персональный план обучения v2.0"
+version: "2.0"
+
+initial_context:
+  module_name: "AI-Путь"
+  onboarding_stage: "start"
+
+steps:
+  - id: start
+    type: start
+    next_step: welcome_ai_path
+
+  - id: welcome_ai_path
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        🎯 **Добро пожаловать в AI-Путь!**
+
+        Я создам для тебя персональный план обучения, основанный на твоих целях и текущем уровне знаний.
+
+        📋 **Мне нужно узнать о тебе:**
+        • Твои цели в изучении ИИ
+        • Текущий уровень знаний
+        • Предпочитаемый формат обучения
+        • Доступное время
+
+        Готов начать? 🚀
+      parse_mode: HTML
+    next_step: ask_goals
+
+  - id: ask_goals
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        🎯 **Какие у тебя цели в изучении ИИ?**
+
+        Например:
+        • Освоить ChatGPT для работы
+        • Создать свой AI-продукт
+        • Автоматизировать бизнес-процессы
+        • Изучить машинное обучение
+        • Стать AI-консультантом
+
+        Опиши свои цели подробно 👇
+      parse_mode: HTML
+    next_step: wait_goals
+
+  - id: wait_goals
+    type: input
+    params:
+      variable: user_goals
+      validation: "required"
+    next_step: ask_experience
+
+  - id: ask_experience
+    type: channel_action
+    params:
+      action: send_buttons
+      chat_id: "{chat_id}"
+      text: |
+        📊 **Какой у тебя опыт с ИИ?**
+
+        Выбери наиболее подходящий вариант:
+      buttons:
+        - - text: "🌱 Новичок (никогда не использовал)"
+            callback_data: "exp_beginner"
+        - - text: "📚 Базовый (пробовал ChatGPT)"
+            callback_data: "exp_basic"
+        - - text: "⚡ Средний (использую регулярно)"
+            callback_data: "exp_intermediate"
+        - - text: "🚀 Продвинутый (создаю решения)"
+            callback_data: "exp_advanced"
+    next_step: wait_experience
+
+  - id: wait_experience
+    type: input
+    params:
+      variable: experience_level
+      validation: "required"
+    next_step: ask_time
+
+  - id: ask_time
+    type: channel_action
+    params:
+      action: send_buttons
+      chat_id: "{chat_id}"
+      text: |
+        ⏰ **Сколько времени готов уделять обучению?**
+
+        Выбери комфортный для тебя режим:
+      buttons:
+        - - text: "⚡ 15-30 мин/день"
+            callback_data: "time_light"
+        - - text: "📚 1-2 часа/день"
+            callback_data: "time_medium"
+        - - text: "🚀 3+ часа/день"
+            callback_data: "time_intensive"
+        - - text: "📅 По выходным"
+            callback_data: "time_weekends"
+    next_step: wait_time
+
+  - id: wait_time
+    type: input
+    params:
+      variable: time_commitment
+      validation: "required"
+    next_step: ask_format
+
+  - id: ask_format
+    type: channel_action
+    params:
+      action: send_buttons
+      chat_id: "{chat_id}"
+      text: |
+        📖 **Какой формат обучения предпочитаешь?**
+
+        Можешь выбрать несколько вариантов:
+      buttons:
+        - - text: "📺 Видео-уроки"
+            callback_data: "format_video"
+        - - text: "📚 Текстовые материалы"
+            callback_data: "format_text"
+        - - text: "🛠️ Практические задания"
+            callback_data: "format_practice"
+        - - text: "🎮 Интерактивные курсы"
+            callback_data: "format_interactive"
+        - - text: "✅ Готов ко всему!"
+            callback_data: "format_all"
+    next_step: wait_format
+
+  - id: wait_format
+    type: input
+    params:
+      variable: learning_format
+      validation: "required"
+    next_step: generate_plan
+
+  - id: generate_plan
+    type: llm_query
+    params:
+      model: "gpt-4"
+      system_prompt: |
+        Ты - эксперт по обучению ИИ. Создай персональный план обучения на основе данных пользователя.
+        
+        Структура плана:
+        1. Анализ целей и уровня
+        2. Рекомендуемый путь обучения (3-5 этапов)
+        3. Конкретные ресурсы и инструменты
+        4. Временные рамки
+        5. Критерии успеха
+        
+        Сделай план практичным и достижимым.
+      user_prompt: |
+        Создай план обучения для пользователя:
+        
+        Цели: {user_goals}
+        Уровень опыта: {experience_level}
+        Время: {time_commitment}
+        Формат: {learning_format}
+        
+        План должен быть структурированным и мотивирующим.
+      output_var: learning_plan
+    next_step: present_plan
+
+  - id: present_plan
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        🎯 **Твой персональный AI-Путь готов!**
+
+        {learning_plan}
+
+        📌 **Что дальше?**
+        • Сохраню план в твоем профиле
+        • Буду напоминать о прогрессе
+        • Помогу с вопросами по материалам
+        • Адаптирую план по мере изучения
+
+        Готов начать обучение? 🚀
+      parse_mode: HTML
+    next_step: save_profile
+
+  - id: save_profile
+    type: mongo_upsert_document
+    params:
+      collection: users
+      filter:
+        user_id: "{user_id}"
+      document:
+        user_id: "{user_id}"
+        goals: "{user_goals}"
+        experience_level: "{experience_level}"
+        time_commitment: "{time_commitment}"
+        learning_format: "{learning_format}"
+        learning_plan: "{learning_plan}"
+        onboarding_completed: true
+        created_at: "{current_timestamp}"
+        updated_at: "{current_timestamp}"
+    next_step: final_message
+
+  - id: final_message
+    type: channel_action
+    params:
+      action: send_buttons
+      chat_id: "{chat_id}"
+      text: |
+        ✅ **Профиль сохранен!**
+
+        Теперь ты можешь:
+      buttons:
+        - - text: "💡 Получить лайфхак"
+            callback_data: "get_lifehack"
+        - - text: "👨‍🏫 Задать вопрос наставнику"
+            callback_data: "ask_mentor"
+        - - text: "🧠 Решить задачу с экспертом"
+            callback_data: "solve_problem"
+        - - text: "🏠 Вернуться в главное меню"
+            callback_data: "main_menu"
+    next_step: end
+
+  - id: end
+    type: end 

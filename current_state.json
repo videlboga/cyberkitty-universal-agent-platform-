@@ -1,0 +1,96 @@
+{
+  "channel_id": "ontobot_main",
+  "user_id": "648981358",
+  "scenario_id": "mr_ontobot_diagnostic_ya_ya",
+  "current_step": "end",
+  "waiting_for_input": false,
+  "input_step_id": null,
+  "context": {
+    "channel_id": "ontobot_main",
+    "scenario_id": "mr_ontobot_diagnostic_ya_ya",
+    "event_type": "callback_query",
+    "telegram_update": {
+      "callback_query": {
+        "user_id": "648981358",
+        "chat_id": "648981358",
+        "callback_data": "write_ya_ya_viruses",
+        "message_id": 1542,
+        "telegram_user_id": 648981358,
+        "telegram_username": "Like_a_duck",
+        "telegram_first_name": "Андрей",
+        "telegram_last_name": "Кирьянов",
+        "telegram_chat_id": 648981358
+      }
+    },
+    "user_id": "648981358",
+    "chat_id": "648981358",
+    "message_text": "/start",
+    "telegram_user_id": 648981358,
+    "telegram_username": "Like_a_duck",
+    "telegram_first_name": "Андрей",
+    "telegram_last_name": "Кирьянов",
+    "telegram_chat_id": 648981358,
+    "execution_started": true,
+    "current_step": "end",
+    "channel_action_result": {
+      "success": true,
+      "result": {
+        "message_id": 1542,
+        "from": {
+          "id": 7907324843,
+          "is_bot": true,
+          "first_name": "Тест",
+          "username": "CyberKittyTest_bot"
+        },
+        "chat": {
+          "id": 648981358,
+          "first_name": "Андрей",
+          "last_name": "Кирьянов",
+          "username": "Like_a_duck",
+          "type": "private"
+        },
+        "date": 1748811158,
+        "text": "📝 После просмотра видео выберите действие:",
+        "entities": [
+          {
+            "offset": 3,
+            "length": 40,
+            "type": "bold"
+          }
+        ],
+        "reply_markup": {
+          "inline_keyboard": [
+            [
+              {
+                "text": "👁️ Посмотреть примеры мыслевирусов",
+                "callback_data": "view_ya_ya_examples"
+              }
+            ],
+            [
+              {
+                "text": "✍️ Написать свои мыслевирусы",
+                "callback_data": "write_ya_ya_viruses"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "channel_action_success": true,
+    "waiting_for_input": false,
+    "execution_stopped": true,
+    "stop_reason": "Ожидание ввода на шаге wait_for_ya_ya_choice",
+    "message_id": 1542,
+    "access_timer_hours": 24,
+    "access_granted_at": "2025-06-01 21:58:12",
+    "diagnostic_started": true,
+    "switched_from_scenario": "mr_ontobot_main_router",
+    "switch_reason": "engine_switch",
+    "scenario_switched": true,
+    "switched_to": "mr_ontobot_diagnostic_ya_ya",
+    "switch_successful": true,
+    "execution_completed": true
+  },
+  "updated_at": "2024-12-29T16:00:00Z",
+  "id": "683cbd8dd3df88bae0f1b6e2"
+}

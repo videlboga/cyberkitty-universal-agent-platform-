@@ -1,0 +1,118 @@
+scenario_id: mr_ontobot_diagnostic_ya_ya
+name: "OntoBot Диагностика Я-Я"
+description: "Диагностика мыслевирусов в области самооценки"
+initial_context:
+  bot_name: "mr_ontobot"
+  current_stage: "diagnostic_ya_ya"
+
+steps:
+  - id: start
+    type: start
+    params:
+      message: "🎯 **Этап 1: Диагностика Я-Я**"
+    next_step: send_ya_ya_video
+
+  - id: send_ya_ya_video
+    type: channel_action
+    params:
+      action: copy_message
+      chat_id: "{chat_id}"
+      from_chat_id: "-1002614708769"
+      message_id: 4
+      disable_notification: true
+    next_step: show_ya_ya_options
+
+  - id: show_ya_ya_options
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: "📝 **После просмотра видео выберите действие:**"
+      reply_markup:
+        inline_keyboard:
+          - - text: "👁️ Посмотреть примеры мыслевирусов"
+              callback_data: "view_ya_ya_examples"
+          - - text: "✍️ Написать свои мыслевирусы"
+              callback_data: "write_ya_ya_viruses"
+    next_step: wait_for_ya_ya_choice
+
+  - id: wait_for_ya_ya_choice
+    type: input
+    params:
+      input_type: "callback_query"
+      expected_callbacks: ["view_ya_ya_examples", "write_ya_ya_viruses"]
+      timeout: 3600
+    next_step: handle_ya_ya_choice
+
+  - id: handle_ya_ya_choice
+    type: branch
+    params:
+      condition: "{callback_data}"
+      branches:
+        "view_ya_ya_examples": show_ya_ya_examples
+        "write_ya_ya_viruses": ask_ya_ya_response
+    next_step: end
+
+  - id: show_ya_ya_examples
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: "👁️ **Примеры мыслевирусов Я-Я:**\n\n• \"Я недостаточно умный\"\n• \"Я не заслуживаю успеха\"\n• \"Я слишком старый/молодой\"\n• \"У меня нет нужных навыков\"\n• \"Я не такой как все\"\n\n💡 *Узнали себя? Теперь напишите свои!*"
+      reply_markup:
+        inline_keyboard:
+          - - text: "✍️ Написать свои мыслевирусы"
+              callback_data: "write_ya_ya_viruses"
+    next_step: wait_write_ya_ya
+
+  - id: wait_write_ya_ya
+    type: input
+    params:
+      input_type: "callback_query"
+      expected_callbacks: ["write_ya_ya_viruses"]
+      timeout: 3600
+    next_step: ask_ya_ya_response
+
+  - id: ask_ya_ya_response
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: "✍️ **Опишите ваши мыслевирусы в области самооценки**\n\nНапример:\n• Что вы думаете о себе негативного?\n• Какие ограничивающие убеждения у вас есть?\n• В чем вы себя обвиняете?\n\n*Будьте максимально откровенны - это поможет точной диагностике.*"
+    next_step: wait_ya_ya_response
+
+  - id: wait_ya_ya_response
+    type: input
+    params:
+      input_type: "text"
+      timeout: 3600
+    next_step: save_ya_ya_response
+
+  - id: save_ya_ya_response
+    type: mongo_upsert_document
+    params:
+      collection: "ontobot_responses"
+      filter:
+        user_id: "{user_id}"
+        bot_name: "mr_ontobot"
+      document:
+        user_id: "{user_id}"
+        bot_name: "mr_ontobot"
+        ya_ya_response: "{user_input}"
+        telegram_username: "{telegram_username}"
+        telegram_first_name: "{telegram_first_name}"
+        updated_at: "{current_datetime}"
+      output_var: "save_response_result"
+    next_step: switch_to_ya_delo
+
+  - id: switch_to_ya_delo
+    type: switch_scenario
+    params:
+      scenario_id: "mr_ontobot_diagnostic_ya_delo"
+      context_merge: true
+    next_step: end
+
+  - id: end
+    type: end
+    params:
+      message: "Этап Я-Я завершен" 

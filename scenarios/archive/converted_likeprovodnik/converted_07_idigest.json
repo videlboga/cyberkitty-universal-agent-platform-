@@ -1,0 +1,38 @@
+{
+  "scenario_id": "idigest_flow",
+  "name": "iДайджест",
+  "description": "Еженедельная подборка новостей из мира ИИ (воскресенье 10:00)",
+  "version": "2.0",
+  "initial_context": {},
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "next_step": "generate_digest"
+    },
+    {
+      "id": "generate_digest",
+      "type": "switch_scenario",
+      "params": {
+        "target_scenario": "atomic_llm_query",
+        "preserve_context": true
+      },
+      "next_step": "send_digest"
+    },
+    {
+      "id": "send_digest",
+      "type": "channel_action",
+      "params": {
+        "action": "send_message",
+        "chat_id": "{chat_id}",
+        "text": "📰 <b>iДайджест: новости ИИ за неделю</b>\n\n{news_digest}",
+        "parse_mode": "HTML"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end"
+    }
+  ]
+}

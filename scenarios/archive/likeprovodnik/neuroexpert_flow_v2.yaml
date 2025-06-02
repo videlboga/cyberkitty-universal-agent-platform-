@@ -1,0 +1,282 @@
+scenario_id: neuroexpert_flow_v2
+description: "НейроЭксперт - пошаговое решение сложных задач v2.0"
+version: "2.0"
+
+initial_context:
+  module_name: "НейроЭксперт"
+  analysis_mode: "step_by_step"
+
+steps:
+  - id: start
+    type: start
+    next_step: welcome_expert
+
+  - id: welcome_expert
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        🧠 **Добро пожаловать к НейроЭксперту!**
+
+        Я помогу разложить любую сложную задачу на простые шаги и найти оптимальное решение.
+
+        💡 **Мой подход:**
+        • Анализ проблемы с разных сторон
+        • Пошаговая декомпозиция
+        • Практические рекомендации
+        • Альтернативные варианты решения
+
+        🎯 **Опиши свою задачу или проблему:**
+      parse_mode: HTML
+    next_step: wait_problem
+
+  - id: wait_problem
+    type: input
+    params:
+      variable: user_problem
+      validation: "required"
+    next_step: analyze_problem
+
+  - id: analyze_problem
+    type: llm_query
+    params:
+      model: "gpt-4"
+      system_prompt: |
+        Ты - эксперт-аналитик, который разбирает сложные задачи пошагово.
+        
+        Структура анализа:
+        1. Понимание проблемы (переформулировка)
+        2. Выявление ключевых факторов
+        3. Декомпозиция на подзадачи
+        4. Пошаговый план решения
+        5. Возможные риски и препятствия
+        6. Альтернативные подходы
+        7. Критерии успеха
+        
+        Принципы:
+        - Системный подход
+        - Практичность решений
+        - Учет ресурсов и ограничений
+        - Измеримые результаты
+      user_prompt: |
+        Задача/проблема: {user_problem}
+        
+        Проведи глубокий анализ и предложи пошаговое решение.
+      output_var: expert_analysis
+    next_step: present_analysis
+
+  - id: present_analysis
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        🧠 **Экспертный анализ:**
+
+        {expert_analysis}
+
+        🤔 **Что хочешь уточнить?**
+      parse_mode: HTML
+    next_step: ask_clarification
+
+  - id: ask_clarification
+    type: channel_action
+    params:
+      action: send_buttons
+      chat_id: "{chat_id}"
+      text: "Выбери действие:"
+      buttons:
+        - - text: "🔍 Углубить анализ"
+            callback_data: "deep_analysis"
+        - - text: "⚡ Быстрые действия"
+            callback_data: "quick_actions"
+        - - text: "🚧 Разобрать препятствия"
+            callback_data: "obstacles"
+        - - text: "📊 Альтернативы"
+            callback_data: "alternatives"
+        - - text: "💾 Сохранить план"
+            callback_data: "save_plan"
+        - - text: "🏠 Главное меню"
+            callback_data: "main_menu"
+    next_step: wait_clarification
+
+  - id: wait_clarification
+    type: input
+    params:
+      variable: clarification_type
+      validation: "required"
+    next_step: process_clarification
+
+  - id: process_clarification
+    type: branch
+    params:
+      conditions:
+        - condition: "context.get('clarification_type') == 'deep_analysis'"
+          next_step: deep_analysis
+        - condition: "context.get('clarification_type') == 'quick_actions'"
+          next_step: quick_actions
+        - condition: "context.get('clarification_type') == 'obstacles'"
+          next_step: analyze_obstacles
+        - condition: "context.get('clarification_type') == 'alternatives'"
+          next_step: find_alternatives
+        - condition: "context.get('clarification_type') == 'save_plan'"
+          next_step: save_analysis
+        - condition: "context.get('clarification_type') == 'main_menu'"
+          next_scenario: likeprovodnik_main_router_v2
+      default_next_step: end
+
+  - id: deep_analysis
+    type: llm_query
+    params:
+      model: "gpt-4"
+      system_prompt: |
+        Углуби анализ проблемы. Рассмотри:
+        - Скрытые факторы и зависимости
+        - Долгосрочные последствия
+        - Системные эффекты
+        - Детальную проработку каждого шага
+      user_prompt: |
+        Исходная проблема: {user_problem}
+        Базовый анализ: {expert_analysis}
+        
+        Проведи углубленный анализ с детализацией.
+      output_var: deep_analysis_result
+    next_step: present_deep_analysis
+
+  - id: present_deep_analysis
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        🔬 **Углубленный анализ:**
+
+        {deep_analysis_result}
+      parse_mode: HTML
+    next_step: ask_clarification
+
+  - id: quick_actions
+    type: llm_query
+    params:
+      model: "gpt-4"
+      system_prompt: |
+        Выдели самые важные и быстрые действия, которые можно предпринять прямо сейчас.
+        Фокус на:
+        - Действия на сегодня/завтра
+        - Минимальные ресурсы
+        - Максимальный эффект
+        - Конкретные шаги
+      user_prompt: |
+        Проблема: {user_problem}
+        Анализ: {expert_analysis}
+        
+        Какие 3-5 действий можно предпринять прямо сейчас?
+      output_var: quick_actions_result
+    next_step: present_quick_actions
+
+  - id: present_quick_actions
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        ⚡ **Быстрые действия:**
+
+        {quick_actions_result}
+      parse_mode: HTML
+    next_step: ask_clarification
+
+  - id: analyze_obstacles
+    type: llm_query
+    params:
+      model: "gpt-4"
+      system_prompt: |
+        Проанализируй возможные препятствия и способы их преодоления.
+        Рассмотри:
+        - Внутренние барьеры
+        - Внешние ограничения
+        - Ресурсные проблемы
+        - Способы обхода каждого препятствия
+      user_prompt: |
+        Проблема: {user_problem}
+        План: {expert_analysis}
+        
+        Какие препятствия могут возникнуть и как их преодолеть?
+      output_var: obstacles_analysis
+    next_step: present_obstacles
+
+  - id: present_obstacles
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        🚧 **Анализ препятствий:**
+
+        {obstacles_analysis}
+      parse_mode: HTML
+    next_step: ask_clarification
+
+  - id: find_alternatives
+    type: llm_query
+    params:
+      model: "gpt-4"
+      system_prompt: |
+        Предложи альтернативные подходы к решению проблемы.
+        Рассмотри:
+        - Кардинально разные методы
+        - Творческие решения
+        - Нестандартные подходы
+        - Плюсы и минусы каждого
+      user_prompt: |
+        Проблема: {user_problem}
+        Основной план: {expert_analysis}
+        
+        Какие есть альтернативные способы решения?
+      output_var: alternatives_result
+    next_step: present_alternatives
+
+  - id: present_alternatives
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        🔄 **Альтернативные решения:**
+
+        {alternatives_result}
+      parse_mode: HTML
+    next_step: ask_clarification
+
+  - id: save_analysis
+    type: mongo_insert_document
+    params:
+      collection: user_expert_sessions
+      document:
+        user_id: "{user_id}"
+        problem: "{user_problem}"
+        analysis: "{expert_analysis}"
+        deep_analysis: "{deep_analysis_result}"
+        quick_actions: "{quick_actions_result}"
+        obstacles: "{obstacles_analysis}"
+        alternatives: "{alternatives_result}"
+        created_at: "{current_timestamp}"
+    next_step: confirm_save
+
+  - id: confirm_save
+    type: channel_action
+    params:
+      action: send_message
+      chat_id: "{chat_id}"
+      text: |
+        💾 **Экспертный анализ сохранен!**
+
+        Ты можешь вернуться к этому плану в любое время.
+
+        Есть еще задачи для анализа? 🧠
+      parse_mode: HTML
+    next_step: welcome_expert
+
+  - id: end
+    type: end 

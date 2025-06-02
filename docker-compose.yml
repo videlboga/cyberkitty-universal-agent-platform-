@@ -7,7 +7,7 @@ services:
     container_name: uap_mongodb
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "27018:27017"  # Используем порт 27018 как в системе
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: password123
@@ -32,13 +32,28 @@ services:
     volumes:
       - ./scenarios:/app/scenarios
       - ./logs:/app/logs:rw  # Права на запись для логов
+      - ./uploads:/app/uploads:rw  # Папка для загрузок файлов
+      - ./generated:/app/generated:rw  # Папка для сгенерированных файлов
     environment:
       # MongoDB подключение
       MONGODB_URL: mongodb://admin:password123@mongodb:27017/universal_agent_platform?authSource=admin
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/universal_agent_platform?authSource=admin
+      MONGO_URL: mongodb://admin:password123@mongodb:27017/universal_agent_platform?authSource=admin
       MONGODB_DATABASE: universal_agent_platform
       
       # Telegram (опционально)
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      
+      # OpenRouter API Key for LLM
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      
+      # PDF Generation settings
+      WKHTMLTOPDF_CMD: /usr/bin/wkhtmltopdf
+      
+      # File handling
+      MAX_FILE_SIZE: 50MB
+      UPLOAD_DIR: /app/uploads
+      GENERATED_DIR: /app/generated
       
       # Logging
       LOG_LEVEL: INFO
@@ -47,6 +62,17 @@ services:
       HOST: 0.0.0.0
       PORT: 8085  # Синхронизируем с портом контейнера
       WORKERS: 1
+      
+      # Python настройки
+      PYTHONPATH: /app
+      PYTHONUNBUFFERED: 1
+      
+      # Timezone
+      TZ: Europe/Moscow
+      
+      # Security
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-here-change-in-production}
+      
     depends_on:
       mongodb:
         condition: service_healthy

@@ -363,6 +363,11 @@ class ToolManager:
             ]
         
         return [tool.get_stats() for tool in self.tools.values()]
+
+    def get_tools_by_category(self, category: str) -> List[Tool]:
+        """Получить инструменты по категории"""
+        tool_names = self.categories.get(category, [])
+        return [self.tools[name] for name in tool_names if name in self.tools]
     
     def get_schema_for_all(self) -> Dict[str, Any]:
         """Получить схемы всех инструментов"""

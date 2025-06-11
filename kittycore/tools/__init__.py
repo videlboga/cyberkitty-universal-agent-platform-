@@ -18,6 +18,10 @@ from .system_tools import FileManager, SystemTools
 from .data_tools import PandasTool, MathCalculationTool
 from .communication_tools import EmailTool, TelegramTool
 
+# === РАСШИРЕННЫЕ ИНСТРУМЕНТЫ ===
+from .enhanced_system_tools import EnhancedSystemTool
+from .code_execution_tools import CodeExecutionTool
+
 # === МЕНЕДЖЕР ИНСТРУМЕНТОВ ===
 def get_default_tool_manager() -> ToolManager:
     """Получить настроенный менеджер инструментов"""
@@ -36,6 +40,10 @@ def get_default_tool_manager() -> ToolManager:
     # Системные инструменты
     manager.register(FileManager(), "system")
     manager.register(SystemTools(), "system")
+    manager.register(EnhancedSystemTool(), "system")
+    
+    # Продвинутые инструменты кода
+    manager.register(CodeExecutionTool(), "code")
     
     # Анализ данных
     manager.register(PandasTool(), "data")
@@ -67,10 +75,10 @@ __all__ = [
     "WebSearchTool", "WebScrapingTool", "ApiRequestTool", "WebClient",
     
     # Инструменты для кода
-    "PythonExecutionTool", "CodeGenerator",
+    "PythonExecutionTool", "CodeGenerator", "CodeExecutionTool",
     
     # Системные инструменты
-    "FileManager", "SystemTools",
+    "FileManager", "SystemTools", "EnhancedSystemTool",
     
     # Анализ данных
     "PandasTool", "MathCalculationTool",
@@ -85,8 +93,8 @@ __all__ = [
 # === КАТЕГОРИИ ИНСТРУМЕНТОВ ===
 TOOL_CATEGORIES = {
     "web": "Веб-инструменты - поиск, браузер, API запросы",
-    "code": "Инструменты для кода - выполнение, генерация", 
-    "system": "Системные - файлы, команды, информация о системе",
+    "code": "Инструменты для кода - выполнение Python/Shell, генерация, sandbox", 
+    "system": "Системные - файлы с безопасностью, мониторинг, healthcheck",
     "data": "Анализ данных - статистика, графики, вычисления",
     "communication": "Коммуникация - email, telegram, уведомления"
 } 

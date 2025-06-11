@@ -1,0 +1,44 @@
+{
+  "benchmark_name": "functional_benchmarks",
+  "timestamp": "2025-06-07T17:04:13.215951",
+  "task_completion": {
+    "total_tasks": 10,
+    "completed_tasks": 5,
+    "success_rate": 0.5,
+    "avg_completion_time": 0.00027337074279785154,
+    "failure_reasons": [
+      "quick_agent_creation: Expected agent_created, got CRITICAL_FAIL_MOCK_DETECTED",
+      "tool_usage: Expected tool_executed, got CRITICAL_FAIL_MOCK_DETECTED",
+      "error_handling: Expected error_handled, got CRITICAL_FAIL_MOCK_DETECTED",
+      "concurrent_operations: Expected concurrent_success, got CRITICAL_FAIL_MOCK_DETECTED",
+      "scalability_basic: Expected scalability_ok, got CRITICAL_FAIL_MOCK_DETECTED"
+    ]
+  },
+  "performance": {
+    "execution_time": 0.0029227733612060547,
+    "memory_usage_mb": 0.83203125,
+    "cpu_usage_percent": 0.0,
+    "tokens_per_second": null
+  },
+  "quality": {
+    "output_correctness": 0.5,
+    "coherence_score": 1.0,
+    "relevance_score": 0.5,
+    "hallucination_rate": 0.0
+  },
+  "metadata": {
+    "test_cases": [
+      "quick_agent_creation",
+      "master_agent_creation",
+      "tool_usage",
+      "memory_operations",
+      "structured_outputs",
+      "enhanced_roles",
+      "cross_agent_communication",
+      "error_handling",
+      "concurrent_operations",
+      "scalability_basic"
+    ],
+    "use_mock_llm": true
+  }
+}

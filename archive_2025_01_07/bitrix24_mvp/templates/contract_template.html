@@ -1,0 +1,81 @@
+```html
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Шаблон договора - Smart Document Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .placeholder {
+            color: #007BFF;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Договор № <span class="placeholder">{НомерДоговора}</span></h1>
+<p>г. <span class="placeholder">{Город}</span> <span class="placeholder">{ДатаПодписания}</span></p>
+
+<div class="section">
+    <h2>1. Стороны договора</h2>
+    <p><strong>Исполнитель:</strong> <span class="placeholder">{Исполнитель}</span>, ИНН <span class="placeholder">{ИННИсполнителя}</span>, адрес: <span class="placeholder">{АдресИсполнителя}</span>.</p>
+    <p><strong>Заказчик:</strong> <span class="placeholder">{Заказчик}</span>, ИНН <span class="placeholder">{ИННЗаказчика}</span>, адрес: <span class="placeholder">{АдресЗаказчика}</span>.</p>
+</div>
+
+<div class="section">
+    <h2>2. Предмет договора</h2>
+    <p>Исполнитель обязуется оказать услуги, а Заказчик обязуется оплатить эти услуги в соответствии с условиями настоящего договора.</p>
+    <p>Перечень услуг:</p>
+    <ul>
+        <li><span class="placeholder">{Услуга1}</span></li>
+        <li><span class="placeholder">{Услуга2}</span></li>
+        <li><span class="placeholder">{Услуга3}</span></li>
+    </ul>
+</div>
+
+<div class="section">
+    <h2>3. Сроки выполнения работ</h2>
+    <p>Исполнитель обязуется выполнить работы в срок до <span class="placeholder">{СрокВыполнения}</span>.</p>
+</div>
+
+<div class="section">
+    <h2>4. Стоимость и порядок расчетов</h2>
+    <p>Общая стоимость услуг составляет <span class="placeholder">{СтоимостьУслуг}</span> рублей.</p>
+    <p>Оплата производится в следующем порядке:</p>
+    <ol>
+        <li>Авансовый платеж в размере <span class="placeholder">{Аванс}</span> рублей.</li>
+        <li>Окончательный расчет в размере <span class="placeholder">{ОкончательныйПлатеж}</span> рублей.</li>
+    </ol>
+</div>
+
+<div class="section">
+    <h2>5. Ответственность сторон</h2>
+    <p>В случае неисполнения или ненадлежащего исполнения обязательств по настоящему договору стороны несут ответственность в соответствии с действующим законодательством Российской Федерации.</p>
+</div>
+
+<div class="section">
+    <h2>6. Форс-мажор</h2>
+    <p>Стороны освобождаются от ответственности за неисполнение обязательств по договору, если это неисполнение вызвано обстоятельствами непреодолимой силы, такими как стихийные бедствия, военные действия, забастовки и т.д.</p>
+</div>
+
+<div class="section">
+    <h2>7. Заключительные положения</h2>
+    <p>Настоящий договор вступает в силу с момента его подписания сторонами и действует до полного исполнения обязательств.</p>
+    <p>Все изменения и дополнения к настоящему договору оформляются в письменной форме и подписываются обеими сторонами.</p>
+</div>
+
+<div class="section">
+    <h2>8. Реквизиты и подписи сторон</h2>
+    <p><strong>Исп

@@ -1,0 +1,52 @@
+{
+  "meta": {
+    "timestamp": "2025-06-07T16:29:28.077247",
+    "total_execution_time": 0,
+    "kittycore_version": "2.1",
+    "use_mock_llm": true
+  },
+  "summary": {
+    "total_benchmarks": 3,
+    "overall_success_rate": 0.2333333333333333,
+    "overall_performance_score": 9.805123224586156,
+    "overall_quality_score": 0.2333333333333333
+  },
+  "details": {
+    "functional": {
+      "success_rate": 0.7,
+      "execution_time": 0.006133556365966797,
+      "memory_usage_mb": 0.7734375,
+      "quality_score": 0.7,
+      "coherence_score": 1.0,
+      "failures": [
+        "tool_usage: Expected tool_executed, got error: Can't instantiate abstract class CalculatorTool without an implementation for abstract method 'get_schema'",
+        "memory_operations: Expected memory_functional, got error: TimelineMemory.get_recent_snapshots() got an unexpected keyword argument 'limit'",
+        "cross_agent_communication: Expected communication_successful, got error: 'CrossAgentMemory' object has no attribute 'store_shared_context'"
+      ]
+    },
+    "performance": {
+      "success_rate": 0,
+      "execution_time": 3.933906555175781e-05,
+      "memory_usage_mb": 0,
+      "quality_score": 0,
+      "coherence_score": 0,
+      "failures": [
+        "Agent.__init__() got an unexpected keyword argument 'use_mock_llm'"
+      ]
+    },
+    "quality": {
+      "success_rate": 0,
+      "execution_time": 2.7894973754882812e-05,
+      "memory_usage_mb": 0,
+      "quality_score": 0,
+      "coherence_score": 0,
+      "failures": [
+        "Agent.__init__() got an unexpected keyword argument 'instructions'"
+      ]
+    }
+  },
+  "recommendations": [
+    "Consider improving error handling and robustness",
+    "Quality improvements needed - enhance LLM prompting or add validation"
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "meta": {
+    "timestamp": "2025-06-07T17:05:21.671567",
+    "total_execution_time": 0,
+    "kittycore_version": "2.1",
+    "use_mock_llm": false
+  },
+  "summary": {
+    "total_benchmarks": 3,
+    "overall_success_rate": 0.6666666666666666,
+    "overall_performance_score": 0.09457085251833902,
+    "overall_quality_score": 0.3333333333333333
+  },
+  "details": {
+    "functional": {
+      "success_rate": 1.0,
+      "execution_time": 29.944846630096436,
+      "memory_usage_mb": 12.4140625,
+      "quality_score": 1.0,
+      "coherence_score": 1.0,
+      "failures": []
+    },
+    "performance": {
+      "success_rate": 0.0,
+      "execution_time": 17.3418390750885,
+      "memory_usage_mb": 0,
+      "quality_score": 0.0,
+      "coherence_score": 1.0,
+      "failures": []
+    },
+    "quality": {
+      "success_rate": 1.0,
+      "execution_time": 5.078782558441162,
+      "memory_usage_mb": 0,
+      "quality_score": 0.0,
+      "coherence_score": 1.0,
+      "failures": []
+    }
+  },
+  "recommendations": [
+    "Consider improving error handling and robustness",
+    "Performance optimization needed - consider async improvements",
+    "Quality improvements needed - enhance LLM prompting or add validation"
+  ]
+}

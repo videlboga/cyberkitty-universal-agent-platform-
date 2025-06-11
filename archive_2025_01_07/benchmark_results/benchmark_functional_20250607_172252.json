@@ -1,0 +1,40 @@
+{
+  "benchmark_name": "functional_benchmarks",
+  "timestamp": "2025-06-07T17:22:32.848631",
+  "task_completion": {
+    "total_tasks": 10,
+    "completed_tasks": 9,
+    "success_rate": 0.9,
+    "avg_completion_time": 3.522166872024536,
+    "failure_reasons": [
+      "master_agent_creation: Expected specialized_agent_created, got CRITICAL_FAIL_NO_TOOLS_FOUND"
+    ]
+  },
+  "performance": {
+    "execution_time": 35.22279763221741,
+    "memory_usage_mb": 12.47265625,
+    "cpu_usage_percent": 0.0,
+    "tokens_per_second": null
+  },
+  "quality": {
+    "output_correctness": 0.9,
+    "coherence_score": 1.0,
+    "relevance_score": 0.9,
+    "hallucination_rate": 0.0
+  },
+  "metadata": {
+    "test_cases": [
+      "quick_agent_creation",
+      "master_agent_creation",
+      "tool_usage",
+      "memory_operations",
+      "structured_outputs",
+      "enhanced_roles",
+      "cross_agent_communication",
+      "error_handling",
+      "concurrent_operations",
+      "scalability_basic"
+    ],
+    "use_mock_llm": true
+  }
+}

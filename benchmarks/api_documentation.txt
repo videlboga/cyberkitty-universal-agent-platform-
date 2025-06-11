@@ -1,0 +1,12 @@
+Endpoint: /users/{id}/name
+GET /users/1/name HTTP/1.1
+Content-Type: application/json
+
+Example Request:
+GET /users/1/name HTTP/1.1
+Content-Type: application/json
+
+Example Response:
+{
+  "name": "John Doe"
+}

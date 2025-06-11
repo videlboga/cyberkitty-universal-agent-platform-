@@ -1,0 +1,128 @@
+Для расчета плотности черной дыры можно использовать следующую формулу:
+
+\[
+\rho = \frac{M}{V}
+\]
+
+Где:
+- \(\rho\) — плотность черной дыры,
+- \(M\) — масса черной дыры,
+- \(V\) — объем черной дыры.
+
+Объем черной дыры можно рассчитать, используя формулу для объема сферы:
+
+\[
+V = \frac{4}{3} \pi r^3
+\]
+
+Где:
+- \(r\) — радиус черной дыры (радиус Шварцшильда), который можно рассчитать по формуле:
+
+\[
+r = \frac{2GM}{c^2}
+\]
+
+Где:
+- \(G\) — гравитационная постоянная (\(6.67430 \times 10^{-11} \, \text{м}^3 \cdot \text{кг}^{-1} \cdot \text{с}^{-2}\)),
+- \(c\) — скорость света (\(2.998 \times 10^8 \, \text{м/с}\)).
+
+### Пример расчета
+
+Предположим, у нас есть черная дыра с массой \(M = 10^{31} \, \text{кг}\).
+
+1. Рассчитаем радиус Шварцшильда:
+
+\[
+r = \frac{2 \times 6.67430 \times 10^{-11} \times 10^{31}}{(2.998 \times 10^8)^2} \approx 1.485 \times 10^4 \, \text{м}
+\]
+
+2. Рассчитаем объем черной дыры:
+
+\[
+V = \frac{4}{3} \pi (1.485 \times 10^4)^3 \approx 1.37 \times 10^{13} \, \text{м}^3
+\]
+
+3. Рассчитаем плотность черной дыры:
+
+\[
+\rho = \frac{10^{31}}{1.37 \times 10^{13}} \approx 7.30 \times 10^{17} \, \text{кг/м}^3
+\]
+
+### HTML-страница для расчета плотности черной дыры
+
+```html
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Расчет плотности черной дыры</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Расчет плотности черной дыры</h1>
+        <div class="form-group">
+            <label for="mass">Масса черной дыры (кг):</label>
+            <input type="number" id="mass" placeholder="Введите массу">
+        </div>
+        <button onclick="calculateDensity()">Рассчитать плотность</button>
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        function calculateDensity() {
+            const G = 6.67430e-11; // Гравитационная постоянная
+            const c = 2.998e8; // Скорость света
+            const mass = parseFloat(document.getElementById('mass').value);
+
+            if (isNaN(mass)) {
+                alert("Пожалуйста, введите корректное значение массы.");
+                return;
+            }
+
+            // Рассчитываем радиус Шварцшильда
+            const r = (2 * G * mass) / (c * c);
+
+            // Рассчитываем объем
+            const V = (4 / 3) * Math.PI * Math.pow(r, 3);
+
+            // Рассчитываем плотность
+            const density = mass / V;
+
+            // Выводим

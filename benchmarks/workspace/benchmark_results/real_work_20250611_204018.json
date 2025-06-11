@@ -1,0 +1,31 @@
+[
+  {
+    "task": "Анализ данных продаж",
+    "complexity": "medium",
+    "score": 0.5,
+    "time": 5.6399986743927,
+    "result": {
+      "task": "Проанализируй данные продаж за последний месяц. Найди топ-3 товара и дай рекомендации по улучшению продаж.",
+      "status": "completed",
+      "duration": 5.638449,
+      "complexity_analysis": {
+        "task": "Проанализируй данные продаж за последний месяц. Найди топ-3 товара и дай рекомендации по улучшению продаж.",
+        "complexity": "simple",
+        "estimated_agents": 1,
+        "word_count": 15,
+        "requires_planning": true,
+        "requires_coordination": false,
+        "reasoning": "обоснование",
+        "estimated_time": 30
+      },
+      "subtasks": [
+        {
+          "id": "single_task",
+          "description": "Проанализируй данные продаж за последний месяц. Найди топ-3 товара и дай рекомендации по улучшению продаж.",
+          "type": "execute"
+        }
+      ],
+      "team": {
+        "team_id": "team_1749663557",
+        "agents": {
+          "agent_single_task": 

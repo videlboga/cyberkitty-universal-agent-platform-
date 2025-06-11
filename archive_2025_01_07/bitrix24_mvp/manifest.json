@@ -1,0 +1,16 @@
+# Manifest for Smart Document Generator MVP
+
+## Overview
+Smart Document Generator is an AI-powered application designed to automate and streamline the document creation process within Bitrix24. This MVP focuses on integrating AI assistance and CRM functionalities to enhance productivity and efficiency.
+
+## Key Features
+1. **AI-Powered Document Generation**: Utilizes AI to generate documents based on CRM data and user inputs.
+2. **CRM Integration**: Seamlessly integrates with Bitrix24 CRM to pull relevant data for document creation.
+3. **Template Management**: Allows users to create, edit, and manage document templates.
+4. **Multi-Language Support**: Supports multiple languages for document generation.
+5. **Customizable Output Formats**: Generates documents in various formats such as PDF, DOCX, and HTML.
+6. **User-Friendly Interface**: Intuitive UI for easy navigation and document creation.
+
+## Configuration Settings
+
+### General Settings

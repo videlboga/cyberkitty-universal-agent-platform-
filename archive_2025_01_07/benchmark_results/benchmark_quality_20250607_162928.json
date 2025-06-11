@@ -1,0 +1,26 @@
+{
+  "benchmark_name": "quality_benchmarks",
+  "timestamp": "2025-06-07T16:29:28.076842",
+  "task_completion": {
+    "total_tasks": 0,
+    "completed_tasks": 0,
+    "success_rate": 0,
+    "avg_completion_time": 0,
+    "failure_reasons": [
+      "Agent.__init__() got an unexpected keyword argument 'instructions'"
+    ]
+  },
+  "performance": {
+    "execution_time": 2.7894973754882812e-05,
+    "memory_usage_mb": 0,
+    "cpu_usage_percent": 11718.4,
+    "tokens_per_second": null
+  },
+  "quality": {
+    "output_correctness": 0,
+    "coherence_score": 0,
+    "relevance_score": 0,
+    "hallucination_rate": 1.0
+  },
+  "metadata": null
+}

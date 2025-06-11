@@ -7,7 +7,7 @@ services:
     container_name: uap_mongodb
     restart: unless-stopped
     ports:
-      - "27018:27017"  # Используем порт 27018 как в системе
+      - "27019:27017"  # Используем порт 27019 для избежания конфликта
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: password123

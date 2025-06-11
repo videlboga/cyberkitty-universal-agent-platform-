@@ -1,0 +1,2 @@
+Топ-3 товара: {top3_product1}, {top3_product2}, {top3_product3}
+Рекомендации по улучшению продаж: {recommendations}

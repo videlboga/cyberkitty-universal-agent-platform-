@@ -1,0 +1,38 @@
+{
+  "benchmark_name": "performance_benchmarks",
+  "timestamp": "2025-06-07T16:57:48.005079",
+  "task_completion": {
+    "total_tasks": 10,
+    "completed_tasks": 10,
+    "success_rate": 1.0,
+    "avg_completion_time": 5.745887756347657e-06,
+    "failure_reasons": []
+  },
+  "performance": {
+    "execution_time": 11.799983501434326,
+    "memory_usage_mb": 0,
+    "cpu_usage_percent": 0.0,
+    "tokens_per_second": null
+  },
+  "quality": {
+    "output_correctness": 0.0,
+    "coherence_score": 1.0,
+    "relevance_score": 0.0,
+    "hallucination_rate": 0.0
+  },
+  "metadata": {
+    "agent_creation_times": [
+      2.0265579223632812e-05,
+      7.3909759521484375e-06,
+      5.4836273193359375e-06,
+      3.5762786865234375e-06,
+      3.337860107421875e-06,
+      3.0994415283203125e-06,
+      3.0994415283203125e-06,
+      3.337860107421875e-06,
+      4.5299530029296875e-06,
+      3.337860107421875e-06
+    ],
+    "avg_creation_time": 5.745887756347657e-06
+  }
+}

@@ -1,0 +1,995 @@
+[
+  {
+    "task": "Анализ данных продаж",
+    "complexity": "medium",
+    "score": 0.5,
+    "time": 12.973244667053223,
+    "result": {
+      "task": "Проанализируй данные продаж за последний месяц. Найди топ-3 товара и дай рекомендации по улучшению продаж.",
+      "status": "completed",
+      "duration": 12.972883,
+      "complexity_analysis": {
+        "task": "Проанализируй данные продаж за последний месяц. Найди топ-3 товара и дай рекомендации по улучшению продаж.",
+        "complexity": "simple",
+        "estimated_agents": 1,
+        "word_count": 15,
+        "requires_planning": true,
+        "requires_coordination": false,
+        "reasoning": "Простое сравнение по количеству продаж",
+        "estimated_time": 30
+      },
+      "subtasks": [
+        {
+          "id": "single_task",
+          "description": "Проанализируй данные продаж за последний месяц. Найди топ-3 товара и дай рекомендации по улучшению продаж.",
+          "type": "execute"
+        }
+      ],
+      "team": {
+        "team_id": "team_1749664375",
+        "agents": {
+          "agent_single_task": "<kittycore.agents.base_agent.Agent object at 0x764bd416fcb0>"
+        },
+        "team_size": 1,
+        "roles": [
+          "agent_single_task"
+        ],
+        "created_at": "2025-06-11T20:52:55.153348"
+      },
+      "workflow": {
+        "workflow_id": "workflow_1749664375",
+        "steps": [
+          {
+            "step_id": "single_task",
+            "description": "Проанализируй данные продаж за последний месяц. Найди топ-3 товара и дай рекомендации по улучшению продаж.",
+            "assigned_agent": "agent_single_task",
+            "estimated_time": 5,
+            "dependencies": []
+          }
+        ],
+        "dependencies": {},
+        "estimated_duration": 5
+      },
+      "workflow_graph": {
+        "id": "workflow_1749664375",
+        "nodes_count": 1,
+        "edges_count": 0,
+        "mermaid": "graph TD\n    single_task[\"⏳ Execute<br/>agent_single_task\"]"
+      },
+      "execution": {
+        "execution_id": "exec_1749664375",
+        "workflow_id": "workflow_1749664375",
+        "start_time": "2025-06-11T20:52:55.154349",
+        "steps_completed": 1,
+        "step_results": {
+          "single_task": {
+            "result": "Выполнено 2 из 4 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:53:02.479276",
+            "agent": "agent_single_task"
+          }
+        },
+        "status": "completed",
+        "files_created": [],
+        "end_time": "2025-06-11T20:53:02.479293"
+      },
+      "validation": {
+        "validation_passed": true,
+        "quality_score": 0.5,
+        "user_benefit": "Валидация недоступна",
+        "issues": [
+          "SmartValidator не инициализирован"
+        ],
+        "recommendations": [],
+        "verdict": "⚠️ БЕЗ ВАЛИДАЦИИ"
+      },
+      "statistics": {
+        "tasks_processed": 1,
+        "agents_created": 1,
+        "workflows_executed": 1,
+        "config": {
+          "orchestrator_id": "main_orchestrator",
+          "max_agents": 10,
+          "timeout": 300,
+          "enable_human_intervention": true,
+          "log_level": "INFO",
+          "report_level": "ReportLevel.DETAILED"
+        }
+      },
+      "collective_memory_stats": {
+        "team_id": "main_orchestrator",
+        "total_memories": 2,
+        "agents_count": 2,
+        "agent_contributions": {
+          "orchestrator": 1,
+          "agent_single_task": 1
+        },
+        "avg_importance": 0.5
+      },
+      "self_improvement_report": {
+        "top_performers": [
+          {
+            "agent_id": "agent_single_task",
+            "task_count": 1,
+            "success_rate": 1.0,
+            "avg_duration": 12.972805,
+            "efficiency_score": 0.0770843314148328,
+            "last_updated": "2025-06-11T20:53:02.479327"
+          }
+        ],
+        "total_agents": 1,
+        "report_time": "2025-06-11T20:53:02.479447"
+      },
+      "completed_at": "2025-06-11T20:53:02.479393",
+      "rich_reporting": {
+        "execution_id": "task_1749664369506513",
+        "detailed_report_file": "workspace/task_reports/detailed_report_task_1749664369506513.md",
+        "ui_summary": "✅ **Проанализируй данные продаж за последний месяц. Найди топ-3 товара и дай рекомендации по улучшению продаж.**\n⏱️ 12973мс | 🤖 1 агентов | ⚡ 0 действий | 📁 0 файлов\n⭐ Качество: 0.50"
+      }
+    }
+  },
+  {
+    "task": "Создание технической документации",
+    "complexity": "high",
+    "score": 0.5,
+    "time": 12.994883298873901,
+    "result": {
+      "task": "Создай техническую документацию для REST API. Включи описание endpoints, примеры запросов и ответов.",
+      "status": "completed",
+      "duration": 12.993362,
+      "complexity_analysis": {
+        "task": "Создай техническую документацию для REST API. Включи описание endpoints, примеры запросов и ответов.",
+        "complexity": "simple",
+        "estimated_agents": 1,
+        "word_count": 13,
+        "requires_planning": false,
+        "requires_coordination": false,
+        "reasoning": "Создание документации для API - простая операция, требующая только одного агента.",
+        "estimated_time": 30
+      },
+      "subtasks": [
+        {
+          "id": "single_task",
+          "description": "Создай техническую документацию для REST API. Включи описание endpoints, примеры запросов и ответов.",
+          "type": "execute"
+        }
+      ],
+      "team": {
+        "team_id": "team_1749664387",
+        "agents": {
+          "agent_single_task": "<kittycore.agents.base_agent.Agent object at 0x764bd3f434d0>"
+        },
+        "team_size": 1,
+        "roles": [
+          "agent_single_task"
+        ],
+        "created_at": "2025-06-11T20:53:07.707481"
+      },
+      "workflow": {
+        "workflow_id": "workflow_1749664387",
+        "steps": [
+          {
+            "step_id": "single_task",
+            "description": "Создай техническую документацию для REST API. Включи описание endpoints, примеры запросов и ответов.",
+            "assigned_agent": "agent_single_task",
+            "estimated_time": 5,
+            "dependencies": []
+          }
+        ],
+        "dependencies": {},
+        "estimated_duration": 5
+      },
+      "workflow_graph": {
+        "id": "workflow_1749664387",
+        "nodes_count": 1,
+        "edges_count": 0,
+        "mermaid": "graph TD\n    single_task[\"⏳ Execute<br/>agent_single_task\"]"
+      },
+      "execution": {
+        "execution_id": "exec_1749664387",
+        "workflow_id": "workflow_1749664387",
+        "start_time": "2025-06-11T20:53:07.707811",
+        "steps_completed": 1,
+        "step_results": {
+          "single_task": {
+            "result": "Выполнено 4 из 5 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:53:15.472590",
+            "agent": "agent_single_task"
+          }
+        },
+        "status": "completed",
+        "files_created": [],
+        "end_time": "2025-06-11T20:53:15.472670"
+      },
+      "validation": {
+        "validation_passed": true,
+        "quality_score": 0.5,
+        "user_benefit": "Валидация недоступна",
+        "issues": [
+          "SmartValidator не инициализирован"
+        ],
+        "recommendations": [],
+        "verdict": "⚠️ БЕЗ ВАЛИДАЦИИ"
+      },
+      "statistics": {
+        "tasks_processed": 1,
+        "agents_created": 1,
+        "workflows_executed": 1,
+        "config": {
+          "orchestrator_id": "main_orchestrator",
+          "max_agents": 10,
+          "timeout": 300,
+          "enable_human_intervention": true,
+          "log_level": "INFO",
+          "report_level": "ReportLevel.DETAILED"
+        }
+      },
+      "collective_memory_stats": {
+        "team_id": "main_orchestrator",
+        "total_memories": 2,
+        "agents_count": 2,
+        "agent_contributions": {
+          "orchestrator": 1,
+          "agent_single_task": 1
+        },
+        "avg_importance": 0.5
+      },
+      "self_improvement_report": {
+        "top_performers": [
+          {
+            "agent_id": "agent_single_task",
+            "task_count": 1,
+            "success_rate": 1.0,
+            "avg_duration": 12.993001,
+            "efficiency_score": 0.07696451343303984,
+            "last_updated": "2025-06-11T20:53:15.472810"
+          }
+        ],
+        "total_agents": 1,
+        "report_time": "2025-06-11T20:53:15.473338"
+      },
+      "completed_at": "2025-06-11T20:53:15.473117",
+      "rich_reporting": {
+        "execution_id": "task_1749664382479756",
+        "detailed_report_file": "workspace/task_reports/detailed_report_task_1749664382479756.md",
+        "ui_summary": "✅ **Создай техническую документацию для REST API. Включи описание endpoints, примеры запросов и ответов.**\n⏱️ 12994мс | 🤖 1 агентов | ⚡ 0 действий | 📁 0 файлов\n⭐ Качество: 0.50"
+      }
+    }
+  },
+  {
+    "task": "План маркетинговой кампании",
+    "complexity": "medium",
+    "score": 0.5,
+    "time": 67.00661444664001,
+    "result": {
+      "task": "Разработай план маркетинговой кампании для запуска нового продукта. Включи целевую аудиторию, каналы и бюджет.",
+      "status": "completed",
+      "duration": 67.005998,
+      "complexity_analysis": {
+        "task": "Разработай план маркетинговой кампании для запуска нового продукта. Включи целевую аудиторию, каналы и бюджет.",
+        "complexity": "medium",
+        "estimated_agents": 3,
+        "word_count": 14,
+        "requires_planning": true,
+        "requires_coordination": true,
+        "reasoning": "Разработать comprehensive campaign с учетом различных каналов и целевой аудитории.",
+        "estimated_time": 1200
+      },
+      "subtasks": [
+        {
+          "id": "step1",
+          "description": "Анализ целевой аудитории. Выявить ключевые характеристики, потребности и поведение target audience.",
+          "type": "planning"
+        },
+        {
+          "id": "step2",
+          "description": "Разработать профиль target audience. Определить demographic characteristics, psychographics и behavior characteristics.",
+          "type": "planning"
+        },
+        {
+          "id": "step3",
+          "description": "Выбрать наиболее эффективные каналы для продвижения продукта. Включить social media, email marketing и paid advertising.",
+          "type": "planning"
+        },
+        {
+          "id": "step4",
+          "description": "Разработать бюджет кампании. Определить затраты на каждый канал и задать общий бюджет.",
+          "type": "planning"
+        },
+        {
+          "id": "step5",
+          "description": "Создать контент для кампании. Разработать стратегию содержания и создать первоначальные материалы.",
+          "type": "execution"
+        },
+        {
+          "id": "step6",
+          "description": "Опубликовать контент и запустить продвижение. Использовать paid advertising platforms и social media tools.",
+          "type": "execution"
+        },
+        {
+          "id": "step7",
+          "description": "Мониторить и анализировать результаты kampanии. Использовать analytics tools и отслеживать key performance indicators (KPI).",
+          "type": "execution"
+        },
+        {
+          "id": "step8",
+          "description": "Верифицировать результаты kampanии. Оценивать эффективность и ajustировать стратегию, если необходимо.",
+          "type": "verification"
+        }
+      ],
+      "team": {
+        "team_id": "team_1749664406",
+        "agents": {
+          "agent_step1": "<kittycore.agents.base_agent.Agent object at 0x764bd3f5a710>",
+          "agent_step2": "<kittycore.agents.base_agent.Agent object at 0x764bd3f4d810>",
+          "agent_step3": "<kittycore.agents.base_agent.Agent object at 0x764bd3f4dba0>",
+          "agent_step4": "<kittycore.agents.base_agent.Agent object at 0x764bd3f03bf0>",
+          "agent_step5": "<kittycore.agents.base_agent.Agent object at 0x764bd3f68490>",
+          "agent_step6": "<kittycore.agents.base_agent.Agent object at 0x764bd3f68270>",
+          "agent_step7": "<kittycore.agents.base_agent.Agent object at 0x764bd3f6c250>",
+          "agent_step8": "<kittycore.agents.base_agent.Agent object at 0x764bd3f6c550>"
+        },
+        "team_size": 8,
+        "roles": [
+          "agent_step1",
+          "agent_step2",
+          "agent_step3",
+          "agent_step4",
+          "agent_step5",
+          "agent_step6",
+          "agent_step7",
+          "agent_step8"
+        ],
+        "created_at": "2025-06-11T20:53:26.421653"
+      },
+      "workflow": {
+        "workflow_id": "workflow_1749664406",
+        "steps": [
+          {
+            "step_id": "step1",
+            "description": "Анализ целевой аудитории. Выявить ключевые характеристики, потребности и поведение target audience.",
+            "assigned_agent": "agent_step1",
+            "estimated_time": 5,
+            "dependencies": []
+          },
+          {
+            "step_id": "step2",
+            "description": "Разработать профиль target audience. Определить demographic characteristics, psychographics и behavior characteristics.",
+            "assigned_agent": "agent_step2",
+            "estimated_time": 5,
+            "dependencies": [
+              "step1"
+            ]
+          },
+          {
+            "step_id": "step3",
+            "description": "Выбрать наиболее эффективные каналы для продвижения продукта. Включить social media, email marketing и paid advertising.",
+            "assigned_agent": "agent_step3",
+            "estimated_time": 5,
+            "dependencies": [
+              "step2"
+            ]
+          },
+          {
+            "step_id": "step4",
+            "description": "Разработать бюджет кампании. Определить затраты на каждый канал и задать общий бюджет.",
+            "assigned_agent": "agent_step4",
+            "estimated_time": 5,
+            "dependencies": [
+              "step3"
+            ]
+          },
+          {
+            "step_id": "step5",
+            "description": "Создать контент для кампании. Разработать стратегию содержания и создать первоначальные материалы.",
+            "assigned_agent": "agent_step5",
+            "estimated_time": 5,
+            "dependencies": [
+              "step4"
+            ]
+          },
+          {
+            "step_id": "step6",
+            "description": "Опубликовать контент и запустить продвижение. Использовать paid advertising platforms и social media tools.",
+            "assigned_agent": "agent_step6",
+            "estimated_time": 5,
+            "dependencies": [
+              "step5"
+            ]
+          },
+          {
+            "step_id": "step7",
+            "description": "Мониторить и анализировать результаты kampanии. Использовать analytics tools и отслеживать key performance indicators (KPI).",
+            "assigned_agent": "agent_step7",
+            "estimated_time": 5,
+            "dependencies": [
+              "step6"
+            ]
+          },
+          {
+            "step_id": "step8",
+            "description": "Верифицировать результаты kampanии. Оценивать эффективность и ajustировать стратегию, если необходимо.",
+            "assigned_agent": "agent_step8",
+            "estimated_time": 5,
+            "dependencies": [
+              "step7"
+            ]
+          }
+        ],
+        "dependencies": {},
+        "estimated_duration": 40
+      },
+      "workflow_graph": {
+        "id": "workflow_1749664406",
+        "nodes_count": 8,
+        "edges_count": 7,
+        "mermaid": "graph TD\n    step1[\"⏳ Planning<br/>agent_step1\"]\n    step2[\"⏳ Planning<br/>agent_step2\"]\n    step3[\"⏳ Planning<br/>agent_step3\"]\n    step4[\"⏳ Planning<br/>agent_step4\"]\n    step5[\"⏳ Execution<br/>agent_step5\"]\n    step6[\"⏳ Execution<br/>agent_step6\"]\n    step7[\"⏳ Execution<br/>agent_step7\"]\n    step8[\"⏳ Verification<br/>agent_step8\"]\n    step1 --> step2\n    step2 --> step3\n    step3 --> step4\n    step4 --> step5\n    step5 --> step6\n    step6 --> step7\n    step7 --> step8"
+      },
+      "execution": {
+        "execution_id": "exec_1749664406",
+        "workflow_id": "workflow_1749664406",
+        "start_time": "2025-06-11T20:53:26.421907",
+        "steps_completed": 8,
+        "step_results": {
+          "step1": {
+            "result": "Выполнено 5 из 6 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:53:32.793927",
+            "agent": "agent_step1"
+          },
+          "step2": {
+            "result": "Выполнено 5 из 5 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:53:38.492990",
+            "agent": "agent_step2"
+          },
+          "step3": {
+            "result": "Выполнено 3 из 6 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:53:44.929134",
+            "agent": "agent_step3"
+          },
+          "step4": {
+            "result": "Выполнено 4 из 5 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:53:51.339813",
+            "agent": "agent_step4"
+          },
+          "step5": {
+            "result": "Выполнено 6 из 6 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:53:58.179801",
+            "agent": "agent_step5"
+          },
+          "step6": {
+            "result": "Выполнено 4 из 7 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:54:09.850089",
+            "agent": "agent_step6"
+          },
+          "step7": {
+            "result": "Выполнено 3 из 6 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:54:16.734924",
+            "agent": "agent_step7"
+          },
+          "step8": {
+            "result": "Выполнено 3 из 3 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:54:22.481006",
+            "agent": "agent_step8"
+          }
+        },
+        "status": "completed",
+        "files_created": [],
+        "end_time": "2025-06-11T20:54:22.481021"
+      },
+      "validation": {
+        "validation_passed": true,
+        "quality_score": 0.5,
+        "user_benefit": "Валидация недоступна",
+        "issues": [
+          "SmartValidator не инициализирован"
+        ],
+        "recommendations": [],
+        "verdict": "⚠️ БЕЗ ВАЛИДАЦИИ"
+      },
+      "statistics": {
+        "tasks_processed": 1,
+        "agents_created": 8,
+        "workflows_executed": 1,
+        "config": {
+          "orchestrator_id": "main_orchestrator",
+          "max_agents": 10,
+          "timeout": 300,
+          "enable_human_intervention": true,
+          "log_level": "INFO",
+          "report_level": "ReportLevel.DETAILED"
+        }
+      },
+      "collective_memory_stats": {
+        "team_id": "main_orchestrator",
+        "total_memories": 9,
+        "agents_count": 9,
+        "agent_contributions": {
+          "orchestrator": 1,
+          "agent_step1": 1,
+          "agent_step2": 1,
+          "agent_step3": 1,
+          "agent_step4": 1,
+          "agent_step5": 1,
+          "agent_step6": 1,
+          "agent_step7": 1,
+          "agent_step8": 1
+        },
+        "avg_importance": 0.5
+      },
+      "self_improvement_report": {
+        "top_performers": [
+          {
+            "agent_id": "agent_step1",
+            "task_count": 1,
+            "success_rate": 1.0,
+            "avg_duration": 67.005786,
+            "efficiency_score": 0.014924084317136434,
+            "last_updated": "2025-06-11T20:54:22.481043"
+          },
+          {
+            "agent_id": "agent_step2",
+            "task_count": 1,
+            "success_rate": 1.0,
+            "avg_duration": 67.005863,
+            "efficiency_score": 0.014924067167077603,
+            "last_updated": "2025-06-11T20:54:22.481116"
+          },
+          {
+            "agent_id": "agent_step3",
+            "task_count": 1,
+            "success_rate": 1.0,
+            "avg_duration": 67.00589,
+            "efficiency_score": 0.014924061153429946,
+            "last_updated": "2025-06-11T20:54:22.481143"
+          },
+          {
+            "agent_id": "agent_step4",
+            "task_count": 1,
+            "success_rate": 1.0,
+            "avg_duration": 67.005919,
+            "efficiency_score": 0.0149240546943323,
+            "last_updated": "2025-06-11T20:54:22.481170"
+          },
+          {
+            "agent_id": "agent_step5",
+            "task_count": 1,
+            "success_rate": 1.0,
+            "avg_duration": 67.005938,
+            "efficiency_score": 0.01492405046251274,
+            "last_updated": "2025-06-11T20:54:22.481189"
+          }
+        ],
+        "total_agents": 8,
+        "report_time": "2025-06-11T20:54:22.481310"
+      },
+      "completed_at": "2025-06-11T20:54:22.481247",
+      "rich_reporting": {
+        "execution_id": "task_1749664395475253",
+        "detailed_report_file": "workspace/task_reports/detailed_report_task_1749664395475253.md",
+        "ui_summary": "✅ **Разработай план маркетинговой кампании для запуска нового продукта. Включи целевую аудиторию, каналы и бюджет.**\n⏱️ 67006мс | 🤖 8 агентов | ⚡ 0 действий | 📁 0 файлов\n⭐ Качество: 0.50"
+      }
+    }
+  },
+  {
+    "task": "Автоматизация рабочего процесса",
+    "complexity": "high",
+    "score": 0.5,
+    "time": 37.42070269584656,
+    "result": {
+      "task": "Создай план автоматизации процесса обработки заявок клиентов. Опиши этапы и необходимые инструменты.",
+      "status": "completed",
+      "duration": 37.419676,
+      "complexity_analysis": {
+        "task": "Создай план автоматизации процесса обработки заявок клиентов. Опиши этапы и необходимые инструменты.",
+        "complexity": "medium",
+        "estimated_agents": 3,
+        "word_count": 12,
+        "requires_planning": true,
+        "requires_coordination": true,
+        "reasoning": "Обработка заявок клиентов включает в себя несколько связанных операций: получение заявления, его проверку, обработку и отправку на проверку. Для эффективного выполнения этих операций требуется координаção между агентами.",
+        "estimated_time": 240
+      },
+      "subtasks": [
+        {
+          "id": "step1",
+          "description": "Анализ заявки клиента",
+          "type": "analysis"
+        },
+        {
+          "id": "step2",
+          "description": "Планирование обработки заявки",
+          "type": "planning"
+        },
+        {
+          "id": "step3",
+          "description": "Выполнение обработки заявки",
+          "type": "execution"
+        },
+        {
+          "id": "step4",
+          "description": "Верификация результатов",
+          "type": "verification"
+        }
+      ],
+      "team": {
+        "team_id": "team_1749664475",
+        "agents": {
+          "agent_step1": "<kittycore.agents.base_agent.Agent object at 0x764bd3cb8140>",
+          "agent_step2": "<kittycore.agents.base_agent.Agent object at 0x764bd3cb8410>",
+          "agent_step3": "<kittycore.agents.base_agent.Agent object at 0x764bd3f1f310>",
+          "agent_step4": "<kittycore.agents.base_agent.Agent object at 0x764bd3f1e7b0>"
+        },
+        "team_size": 4,
+        "roles": [
+          "agent_step1",
+          "agent_step2",
+          "agent_step3",
+          "agent_step4"
+        ],
+        "created_at": "2025-06-11T20:54:35.538728"
+      },
+      "workflow": {
+        "workflow_id": "workflow_1749664475",
+        "steps": [
+          {
+            "step_id": "step1",
+            "description": "Анализ заявки клиента",
+            "assigned_agent": "agent_step1",
+            "estimated_time": 5,
+            "dependencies": []
+          },
+          {
+            "step_id": "step2",
+            "description": "Планирование обработки заявки",
+            "assigned_agent": "agent_step2",
+            "estimated_time": 5,
+            "dependencies": [
+              "step1"
+            ]
+          },
+          {
+            "step_id": "step3",
+            "description": "Выполнение обработки заявки",
+            "assigned_agent": "agent_step3",
+            "estimated_time": 5,
+            "dependencies": [
+              "step2"
+            ]
+          },
+          {
+            "step_id": "step4",
+            "description": "Верификация результатов",
+            "assigned_agent": "agent_step4",
+            "estimated_time": 5,
+            "dependencies": [
+              "step3"
+            ]
+          }
+        ],
+        "dependencies": {},
+        "estimated_duration": 20
+      },
+      "workflow_graph": {
+        "id": "workflow_1749664475",
+        "nodes_count": 4,
+        "edges_count": 3,
+        "mermaid": "graph TD\n    step1[\"⏳ Analysis<br/>agent_step1\"]\n    step2[\"⏳ Planning<br/>agent_step2\"]\n    step3[\"⏳ Execution<br/>agent_step3\"]\n    step4[\"⏳ Verification<br/>agent_step4\"]\n    step1 --> step2\n    step2 --> step3\n    step3 --> step4"
+      },
+      "execution": {
+        "execution_id": "exec_1749664475",
+        "workflow_id": "workflow_1749664475",
+        "start_time": "2025-06-11T20:54:35.538787",
+        "steps_completed": 4,
+        "step_results": {
+          "step1": {
+            "result": "Выполнено 4 из 4 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:54:42.012106",
+            "agent": "agent_step1"
+          },
+          "step2": {
+            "result": "Выполнено 2 из 3 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:54:47.605678",
+            "agent": "agent_step2"
+          },
+          "step3": {
+            "result": "Выполнено 3 из 3 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:54:53.709735",
+            "agent": "agent_step3"
+          },
+          "step4": {
+            "result": "Выполнено 4 из 4 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:54:59.900678",
+            "agent": "agent_step4"
+          }
+        },
+        "status": "completed",
+        "files_created": [],
+        "end_time": "2025-06-11T20:54:59.900721"
+      },
+      "validation": {
+        "validation_passed": true,
+        "quality_score": 0.5,
+        "user_benefit": "Валидация недоступна",
+        "issues": [
+          "SmartValidator не инициализирован"
+        ],
+        "recommendations": [],
+        "verdict": "⚠️ БЕЗ ВАЛИДАЦИИ"
+      },
+      "statistics": {
+        "tasks_processed": 1,
+        "agents_created": 4,
+        "workflows_executed": 1,
+        "config": {
+          "orchestrator_id": "main_orchestrator",
+          "max_agents": 10,
+          "timeout": 300,
+          "enable_human_intervention": true,
+          "log_level": "INFO",
+          "report_level": "ReportLevel.DETAILED"
+        }
+      },
+      "collective_memory_stats": {
+        "team_id": "main_orchestrator",
+        "total_memories": 5,
+        "agents_count": 5,
+        "agent_contributions": {
+          "orchestrator": 1,
+          "agent_step1": 1,
+          "agent_step2": 1,
+          "agent_step3": 1,
+          "agent_step4": 1
+        },
+        "avg_importance": 0.5
+      },
+      "self_improvement_report": {
+        "top_performers": [
+          {
+            "agent_id": "agent_step1",
+            "task_count": 1,
+            "success_rate": 1.0,
+            "avg_duration": 37.419119,
+            "efficiency_score": 0.026724306363279157,
+            "last_updated": "2025-06-11T20:54:59.900798"
+          },
+          {
+            "agent_id": "agent_step2",
+            "task_count": 1,
+            "success_rate": 1.0,
+            "avg_duration": 37.419348,
+            "efficiency_score": 0.026724142815101964,
+            "last_updated": "2025-06-11T20:54:59.901023"
+          },
+          {
+            "agent_id": "agent_step3",
+            "task_count": 1,
+            "success_rate": 1.0,
+            "avg_duration": 37.419471,
+            "efficiency_score": 0.02672405497127418,
+            "last_updated": "2025-06-11T20:54:59.901139"
+          },
+          {
+            "agent_id": "agent_step4",
+            "task_count": 1,
+            "success_rate": 1.0,
+            "avg_duration": 37.419588,
+            "efficiency_score": 0.026723971413047092,
+            "last_updated": "2025-06-11T20:54:59.901255"
+          }
+        ],
+        "total_agents": 4,
+        "report_time": "2025-06-11T20:54:59.901556"
+      },
+      "completed_at": "2025-06-11T20:54:59.901331",
+      "rich_reporting": {
+        "execution_id": "task_1749664462481656",
+        "detailed_report_file": "workspace/task_reports/detailed_report_task_1749664462481656.md",
+        "ui_summary": "✅ **Создай план автоматизации процесса обработки заявок клиентов. Опиши этапы и необходимые инструменты.**\n⏱️ 37420мс | 🤖 4 агентов | ⚡ 0 действий | 📁 0 файлов\n⭐ Качество: 0.50"
+      }
+    }
+  },
+  {
+    "task": "Анализ конкурентов",
+    "complexity": "medium",
+    "score": 0.5,
+    "time": 38.20359659194946,
+    "result": {
+      "task": "Проведи анализ 3 основных конкурентов. Сравни их продукты, цены и маркетинговые стратегии.",
+      "status": "completed",
+      "duration": 38.203059,
+      "complexity_analysis": {
+        "task": "Проведи анализ 3 основных конкурентов. Сравни их продукты, цены и маркетинговые стратегии.",
+        "complexity": "medium",
+        "estimated_agents": 3,
+        "word_count": 12,
+        "requires_planning": true,
+        "requires_coordination": true,
+        "reasoning": "Провести анализ 3 основных конкурентов, сравнить их продукты, цены и маркетинговые стратегии, а также определить ключевые преимущества и недостатки каждого конкурента.",
+        "estimated_time": 120
+      },
+      "subtasks": [
+        {
+          "id": "analyze",
+          "description": "Анализ задачи: Проведи анализ 3 основных конкурентов. Сравни их продукты, цены и маркетинговые стратегии.",
+          "type": "analysis"
+        },
+        {
+          "id": "execute",
+          "description": "Выполнение: Проведи анализ 3 основных конкурентов. Сравни их продукты, цены и маркетинговые стратегии.",
+          "type": "execution"
+        },
+        {
+          "id": "verify",
+          "description": "Проверка результата: Проведи анализ 3 основных конкурентов. Сравни их продукты, цены и маркетинговые стратегии.",
+          "type": "verification"
+        }
+      ],
+      "team": {
+        "team_id": "team_1749664519",
+        "agents": {
+          "agent_analyze": "<kittycore.agents.base_agent.Agent object at 0x764bd3c997e0>",
+          "agent_execute": "<kittycore.agents.base_agent.Agent object at 0x764bd3cacb90>",
+          "agent_verify": "<kittycore.agents.base_agent.Agent object at 0x764bd3cae810>"
+        },
+        "team_size": 3,
+        "roles": [
+          "agent_analyze",
+          "agent_execute",
+          "agent_verify"
+        ],
+        "created_at": "2025-06-11T20:55:19.190920"
+      },
+      "workflow": {
+        "workflow_id": "workflow_1749664519",
+        "steps": [
+          {
+            "step_id": "analyze",
+            "description": "Анализ задачи: Проведи анализ 3 основных конкурентов. Сравни их продукты, цены и маркетинговые стратегии.",
+            "assigned_agent": "agent_analyze",
+            "estimated_time": 5,
+            "dependencies": []
+          },
+          {
+            "step_id": "execute",
+            "description": "Выполнение: Проведи анализ 3 основных конкурентов. Сравни их продукты, цены и маркетинговые стратегии.",
+            "assigned_agent": "agent_execute",
+            "estimated_time": 5,
+            "dependencies": [
+              "analyze"
+            ]
+          },
+          {
+            "step_id": "verify",
+            "description": "Проверка результата: Проведи анализ 3 основных конкурентов. Сравни их продукты, цены и маркетинговые стратегии.",
+            "assigned_agent": "agent_verify",
+            "estimated_time": 5,
+            "dependencies": [
+              "execute"
+            ]
+          }
+        ],
+        "dependencies": {},
+        "estimated_duration": 15
+      },
+      "workflow_graph": {
+        "id": "workflow_1749664519",
+        "nodes_count": 3,
+        "edges_count": 2,
+        "mermaid": "graph TD\n    analyze[\"⏳ Analysis<br/>agent_analyze\"]\n    execute[\"⏳ Execution<br/>agent_execute\"]\n    verify[\"⏳ Verification<br/>agent_verify\"]\n    analyze --> execute\n    execute --> verify"
+      },
+      "execution": {
+        "execution_id": "exec_1749664519",
+        "workflow_id": "workflow_1749664519",
+        "start_time": "2025-06-11T20:55:19.191220",
+        "steps_completed": 3,
+        "step_results": {
+          "analyze": {
+            "result": "Выполнено 2 из 5 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:55:25.012517",
+            "agent": "agent_analyze"
+          },
+          "execute": {
+            "result": "Выполнено 3 из 4 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:55:31.839763",
+            "agent": "agent_execute"
+          },
+          "verify": {
+            "result": "Выполнено 3 из 4 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:55:38.105962",
+            "agent": "agent_verify"
+          }
+        },
+        "status": "completed",
+        "files_created": [],
+        "end_time": "2025-06-11T20:55:38.105979"
+      },
+      "validation": {
+        "validation_passed": true,
+        "quality_score": 0.5,
+        "user_benefit": "Валидация недоступна",
+        "issues": [
+          "SmartValidator не инициализирован"
+        ],
+        "recommendations": [],
+        "verdict": "⚠️ БЕЗ ВАЛИДАЦИИ"
+      },
+      "statistics": {
+        "tasks_processed": 1,
+        "agents_created": 3,
+        "workflows_executed": 1,
+        "config": {
+          "orchestrator_id": "main_orchestrator",
+          "max_agents": 10,
+          "timeout": 300,
+          "enable_human_intervention": true,
+          "log_level": "INFO",
+          "report_level": "ReportLevel.DETAILED"
+        }
+      },
+      "collective_memory_stats": {
+        "team_id": "main_orchestrator",
+        "total_memories": 4,
+        "agents_count": 4,
+        "agent_contributions": {
+          "orchestrator": 1,
+          "agent_analyze": 1,
+          "agent_execute": 1,
+          "agent_verify": 1
+        },
+        "avg_importance": 0.5
+      },
+      "self_improvement_report": {
+        "top_performers": [
+          {
+            "agent_id": "agent_analyze",
+            "task_count": 1,
+            "success_rate": 1.0,
+            "avg_duration": 38.202945,
+            "efficiency_score": 0.026175992452937856,
+            "last_updated": "2025-06-11T20:55:38.106002"
+          },
+          {
+            "agent_id": "agent_execute",
+            "task_count": 1,
+            "success_rate": 1.0,
+            "avg_duration": 38.203018,
+            "efficiency_score": 0.026175942434705026,
+            "last_updated": "2025-06-11T20:55:38.106069"
+          },
+          {
+            "agent_id": "agent_verify",
+            "task_count": 1,
+            "success_rate": 1.0,
+            "avg_duration": 38.203042,
+            "efficiency_score": 0.02617592599039626,
+            "last_updated": "2025-06-11T20:55:38.106092"
+          }
+        ],
+        "total_agents": 3,
+        "report_time": "2025-06-11T20:55:38.106157"
+      },
+      "completed_at": "2025-06-11T20:55:38.106107",
+      "rich_reporting": {
+        "execution_id": "task_1749664499903052",
+        "detailed_report_file": "workspace/task_reports/detailed_report_task_1749664499903052.md",
+        "ui_summary": "✅ **Проведи анализ 3 основных конкурентов. Сравни их продукты, цены и маркетинговые стратегии.**\n⏱️ 38203мс | 🤖 3 агентов | ⚡ 0 действий | 📁 0 файлов\n⭐ Качество: 0.50"
+      }
+    }
+  }
+]

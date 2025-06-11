@@ -1,0 +1,237 @@
+{
+  "scenario_id": "bitrix_market_analysis",
+  "description": "Анализ рынка приложений Битрикс24 с использованием умных агентов",
+  "initial_context": {
+    "project_name": "Битрикс24 Маркет Анализ",
+    "analysis_stage": "start",
+    "tasks_completed": [],
+    "findings": {}
+  },
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "params": {
+        "message": "🚀 Запуск анализа рынка Битрикс24 приложений"
+      },
+      "next_step": "analyze_user_request"
+    },
+    {
+      "id": "analyze_user_request",
+      "type": "llm_classify_request",
+      "params": {
+        "user_message": "{user_message}"
+      },
+      "next_step": "route_to_research"
+    },
+    {
+      "id": "route_to_research",
+      "type": "llm_route_task",
+      "params": {
+        "task": "Найди топ-20 самых популярных приложений в Битрикс24 маркете и проанализируй их характеристики",
+        "priority": "high"
+      },
+      "next_step": "execute_market_research"
+    },
+    {
+      "id": "execute_market_research",
+      "type": "conditional_execute",
+      "params": {
+        "condition": "selected_agent == 'sherlock'",
+        "true_step": "sherlock_research_phase",
+        "false_step": "route_to_data_analysis"
+      }
+    },
+    {
+      "id": "sherlock_research_phase",
+      "type": "action",
+      "params": {
+        "action_type": "research",
+        "message": "🔍 SherlockAgent исследует рынок Битрикс24...",
+        "research_tasks": [
+          "Анализ топ-20 приложений по популярности",
+          "Категоризация приложений по функциональности", 
+          "Изучение отзывов пользователей",
+          "Анализ ценовой политики"
+        ]
+      },
+      "next_step": "route_to_data_analysis"
+    },
+    {
+      "id": "route_to_data_analysis",
+      "type": "llm_route_task",
+      "params": {
+        "task": "Проанализируй статистику загрузок, рейтингов и выяви тренды в популярных приложениях Битрикс24",
+        "priority": "high"
+      },
+      "next_step": "execute_data_analysis"
+    },
+    {
+      "id": "execute_data_analysis",
+      "type": "conditional_execute",
+      "params": {
+        "condition": "selected_agent == 'nova'",
+        "true_step": "nova_analysis_phase",
+        "false_step": "route_to_ux_analysis"
+      }
+    },
+    {
+      "id": "nova_analysis_phase",
+      "type": "action",
+      "params": {
+        "action_type": "data_analysis",
+        "message": "📊 NovaAgent анализирует данные...",
+        "analysis_tasks": [
+          "Статистический анализ загрузок и рейтингов",
+          "Выявление паттернов успешности",
+          "Корреляционный анализ цены и популярности",
+          "Прогнозирование трендов"
+        ]
+      },
+      "next_step": "route_to_ux_analysis"
+    },
+    {
+      "id": "route_to_ux_analysis",
+      "type": "llm_route_task",
+      "params": {
+        "task": "Проанализируй интерфейсы популярных приложений и выяви UX проблемы для создания улучшенного дизайна",
+        "priority": "critical"
+      },
+      "next_step": "execute_ux_analysis"
+    },
+    {
+      "id": "execute_ux_analysis",
+      "type": "conditional_execute",
+      "params": {
+        "condition": "selected_agent == 'artemis'",
+        "true_step": "artemis_ux_phase",
+        "false_step": "route_to_prototyping"
+      }
+    },
+    {
+      "id": "artemis_ux_phase",
+      "type": "action",
+      "params": {
+        "action_type": "ux_analysis",
+        "message": "🎨 ArtemisAgent анализирует UX...",
+        "ux_tasks": [
+          "Анализ интерфейсов топ-5 приложений",
+          "Выявление UX проблем и болевых точек",
+          "Исследование лучших практик дизайна",
+          "Определение возможностей улучшения"
+        ]
+      },
+      "next_step": "route_to_prototyping"
+    },
+    {
+      "id": "route_to_prototyping",
+      "type": "llm_route_task",
+      "params": {
+        "task": "Создай концепты и прототипы улучшенных приложений с лучшим UX на основе анализа",
+        "priority": "critical"
+      },
+      "next_step": "execute_prototyping"
+    },
+    {
+      "id": "execute_prototyping",
+      "type": "conditional_execute",
+      "params": {
+        "condition": "selected_agent == 'artemis'",
+        "true_step": "artemis_prototype_phase",
+        "false_step": "route_to_technical_spec"
+      }
+    },
+    {
+      "id": "artemis_prototype_phase",
+      "type": "action",
+      "params": {
+        "action_type": "prototyping",
+        "message": "🎨 ArtemisAgent создает прототипы...",
+        "prototype_tasks": [
+          "Концепт улучшенного CRM приложения",
+          "Прототип приложения управления проектами",
+          "Дизайн-система для Битрикс24",
+          "Wireframes мобильной версии"
+        ]
+      },
+      "next_step": "route_to_technical_spec"
+    },
+    {
+      "id": "route_to_technical_spec",
+      "type": "llm_route_task",
+      "params": {
+        "task": "Создай техническую спецификацию и архитектуру приложения с API интеграцией",
+        "priority": "high"
+      },
+      "next_step": "execute_technical_spec"
+    },
+    {
+      "id": "execute_technical_spec",
+      "type": "conditional_execute",
+      "params": {
+        "condition": "selected_agent == 'ada'",
+        "true_step": "ada_technical_phase",
+        "false_step": "generate_final_report"
+      }
+    },
+    {
+      "id": "ada_technical_phase",
+      "type": "action",
+      "params": {
+        "action_type": "technical_specification",
+        "message": "💻 AdaAgent создает техспецификацию...",
+        "technical_tasks": [
+          "API интеграция с Битрикс24",
+          "Архитектура приложения",
+          "Система уведомлений",
+          "План миграции данных"
+        ]
+      },
+      "next_step": "generate_final_report"
+    },
+    {
+      "id": "generate_final_report",
+      "type": "llm_route_task",
+      "params": {
+        "task": "Создай финальный отчет с рекомендациями для разработки успешного Битрикс24 приложения",
+        "priority": "critical"
+      },
+      "next_step": "compile_report"
+    },
+    {
+      "id": "compile_report",
+      "type": "action",
+      "params": {
+        "action_type": "report_generation",
+        "message": "📊 Компиляция финального отчета анализа рынка Битрикс24",
+        "report_sections": [
+          "Исследование рынка",
+          "Анализ данных",
+          "UX анализ",
+          "Прототипы решений",
+          "Техническая спецификация",
+          "Ключевые рекомендации"
+        ]
+      },
+      "next_step": "send_results"
+    },
+    {
+      "id": "send_results",
+      "type": "channel_action",
+      "params": {
+        "action": "send_message",
+        "chat_id": "{chat_id}",
+        "text": "✅ Анализ рынка Битрикс24 завершен!\n\n📊 Результаты:\n- Исследовано топ-20 приложений\n- Выявлены ключевые тренды\n- Проанализированы UX проблемы\n- Созданы прототипы улучшений\n- Подготовлена техспецификация\n\n🎯 Готовы рекомендации для разработки успешного приложения с улучшенным UX!"
+      },
+      "next_step": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "params": {
+        "status": "completed",
+        "message": "Анализ рынка Битрикс24 успешно завершен"
+      }
+    }
+  ]
+} 

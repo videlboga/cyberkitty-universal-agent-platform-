@@ -1,0 +1,186 @@
+[
+  {
+    "task": "Анализ данных продаж",
+    "complexity": "medium",
+    "score": 0.5,
+    "time": 31.67222833633423,
+    "result": {
+      "task": "Проанализируй данные продаж за последний месяц. Найди топ-3 товара и дай рекомендации по улучшению продаж.",
+      "status": "completed",
+      "duration": 31.671599,
+      "complexity_analysis": {
+        "task": "Проанализируй данные продаж за последний месяц. Найди топ-3 товара и дай рекомендации по улучшению продаж.",
+        "complexity": "medium",
+        "estimated_agents": 1,
+        "word_count": 15,
+        "requires_planning": false,
+        "requires_coordination": false,
+        "reasoning": "Обработка данных, обучение модели и анализ данных",
+        "estimated_time": 120
+      },
+      "subtasks": [
+        {
+          "id": "step1",
+          "description": "Используйте базовые данные для анализа продаж за последний месяц. Найдите общую сумму продаж и среднюю цену товара.",
+          "type": "analysis"
+        },
+        {
+          "id": "step2",
+          "description": "Используйте данные из шага 1 для создания таблицы с(top-3) bestselling-Product-Name",
+          "type": "execution"
+        },
+        {
+          "id": "step3",
+          "description": "Анализируйте top-3 товара и выявите основные факторы, которые способствуют их успеху.",
+          "type": "analysis"
+        },
+        {
+          "id": "step4",
+          "description": "Напишите отчет с рекомендациями по улучшению продаж, основанным на анализе и выявленных факторах.",
+          "type": "writing"
+        }
+      ],
+      "team": {
+        "team_id": "team_1749663863",
+        "agents": {
+          "agent_step1": "<kittycore.agents.base_agent.Agent object at 0x7e73fae4fcb0>",
+          "agent_step2": "<kittycore.agents.base_agent.Agent object at 0x7e73faf2fed0>",
+          "agent_step3": "<kittycore.agents.base_agent.Agent object at 0x7e73faf2ec10>",
+          "agent_step4": "<kittycore.agents.base_agent.Agent object at 0x7e73fae242b0>"
+        },
+        "team_size": 4,
+        "roles": [
+          "agent_step1",
+          "agent_step2",
+          "agent_step3",
+          "agent_step4"
+        ],
+        "created_at": "2025-06-11T20:44:23.377798"
+      },
+      "workflow": {
+        "workflow_id": "workflow_1749663863",
+        "steps": [
+          {
+            "step_id": "step1",
+            "description": "Используйте базовые данные для анализа продаж за последний месяц. Найдите общую сумму продаж и среднюю цену товара.",
+            "assigned_agent": "agent_step1",
+            "estimated_time": 5,
+            "dependencies": []
+          },
+          {
+            "step_id": "step2",
+            "description": "Используйте данные из шага 1 для создания таблицы с(top-3) bestselling-Product-Name",
+            "assigned_agent": "agent_step2",
+            "estimated_time": 5,
+            "dependencies": [
+              "step1"
+            ]
+          },
+          {
+            "step_id": "step3",
+            "description": "Анализируйте top-3 товара и выявите основные факторы, которые способствуют их успеху.",
+            "assigned_agent": "agent_step3",
+            "estimated_time": 5,
+            "dependencies": [
+              "step2"
+            ]
+          },
+          {
+            "step_id": "step4",
+            "description": "Напишите отчет с рекомендациями по улучшению продаж, основанным на анализе и выявленных факторах.",
+            "assigned_agent": "agent_step4",
+            "estimated_time": 5,
+            "dependencies": [
+              "step3"
+            ]
+          }
+        ],
+        "dependencies": {},
+        "estimated_duration": 20
+      },
+      "workflow_graph": {
+        "id": "workflow_1749663863",
+        "nodes_count": 4,
+        "edges_count": 3,
+        "mermaid": "graph TD\n    step1[\"⏳ Analysis<br/>agent_step1\"]\n    step2[\"⏳ Execution<br/>agent_step2\"]\n    step3[\"⏳ Analysis<br/>agent_step3\"]\n    step4[\"⏳ Writing<br/>agent_step4\"]\n    step1 --> step2\n    step2 --> step3\n    step3 --> step4"
+      },
+      "execution": {
+        "execution_id": "exec_1749663863",
+        "workflow_id": "workflow_1749663863",
+        "start_time": "2025-06-11T20:44:23.379783",
+        "steps_completed": 4,
+        "step_results": {
+          "step1": {
+            "result": "Выполнено 1 из 5 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:44:29.500310",
+            "agent": "agent_step1"
+          },
+          "step2": {
+            "result": "Выполнено 4 из 4 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:44:35.777723",
+            "agent": "agent_step2"
+          },
+          "step3": {
+            "result": "Выполнено 5 из 5 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:44:41.783512",
+            "agent": "agent_step3"
+          },
+          "step4": {
+            "result": "Выполнено 3 из 3 шагов",
+            "status": "completed",
+            "timestamp": "2025-06-11T20:44:47.781442",
+            "agent": "agent_step4"
+          }
+        },
+        "status": "completed",
+        "files_created": [],
+        "end_time": "2025-06-11T20:44:47.781469"
+      },
+      "validation": {
+        "validation_passed": true,
+        "quality_score": 0.5,
+        "user_benefit": "Валидация недоступна",
+        "issues": [
+          "SmartValidator не инициализирован"
+        ],
+        "recommendations": [],
+        "verdict": "⚠️ БЕЗ ВАЛИДАЦИИ"
+      },
+      "statistics": {
+        "tasks_processed": 1,
+        "agents_created": 4,
+        "workflows_executed": 1,
+        "config": {
+          "orchestrator_id": "main_orchestrator",
+          "max_agents": 10,
+          "timeout": 300,
+          "enable_human_intervention": true,
+          "log_level": "INFO",
+          "report_level": "ReportLevel.DETAILED"
+        }
+      },
+      "collective_memory_stats": {
+        "team_id": "main_orchestrator",
+        "total_memories": 5,
+        "agents_count": 5,
+        "agent_contributions": {
+          "orchestrator": 1,
+          "agent_step1": 1,
+          "agent_step2": 1,
+          "agent_step3": 1,
+          "agent_step4": 1
+        },
+        "avg_importance": 0.5
+      },
+      "self_improvement_report": {
+        "top_performers": [
+          {
+            "agent_id": "agent_step1",
+            "task_count": 1,
+            "success_rate": 1.0,
+            "avg_duration": 31.671258,
+            "efficiency_score": 0.031574369417217335,
+            "last_updated": 

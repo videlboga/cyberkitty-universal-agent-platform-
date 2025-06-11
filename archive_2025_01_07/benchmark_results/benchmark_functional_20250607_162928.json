@@ -1,0 +1,42 @@
+{
+  "benchmark_name": "functional_benchmarks",
+  "timestamp": "2025-06-07T16:29:28.076653",
+  "task_completion": {
+    "total_tasks": 10,
+    "completed_tasks": 7,
+    "success_rate": 0.7,
+    "avg_completion_time": 0.0005146741867065429,
+    "failure_reasons": [
+      "tool_usage: Expected tool_executed, got error: Can't instantiate abstract class CalculatorTool without an implementation for abstract method 'get_schema'",
+      "memory_operations: Expected memory_functional, got error: TimelineMemory.get_recent_snapshots() got an unexpected keyword argument 'limit'",
+      "cross_agent_communication: Expected communication_successful, got error: 'CrossAgentMemory' object has no attribute 'store_shared_context'"
+    ]
+  },
+  "performance": {
+    "execution_time": 0.006133556365966797,
+    "memory_usage_mb": 0.7734375,
+    "cpu_usage_percent": 0.0,
+    "tokens_per_second": null
+  },
+  "quality": {
+    "output_correctness": 0.7,
+    "coherence_score": 1.0,
+    "relevance_score": 0.7,
+    "hallucination_rate": 0.0
+  },
+  "metadata": {
+    "test_cases": [
+      "quick_agent_creation",
+      "master_agent_creation",
+      "tool_usage",
+      "memory_operations",
+      "structured_outputs",
+      "enhanced_roles",
+      "cross_agent_communication",
+      "error_handling",
+      "concurrent_operations",
+      "scalability_basic"
+    ],
+    "use_mock_llm": true
+  }
+}

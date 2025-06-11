@@ -19,7 +19,7 @@ from pathlib import Path
 # Импорт коллективной памяти, граф-планирования, самообучения и богатых отчётов
 from ..memory import CollectiveMemory
 from .graph_workflow import WorkflowGraph, WorkflowPlanner as GraphWorkflowPlanner, NodeStatus
-from .self_improvement import SelfImprovementEngine
+from .self_improvement import SelfLearningEngine
 from .rich_reporting import get_rich_reporter, ReportLevel
 from .shared_chat import SharedChat
 from ..agents.tool_adapter_agent import ToolAdapterAgent
@@ -556,7 +556,7 @@ class OrchestratorAgent:
         self.graph_planner = GraphWorkflowPlanner()
         
         # Система самообучения (НОВОЕ!)
-        self.self_improvement = SelfImprovementEngine()
+        self.self_improvement = SelfLearningEngine()
         
         # Коллективная память 
         self.collective_memory = CollectiveMemory(self.config.orchestrator_id)
@@ -780,8 +780,14 @@ class OrchestratorAgent:
                 # Записываем в систему самообучения (НОВОЕ!)
                 # Вычисляем предварительную длительность
                 temp_duration = (datetime.now() - start_time).total_seconds()
-                await self.self_improvement.record_task_execution(
-                    agent_id, task[:100], temp_duration, True  # Считаем задачу успешной
+                await self.self_improvement.record_agent_execution(
+                    agent_id=agent_id,
+                    task_id=task[:100],  
+                    input_data={"task": task, "context": context or {}},
+                    output=execution_result,
+                    execution_time=temp_duration,
+                    success=True,  # Считаем задачу успешной
+                    quality_score=validation_result.get("quality_score", 0.5)
                 )
             
             # 7. РЕЗУЛЬТАТ
@@ -809,7 +815,7 @@ class OrchestratorAgent:
                 "validation": validation_result,
                 "statistics": self.get_statistics(),
                 "collective_memory_stats": self.collective_memory.get_team_stats(),
-                "self_improvement_report": self.self_improvement.get_system_report(),
+                "self_improvement_report": self.self_improvement.get_system_overview(),
                 "coordination": {
                     "team_status": self.shared_chat.get_team_status(),
                     "chat_messages": len(self.shared_chat.messages),

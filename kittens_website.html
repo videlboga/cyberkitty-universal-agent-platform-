@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐱 Мир котят - Самые милые породы кошек</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Arial', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        header { text-align: center; color: white; margin-bottom: 40px; }
+        h1 { font-size: 3em; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .cats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 30px; }
+        .cat-card { background: white; border-radius: 15px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); transition: transform 0.3s; }
+        .cat-card:hover { transform: translateY(-10px); }
+        .cat-image { width: 100%; height: 200px; background: #f0f0f0; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 4em; margin-bottom: 15px; }
+        h2 { color: #333; margin-bottom: 15px; }
+        .description { color: #666; line-height: 1.6; margin-bottom: 15px; }
+        .characteristics { background: #f8f9fa; padding: 15px; border-radius: 8px; }
+        .char-item { margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🐱 Мир котят</h1>
+            <p>Откройте для себя самые очаровательные породы кошек</p>
+        </header>
+        
+        <div class="cats-grid">
+            <div class="cat-card">
+                <div class="cat-image">🐱</div>
+                <h2>Мейн-кун</h2>
+                <div class="description">
+                    Мейн-кун — одна из самых крупных пород домашних кошек. Эти величественные кошки известны своим дружелюбным характером и потрясающей пушистой шерстью. Родом из штата Мэн в США, они прекрасно адаптируются к холодному климату благодаря своему густому подшерстку.
+                </div>
+                <div class="characteristics">
+                    <div class="char-item"><strong>Вес:</strong> 4.5-8.2 кг</div>
+                    <div class="char-item"><strong>Характер:</strong> Дружелюбный, игривый</div>
+                    <div class="char-item"><strong>Уход:</strong> Требует регулярного вычесывания</div>
+                </div>
+            </div>
+            
+            <div class="cat-card">
+                <div class="cat-image">🐾</div>
+                <h2>Британская короткошерстная</h2>
+                <div class="description">
+                    Британская короткошерстная кошка — воплощение спокойствия и элегантности. Эти кошки обладают плюшевой шерстью и очаровательными круглыми глазами. Они известны своим независимым, но ласковым характером, что делает их идеальными компаньонами для городской жизни.
+                </div>
+                <div class="characteristics">
+                    <div class="char-item"><strong>Вес:</strong> 3.2-7.7 кг</div>
+                    <div class="char-item"><strong>Характер:</strong> Спокойный, независимый</div>
+                    <div class="char-item"><strong>Уход:</strong> Минимальный</div>
+                </div>
+            </div>
+            
+            <div class="cat-card">
+                <div class="cat-image">✨</div>
+                <h2>Сиамская кошка</h2>
+                <div class="description">
+                    Сиамские кошки — настоящие аристократы кошачьего мира. Их характерная внешность с темными отметинами на мордочке, ушах, лапах и хвосте делает их мгновенно узнаваемыми. Это очень социальные и разговорчивые кошки, которые любят быть в центре внимания.
+                </div>
+                <div class="characteristics">
+                    <div class="char-item"><strong>Вес:</strong> 2.2-4.5 кг</div>
+                    <div class="char-item"><strong>Характер:</strong> Активный, разговорчивый</div>
+                    <div class="char-item"><strong>Уход:</strong> Простой</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

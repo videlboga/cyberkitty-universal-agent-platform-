@@ -1,0 +1,6 @@
+Имение:
+* Adress: [адрес]
+* Price: [цена]
+* Mortgage term: [срок погашения]
+* Interest rate: [стоимость кредита]
+* Down payment: [вклад]

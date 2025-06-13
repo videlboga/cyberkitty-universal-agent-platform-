@@ -1,0 +1,14 @@
+{
+  "task": "Создай JSON файл с конфигурацией веб-сервера",
+  "filename": "config.json",
+  "content_size": 16,
+  "validation": {
+    "valid": true,
+    "score": 1.0,
+    "forbidden_found": [],
+    "relevance_score": 0.5,
+    "reason": "Валидный контент"
+  },
+  "created_at": "2025-06-13T15:00:56.834200",
+  "content_preview": "Задача выполнена"
+}

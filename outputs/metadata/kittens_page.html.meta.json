@@ -1,0 +1,16 @@
+{
+  "task": "Создай HTML страницу с котятами",
+  "filename": "kittens_page.html",
+  "content_size": 642,
+  "validation": {
+    "valid": false,
+    "score": 0.0,
+    "forbidden_found": [],
+    "relevance_score": 0.0,
+    "reason": "Найдены отчёты: []",
+    "fixed": true,
+    "fixed_score": 1.0
+  },
+  "created_at": "2025-06-13T15:00:05.130028",
+  "content_preview": "<!DOCTYPE html>\n<html lang=\"ru\">\n<head>\n    <meta charset=\"UTF-8\">\n    <title>Котята</title>\n    <style>\n        body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }\n        .kit..."
+}

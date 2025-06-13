@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Простой тест кнопки</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: #0f1419; 
+            color: #fff; 
+        }
+        button { 
+            background: #0088ff; 
+            color: white; 
+            padding: 12px 20px; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            margin: 10px; 
+            font-size: 14px; 
+        }
+        button:hover { background: #0066cc; }
+        button:disabled { background: #666; cursor: not-allowed; }
+        .log { 
+            background: #1a1f2e; 
+            padding: 10px; 
+            border-radius: 5px; 
+            margin: 10px 0; 
+            font-family: monospace; 
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Простой тест кнопки KittyCore</h1>
+    
+    <button id="mainBtn">⚡ Дать агентам задачу</button>
+    
+    <div id="log" class="log">Логи появятся здесь...</div>
+    
+    <script>
+        function log(message) {
+            const logEl = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            logEl.innerHTML += `<br/>[${time}] ${message}`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+        
+        async function executeTask() {
+            log('🚀 executeTask вызван');
+            
+            const task = prompt("Описание задачи:");
+            if (!task) {
+                log('❌ Задача отменена пользователем');
+                return;
+            }
+            
+            log(`📝 Получена задача: ${task}`);
+            
+            try {
+                log('🔗 Проверяем API...');
+                const response = await fetch('http://localhost:8003/api/status');
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ API доступен: ${data.status} v${data.version}`);
+                    log(`📋 Задача "${task}" была бы отправлена в KittyCore`);
+                } else {
+                    log(`❌ API недоступен: ${response.status}`);
+                }
+            } catch (error) {
+                log(`❌ Ошибка API: ${error.message}`);
+            }
+        }
+        
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', () => {
+            const button = document.getElementById('mainBtn');
+            
+            const handleClick = async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                log('🖱️ Кнопка нажата!');
+                
+                // Блокируем повторные нажатия
+                button.disabled = true;
+                button.textContent = "⏳ Обработка...";
+                
+                try {
+                    await executeTask();
+                } catch (error) {
+                    log(`❌ Ошибка: ${error.message}`);
+                } finally {
+                    // Восстанавливаем кнопку
+                    button.disabled = false;
+                    button.textContent = "⚡ Дать агентам задачу";
+                }
+            };
+            
+            button.addEventListener('click', handleClick);
+            log('✅ Кнопка готова к работе');
+        });
+    </script>
+</body>
+</html> 

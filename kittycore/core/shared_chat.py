@@ -126,15 +126,10 @@ class SharedChat:
         
         # Сохраняем в коллективную память
         if self.collective_memory:
-            await self.collective_memory.add_memory(
-                agent_id=sender_id,
+            await self.collective_memory.store(
                 content=f"Сообщение в чат: {content}",
-                memory_type="communication",
-                metadata={
-                    'chat_message_id': message.id,
-                    'message_type': message_type,
-                    'addressed_to': addressed_to
-                }
+                agent_id=sender_id,
+                tags=[message_type, "communication"]
             )
         
         logger.debug(f"Сообщение от {sender_id}: {content[:50]}...")

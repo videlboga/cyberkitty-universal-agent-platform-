@@ -1,0 +1,20 @@
+# Веб-интерфейс KittyCore 3.0 (совместимо с Python 3.13)
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+websockets>=11.0.0
+requests>=2.30.0
+
+# Для валидации данных (более новая версия)
+pydantic>=2.6.0
+
+# Для WebSocket в продакшене
+python-multipart>=0.0.5
+
+# Для статических файлов
+aiofiles>=23.0.0
+
+# Для CORS и middleware
+python-jose[cryptography]==3.3.0
+
+# Опционально для продакшена
+gunicorn>=21.0.0 

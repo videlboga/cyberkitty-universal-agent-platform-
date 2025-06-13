@@ -23,6 +23,12 @@ from .self_improvement import SelfLearningEngine
 from .rich_reporting import get_rich_reporter, ReportLevel
 from .shared_chat import SharedChat
 from ..agents.tool_adapter_agent import ToolAdapterAgent
+from ..obsidian_integration import ObsidianAdapter, ObsidianConfig
+
+# Импорт новых компонентов системы метрик и качества
+from .agent_metrics import get_metrics_collector, MetricsCollector, TaskStatus
+from ..memory.vector_memory import get_vector_store, VectorMemoryStore
+from .quality_controller import QualityController
 
 logger = logging.getLogger(__name__)
 
@@ -38,12 +44,14 @@ class TaskAnalyzer:
     def _init_llm(self):
         """Инициализация LLM для анализа"""
         try:
-            from ..llm import get_default_provider
-            return get_default_provider()
+            # Используем новый LLM модуль
+            from ..llm import get_llm_provider
+            return get_llm_provider()
         except ImportError:
             try:
-                from ..llm import get_llm_provider
-                return get_llm_provider()
+                # Fallback на старый модуль
+                from ..llm import get_default_provider
+                return get_default_provider()
             except ImportError:
                 raise Exception("❌ LLM провайдер не найден! Требуется настройка LLM.")
     
@@ -176,12 +184,14 @@ class TaskDecomposer:
     def _init_llm(self):
         """Инициализация LLM"""
         try:
-            from ..llm import get_default_provider
-            return get_default_provider()
+            # Используем новый LLM модуль
+            from ..llm import get_llm_provider
+            return get_llm_provider()
         except ImportError:
             try:
-                from ..llm import get_llm_provider
-                return get_llm_provider()
+                # Fallback на старый модуль
+                from ..llm import get_default_provider
+                return get_default_provider()
             except ImportError:
                 raise Exception("❌ LLM провайдер не найден! Требуется настройка LLM.")
     
@@ -522,7 +532,16 @@ class OrchestratorConfig:
     timeout: int = 300
     enable_human_intervention: bool = True
     log_level: str = "INFO"
-    report_level: ReportLevel = ReportLevel.DETAILED  # Уровень детализации отчётов 
+    report_level: ReportLevel = ReportLevel.DETAILED  # Уровень детализации отчётов
+    # Obsidian интеграция
+    enable_obsidian: bool = False
+    obsidian_vault_path: str = "./obsidian_vault"
+    # Новые компоненты
+    enable_metrics: bool = True           # Система метрик агентов
+    enable_vector_memory: bool = True     # Векторная память для поиска
+    enable_quality_control: bool = True   # Контроллер качества
+    vector_memory_path: str = "./vector_memory"
+    metrics_storage_path: str = "./metrics_storage" 
 
 # === ГЛАВНЫЙ ОРКЕСТРАТОР ===
 
@@ -576,12 +595,29 @@ class OrchestratorAgent:
         
         # ToolAdapterAgent для работы с инструментами (НОВОЕ!)
         try:
-            from ..llm import get_default_provider
-            llm_provider = get_default_provider()
+            # Используем новый LLM модуль
+            from ..llm import get_llm_provider
+            llm_provider = get_llm_provider()
             self.tool_adapter = ToolAdapterAgent(llm_provider)
         except Exception as e:
             logger.warning(f"Не удалось создать ToolAdapterAgent: {e}")
             self.tool_adapter = None
+        
+        # Obsidian интеграция (НОВОЕ!)
+        self.obsidian_adapter = None
+        if self.config.enable_obsidian:
+            try:
+                obsidian_config = ObsidianConfig(
+                    vault_path=self.config.obsidian_vault_path,
+                    notes_folder="KittyCore",
+                    auto_link=True,
+                    execute_code=True
+                )
+                self.obsidian_adapter = ObsidianAdapter(obsidian_config)
+                logger.info(f"📝 Obsidian интеграция активирована: {self.config.obsidian_vault_path}")
+            except Exception as e:
+                logger.warning(f"Не удалось создать ObsidianAdapter: {e}")
+                self.obsidian_adapter = None
         
         # Регистрируем оркестратор в чате как координатор
         self.shared_chat.register_agent(
@@ -590,6 +626,29 @@ class OrchestratorAgent:
             is_coordinator=True
         )
         
+        # === НОВЫЕ КОМПОНЕНТЫ СИСТЕМЫ МЕТРИК И КАЧЕСТВА ===
+        
+        # Система метрик агентов
+        self.metrics_collector = None
+        if self.config.enable_metrics:
+            self.metrics_collector = get_metrics_collector()
+            logger.info("📊 Система метрик агентов активирована")
+        
+        # Векторная память для поиска 
+        self.vector_store = None
+        if self.config.enable_vector_memory:
+            self.vector_store = get_vector_store()
+            # Инициализируем поиск в базе знаний если есть vault
+            if self.config.enable_obsidian and Path(self.config.obsidian_vault_path).exists():
+                asyncio.create_task(self._initialize_vector_memory())
+            logger.info("🔍 Векторная память активирована")
+        
+        # Контроллер качества
+        self.quality_controller = None
+        if self.config.enable_quality_control:
+            self.quality_controller = QualityController()
+            logger.info("🎯 Контроллер качества активирован")
+        
         # Статистика
         self.tasks_processed = 0
         self.agents_created = 0
@@ -597,6 +656,16 @@ class OrchestratorAgent:
         
         logger.info(f"🧭 OrchestratorAgent инициализирован: {self.config.orchestrator_id}")
         logger.info(f"💬 SharedChat готов для команды: team_{self.config.orchestrator_id}")
+    
+    async def _initialize_vector_memory(self):
+        """Инициализация векторной памяти с индексацией Obsidian vault"""
+        try:
+            vault_path = Path(self.config.obsidian_vault_path)
+            if vault_path.exists() and self.vector_store:
+                indexed_count = await self.vector_store.index_documents(vault_path)
+                logger.info(f"🔍 Проиндексировано {indexed_count} документов из Obsidian vault")
+        except Exception as e:
+            logger.warning(f"⚠️ Ошибка индексации Obsidian vault: {e}")
     
     async def _execute_with_coordination(self, workflow: Dict, team: Dict, original_task: str) -> Dict[str, Any]:
         """Выполнение workflow с координацией через SharedChat"""
@@ -642,6 +711,10 @@ class OrchestratorAgent:
                     'original_task': original_task
                 }
             )
+            
+            # Создаём заметки в Obsidian если включено
+            if self.obsidian_adapter:
+                await self._create_obsidian_notes(original_task, workflow, team, execution_result)
             
             return execution_result
             
@@ -713,6 +786,15 @@ class OrchestratorAgent:
                     agent_id=agent_id,
                     agent_role=getattr(agent, 'role', 'worker')
                 )
+                
+                # === НАЧИНАЕМ ОТСЛЕЖИВАНИЕ МЕТРИК АГЕНТА ===
+                if self.metrics_collector:
+                    task_metric = self.metrics_collector.start_task_tracking(
+                        task_id=f"{execution_id}_{subtask['id']}",
+                        agent_id=agent_id,
+                        task_description=subtask["description"]
+                    )
+                    logger.debug(f"📊 Начато отслеживание метрик для {agent_id}")
                 
                 # ЛОГИРУЕМ СОЗДАНИЕ АГЕНТА
                 self.rich_reporter.log_agent_created(execution_id, {
@@ -893,66 +975,171 @@ class OrchestratorAgent:
         return result.get("result", result.get("execution", {}).get("final_result", "Задача выполнена"))
     
     async def _validate_execution_result(self, original_task: str, execution_result: Dict[str, Any]) -> Dict[str, Any]:
-        """Валидация результатов выполнения через SmartValidator"""
+        """Валидация результатов выполнения через QualityController"""
         try:
-            # Проверяем доступность валидатора
-            if self.smart_validator is None:
+            # === НОВАЯ СИСТЕМА КОНТРОЛЯ КАЧЕСТВА ===
+            if self.quality_controller:
+                # Получаем список созданных файлов
+                created_files = execution_result.get("files_created", [])
+                artifact_paths = [Path(f) for f in created_files if f]
+                
+                # Проводим оценку качества
+                quality_assessment = await self.quality_controller.assess_quality(
+                    task_description=original_task,
+                    result=execution_result,
+                    artifacts_paths=artifact_paths
+                )
+                
+                logger.info(f"🎯 Контроль качества: {quality_assessment.verdict} ({quality_assessment.overall_score:.2f}/1.0)")
+                
+                # Логируем проблемы если есть
+                if quality_assessment.fatal_issues:
+                    logger.warning(f"💀 Фатальные проблемы качества:")
+                    for issue in quality_assessment.fatal_issues:
+                        logger.warning(f"  - {issue}")
+                
+                # === ЗАВЕРШАЕМ МЕТРИКИ АГЕНТОВ ===
+                if self.metrics_collector:
+                    # Завершаем отслеживание метрик для всех агентов
+                    for check in quality_assessment.checks:
+                        if hasattr(check, 'criteria'):
+                            agent_id = f"agent_{check.criteria.value}"  # Примерное соответствие
+                            if agent_id in execution_result.get('agent_results', {}):
+                                self.metrics_collector.complete_task(
+                                    task_id=f"task_{int(time.time())}_{agent_id}",
+                                    quality_score=quality_assessment.overall_score,
+                                    artifacts_created=len(artifact_paths),
+                                    errors=quality_assessment.fatal_issues,
+                                    tools_used=execution_result.get('tools_used', []),
+                                    llm_calls=execution_result.get('llm_calls', 0)
+                                )
+                
                 return {
-                    "validation_passed": True,  # Считаем прошедшим если валидатор недоступен
-                    "quality_score": 0.5,
-                    "user_benefit": "Валидация недоступна",
-                    "issues": ["SmartValidator не инициализирован"],
-                    "recommendations": [],
-                    "verdict": "⚠️ БЕЗ ВАЛИДАЦИИ"
+                    "validation_passed": quality_assessment.is_acceptable(),
+                    "quality_score": quality_assessment.overall_score,
+                    "user_benefit": f"Оценка качества: {quality_assessment.overall_score:.2f}/1.0",
+                    "issues": quality_assessment.fatal_issues,
+                    "recommendations": getattr(quality_assessment, 'improvement_suggestions', []),
+                    "verdict": quality_assessment.verdict,
+                    "quality_details": {
+                        "passed_checks": quality_assessment.passed_checks,
+                        "total_checks": quality_assessment.total_checks,
+                        "check_results": [
+                            {
+                                "criteria": check.criteria.value,
+                                "passed": check.passed,
+                                "score": check.score,
+                                "message": check.message
+                            } for check in quality_assessment.checks
+                        ]
+                    }
                 }
-            # Получаем список созданных файлов
-            created_files = execution_result.get("files_created", [])
             
-            # Валидируем через SmartValidator
-            validation = await self.smart_validator.validate_result(
-                original_task=original_task,
-                result=execution_result,
-                created_files=created_files
-            )
-            
-            logger.info(f"🔍 Валидация: {validation.verdict} (балл: {validation.score:.2f})")
-            
-            # Если результат не прошел валидацию, логируем проблемы
-            if not validation.is_valid:
-                logger.warning(f"⚠️ Результат не прошел валидацию:")
-                for issue in validation.issues:
-                    logger.warning(f"  - {issue}")
-                for rec in validation.recommendations:
-                    logger.info(f"  💡 {rec}")
-            
-            return {
-                "validation_passed": validation.is_valid,
-                "quality_score": validation.score,
-                "user_benefit": validation.user_benefit,
-                "issues": validation.issues,
-                "recommendations": validation.recommendations,
-                "verdict": validation.verdict
-            }
+            else:
+                # Fallback если контроллер качества недоступен
+                return {
+                    "validation_passed": True,
+                    "quality_score": 0.5,
+                    "user_benefit": "Контроль качества недоступен",
+                    "issues": ["QualityController не инициализирован"],
+                    "recommendations": [],
+                    "verdict": "⚠️ БЕЗ КОНТРОЛЯ КАЧЕСТВА"
+                }
             
         except Exception as e:
-            logger.error(f"❌ Ошибка валидации результата: {e}")
+            logger.error(f"❌ Ошибка контроля качества: {e}")
             return {
                 "validation_passed": False,
                 "quality_score": 0.0,
-                "user_benefit": "Ошибка валидации",
-                "issues": [f"Валидатор недоступен: {e}"],
-                "recommendations": ["Проверить работу валидатора"],
-                "verdict": "❌ ОШИБКА ВАЛИДАЦИИ"
+                "user_benefit": "Ошибка контроля качества",
+                "issues": [f"Контроллер качества недоступен: {e}"],
+                "recommendations": ["Проверить работу контроллера качества"],
+                "verdict": "❌ ОШИБКА КОНТРОЛЯ КАЧЕСТВА"
             }
     
+    async def _create_obsidian_notes(self, task: str, workflow: Dict, team: Dict, execution_result: Dict[str, Any]):
+        """Создание заметок в Obsidian о выполненной задаче"""
+        try:
+            task_id = f"TASK-{int(time.time())}"
+            
+            # 1. Создаём заметку задачи
+            task_data = {
+                "title": task[:100],
+                "description": task,
+                "status": "completed" if execution_result.get("success", False) else "failed",
+                "priority": "normal",
+                "complexity": workflow.get("complexity", "medium"),
+                "assigned_agents": list(team.keys()),
+                "type": "orchestrator_task"
+            }
+            
+            task_note = await self.obsidian_adapter.create_task_note(task_id, task_data)
+            logger.info(f"📝 Создана заметка задачи в Obsidian: {task_note}")
+            
+            # 2. Создаём заметки агентов
+            for agent_id, agent in team.items():
+                agent_data = {
+                    "description": f"Агент для выполнения подзадачи {agent_id}",
+                    "type": getattr(agent, 'agent_type', 'worker'),
+                    "capabilities": getattr(agent, 'capabilities', ['general']),
+                    "tasks_completed": 1,
+                    "success_rate": 100.0 if execution_result.get("success", False) else 0.0
+                }
+                
+                agent_note = await self.obsidian_adapter.create_agent_note(agent_id, agent_data)
+                logger.debug(f"📝 Создана заметка агента в Obsidian: {agent_note}")
+            
+            # 3. Создаём заметку результата
+            result_data = {
+                "title": f"Результат выполнения: {task[:50]}",
+                "description": "Результат работы команды агентов",
+                "status": "completed" if execution_result.get("success", False) else "failed",
+                "success": execution_result.get("success", False),
+                "quality_score": execution_result.get("quality_score", 0.0),
+                "execution_time": execution_result.get("duration", "неизвестно"),
+                "output": str(execution_result.get("final_result", "Результат недоступен"))[:1000],
+                "files": execution_result.get("files_created", []),
+                "reviewed_by": "OrchestratorAgent",
+                "review_status": "completed"
+            }
+            
+            result_note = await self.obsidian_adapter.create_result_note(task_id, "Team", result_data)
+            logger.info(f"📝 Создана заметка результата в Obsidian: {result_note}")
+            
+            # 4. Создаём итоговый отчёт
+            report_data = {
+                "title": f"Отчёт: {task[:50]}",
+                "summary": f"Команда из {len(team)} агентов выполнила задачу",
+                "overall_success": execution_result.get("success", False),
+                "overall_quality": execution_result.get("quality_score", 0.0),
+                "execution_time": execution_result.get("duration", "неизвестно"),
+                "agents": [{"name": agent_id, "tasks_completed": 1, "success_rate": 100} for agent_id in team.keys()],
+                "conclusions": "Задача выполнена через систему саморедуплицирующихся агентов KittyCore 3.0"
+            }
+            
+            report_note = await self.obsidian_adapter.create_report_note(task_id, report_data)
+            logger.info(f"📝 Создан итоговый отчёт в Obsidian: {report_note}")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Ошибка создания заметок в Obsidian: {e}")
+
     def get_statistics(self) -> Dict[str, Any]:
         """Получить статистику работы оркестратора"""
-        return {
+        stats = {
             "tasks_processed": self.tasks_processed,
             "agents_created": self.agents_created,
             "workflows_executed": self.workflows_executed,
             "config": asdict(self.config)
         }
+        
+        # Добавляем статистику Obsidian если доступен
+        if self.obsidian_adapter:
+            stats["obsidian"] = {
+                "enabled": True,
+                "vault_path": self.config.obsidian_vault_path
+            }
+        
+        return stats
 
 # === УДОБНЫЕ ФУНКЦИИ ===
 

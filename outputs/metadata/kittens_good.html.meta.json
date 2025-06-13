@@ -1,0 +1,14 @@
+{
+  "task": "Создай HTML страницу с котятами",
+  "filename": "kittens_good.html",
+  "content_size": 141,
+  "validation": {
+    "valid": true,
+    "score": 1.0,
+    "forbidden_found": [],
+    "relevance_score": 0.6666666666666666,
+    "reason": "Валидный контент"
+  },
+  "created_at": "2025-06-13T14:56:20.314612",
+  "content_preview": "<!DOCTYPE html>\n<html>\n<head><title>Котята</title></head>\n<body>\n    <h1>Милые котята</h1>\n    <p>🐱 Пушистик очень милый!</p>\n</body>\n</html>"
+}

@@ -31,6 +31,10 @@ __version__ = "3.0.0"
 __author__ = "CyberKitty Team"
 __description__ = "Саморедуплицирующаяся агентная система с коллективным интеллектом"
 
+# ====== СИСТЕМА ЛОГИРОВАНИЯ ======
+# Настраиваем простое логирование в Obsidian vault ПЕРВЫМ делом
+from .config.simple_obsidian_logging import setup_simple_obsidian_logging
+
 # ====== ОСНОВНЫЕ КОМПОНЕНТЫ СИСТЕМЫ ======
 
 # Главный оркестратор (Этап 2 - активен)
@@ -132,24 +136,9 @@ def create_agent_team(project_description: str) -> list:
 # Добавляем функции в экспорт
 __all__.extend(["create_agent", "create_agent_team"])
 
-# ====== СИСТЕМА ЛОГИРОВАНИЯ ======
+# ====== ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ ======
 
-import logging
-from pathlib import Path
-
-# Создаём папку для логов
-logs_dir = Path("logs")
-logs_dir.mkdir(exist_ok=True)
-
-# Настраиваем логирование для KittyCore
-logger = logging.getLogger("kittycore")
-if not logger.handlers:
-    handler = logging.FileHandler(logs_dir / "kittycore.log")
-    handler.setFormatter(
-        logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    )
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
+from loguru import logger
 
 logger.info(f"🐱 KittyCore {__version__} инициализирован")
 logger.info("🔄 Саморедуплицирующаяся агентная система готова к работе")

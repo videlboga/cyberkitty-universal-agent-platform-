@@ -1,0 +1,22 @@
+{
+    "server": {
+        "name": "KittyCore Web Server",
+        "port": 8080,
+        "host": "localhost",
+        "document_root": "/var/www/html",
+        "ssl": {
+            "enabled": false,
+            "cert_file": "",
+            "key_file": ""
+        },
+        "logging": {
+            "level": "info",
+            "file": "/var/log/server.log"
+        },
+        "routes": {
+            "/": "index.html",
+            "/api": "api.php",
+            "/static": "/static/"
+        }
+    }
+}

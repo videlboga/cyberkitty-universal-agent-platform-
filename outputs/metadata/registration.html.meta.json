@@ -1,0 +1,22 @@
+{
+  "task": "Создай HTML страницу с формой регистрации",
+  "filename": "registration.html",
+  "content_size": 695,
+  "validation": {
+    "valid": false,
+    "score": 0.0,
+    "forbidden_found": [
+      "Задача:",
+      "Результат работы",
+      "агентом",
+      "Выполнено интеллектуальным",
+      "## Результат"
+    ],
+    "relevance_score": 0.6666666666666666,
+    "reason": "Найдены отчёты: ['Задача:', 'Результат работы', 'агентом', 'Выполнено интеллектуальным', '## Результат']",
+    "fixed": true,
+    "fixed_score": 1.0
+  },
+  "created_at": "2025-06-13T14:56:20.314174",
+  "content_preview": "<!DOCTYPE html>\n<html lang=\"ru\">\n<head>\n    <meta charset=\"UTF-8\">\n    <title>Регистрация</title>\n    <style>\n        body { font-family: Arial, sans-serif; margin: 40px; }\n        form { max-width: 4..."
+}

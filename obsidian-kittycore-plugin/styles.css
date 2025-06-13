@@ -1,0 +1,358 @@
+/* KittyCore 3.0 Plugin Styles - Cobalt2 Theme */
+
+/* Cobalt2 Color Palette */
+:root {
+  --cobalt2-bg: #193549;
+  --cobalt2-bg-dark: #0d1926;
+  --cobalt2-bg-light: #1e3a52;
+  --cobalt2-blue: #0088ff;
+  --cobalt2-blue-light: #33aaff;
+  --cobalt2-orange: #ff9d00;
+  --cobalt2-pink: #ff2c70;
+  --cobalt2-green: #3ad900;
+  --cobalt2-yellow: #ffc600;
+  --cobalt2-purple: #9d00ff;
+  --cobalt2-cyan: #00d8ff;
+  --cobalt2-white: #ffffff;
+  --cobalt2-gray: #627d9d;
+  --cobalt2-gray-dark: #3d5466;
+}
+
+/* Override Obsidian variables for KittyCore components */
+.kittycore-dashboard-view {
+  --background-primary: var(--cobalt2-bg);
+  --background-secondary: var(--cobalt2-bg-light);
+  --background-primary-alt: var(--cobalt2-bg-dark);
+  --text-normal: var(--cobalt2-white);
+  --text-accent: var(--cobalt2-blue);
+  --text-muted: var(--cobalt2-gray);
+  --interactive-accent: var(--cobalt2-blue);
+  --interactive-accent-hover: var(--cobalt2-blue-light);
+  --color-accent: var(--cobalt2-orange);
+  --color-green: var(--cobalt2-green);
+  --color-red: var(--cobalt2-pink);
+  --color-yellow: var(--cobalt2-yellow);
+  --background-modifier-border: var(--cobalt2-gray-dark);
+  --background-modifier-hover: var(--cobalt2-bg-light);
+}
+
+/* KittyCore 3.0 Plugin Styles */
+
+.kittycore-modal {
+  max-width: 400px;
+}
+
+.kittycore-modal h2 {
+  color: var(--text-accent);
+  margin-bottom: 1em;
+}
+
+.kittycore-agent-note {
+  border-left: 3px solid var(--color-accent);
+  padding-left: 1em;
+}
+
+.kittycore-task-result {
+  background: var(--background-modifier-success);
+  padding: 0.5em;
+  border-radius: 4px;
+  margin: 0.5em 0;
+}
+
+.kittycore-agent-status {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.8em;
+  font-weight: bold;
+}
+
+.kittycore-agent-status.active {
+  background: var(--color-green);
+  color: white;
+}
+
+.kittycore-agent-status.idle {
+  background: var(--color-yellow);
+  color: black;
+}
+
+.kittycore-agent-status.error {
+  background: var(--color-red);
+  color: white;
+}
+
+.kittycore-graph-view {
+  min-height: 300px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  margin: 1em 0;
+}
+
+.kittycore-notification {
+  border-left: 3px solid var(--color-accent);
+  padding: 0.5em 1em;
+  margin: 0.5em 0;
+  background: var(--background-secondary);
+}
+
+.kittycore-code-block {
+  position: relative;
+}
+
+.kittycore-code-block .copy-code-button {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  opacity: 0.7;
+}
+
+.kittycore-agent-card {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 1em;
+  margin: 0.5em 0;
+  background: var(--background-secondary);
+}
+
+.kittycore-agent-card h3 {
+  margin: 0 0 0.5em 0;
+  color: var(--text-accent);
+}
+
+.kittycore-progress-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--background-modifier-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.kittycore-progress-bar .progress {
+  height: 100%;
+  background: var(--color-accent);
+  transition: width 0.3s ease;
+}
+
+/* Dark theme adjustments */
+.theme-dark .kittycore-agent-card {
+  background: var(--background-primary-alt);
+}
+
+/* Mobile adjustments */
+.is-mobile .kittycore-modal {
+  max-width: 90vw;
+}
+
+/* KittyCore Dashboard Styles - Cobalt2 */
+.kittycore-dashboard-header {
+  text-align: center;
+  padding: 1.5em;
+  background: linear-gradient(135deg, var(--cobalt2-bg-dark) 0%, var(--cobalt2-bg) 100%);
+  border-bottom: 3px solid var(--cobalt2-orange);
+  margin-bottom: 1em;
+  border-radius: 8px 8px 0 0;
+  box-shadow: 0 4px 20px rgba(0, 136, 255, 0.15);
+}
+
+.kittycore-dashboard-header h1 {
+  margin: 0;
+  color: var(--cobalt2-blue);
+  font-size: 2em;
+  font-weight: 700;
+  text-shadow: 0 0 10px rgba(0, 136, 255, 0.5);
+  background: linear-gradient(45deg, var(--cobalt2-blue), var(--cobalt2-cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.kittycore-dashboard-header p {
+  margin: 0.5em 0 0 0;
+  color: var(--cobalt2-gray);
+  font-style: italic;
+  font-size: 1.1em;
+  opacity: 0.9;
+}
+
+.kittycore-section {
+  margin: 1.5em 0;
+  padding: 1.5em;
+  border: 2px solid var(--cobalt2-gray-dark);
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--cobalt2-bg) 0%, var(--cobalt2-bg-light) 100%);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.kittycore-section:hover {
+  border-color: var(--cobalt2-blue);
+  box-shadow: 0 8px 32px rgba(0, 136, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.kittycore-section h2 {
+  margin: 0 0 1em 0;
+  color: var(--cobalt2-orange);
+  border-bottom: 2px solid var(--cobalt2-orange);
+  padding-bottom: 0.8em;
+  font-size: 1.3em;
+  font-weight: 600;
+  text-shadow: 0 0 5px rgba(255, 157, 0, 0.3);
+}
+
+/* Status Grid */
+.kittycore-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1em;
+}
+
+.kittycore-stat {
+  padding: 0.8em;
+  border-radius: 6px;
+  text-align: center;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.kittycore-stat-good {
+  background: rgba(0, 136, 255, 0.15);
+  border-color: var(--cobalt2-blue);
+  color: var(--cobalt2-blue);
+}
+
+.kittycore-stat-error {
+  background: rgba(255, 85, 85, 0.15);
+  border-color: #ff5555;
+  color: #ff5555;
+}
+
+.kittycore-stat-warning {
+  background: rgba(255, 157, 0, 0.15);
+  border-color: var(--cobalt2-orange);
+  color: var(--cobalt2-orange);
+}
+
+.kittycore-stat-info {
+  background: rgba(0, 255, 255, 0.15);
+  border-color: var(--cobalt2-cyan);
+  color: var(--cobalt2-cyan);
+}
+
+.kittycore-stat-label {
+  font-size: 0.9em;
+  color: var(--text-muted);
+  margin-bottom: 0.3em;
+}
+
+.kittycore-stat-value {
+  font-size: 1.1em;
+  font-weight: bold;
+  color: var(--text-normal);
+}
+
+/* Commands Grid */
+.kittycore-commands-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.8em;
+}
+
+.kittycore-command-btn {
+  padding: 8px 12px;
+  background: rgba(0, 136, 255, 0.1);
+  color: var(--cobalt2-blue);
+  border: 1px solid rgba(0, 136, 255, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+  white-space: nowrap;
+}
+
+.kittycore-command-btn:hover {
+  background: rgba(0, 136, 255, 0.2);
+  border-color: var(--cobalt2-blue);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 136, 255, 0.2);
+  color: var(--cobalt2-blue);
+}
+
+/* Quick Actions Grid */
+.kittycore-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.6em;
+}
+
+.kittycore-quick-action {
+  padding: 6px 10px;
+  background: rgba(255, 157, 0, 0.1);
+  color: var(--cobalt2-orange);
+  border: 1px solid rgba(255, 157, 0, 0.3);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 400;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+}
+
+.kittycore-quick-action:hover {
+  background: rgba(255, 157, 0, 0.2);
+  border-color: var(--cobalt2-orange);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(255, 157, 0, 0.2);
+}
+
+/* Logs Section */
+.kittycore-logs {
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 0.5em;
+  font-family: var(--font-monospace);
+  font-size: 0.85em;
+}
+
+.kittycore-log-line {
+  padding: 0.2em 0;
+  border-bottom: 1px solid var(--background-modifier-border-focus);
+  color: var(--text-muted);
+}
+
+.kittycore-log-line:last-child {
+  border-bottom: none;
+}
+
+.kittycore-log-line:hover {
+  background: var(--background-modifier-hover);
+}
+
+/* Dark theme specific */
+.theme-dark .kittycore-section {
+  background: var(--background-primary-alt);
+}
+
+.theme-dark .kittycore-logs {
+  background: var(--background-primary);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .kittycore-status-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .kittycore-commands-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .kittycore-actions-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+} 

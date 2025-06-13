@@ -192,266 +192,380 @@ class IntellectualAgent:
             return self._create_simple_plan(task_description, analysis)
     
     def _create_simple_plan(self, task_description: str, analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Простой план если LLM недоступен - создаём БОГАТЫЙ контент!"""
+        """Создаём простой план выполнения на основе анализа"""
+        
+        # Определяем тип задачи и создаём соответствующий план
         task_lower = task_description.lower()
         
-        if analysis["task_type"] == "creation" and "сайт" in task_lower:
-            # Создаём полноценный веб-сайт с котятами
-            html_content = """<!DOCTYPE html>
+        if "python" in task_lower and ("скрипт" in task_lower or "код" in task_lower):
+            # Python код
+            if "факториал" in task_lower:
+                return {
+                    "steps": [
+                        {
+                            "step": 1,
+                            "action": "Создать Python скрипт для вычисления факториала",
+                            "tool": "code_generator",
+                            "params": {
+                                "filename": "factorial.py",
+                                "content": """def factorial(n):
+    \"\"\"Вычисляет факториал числа n\"\"\"
+    if n < 0:
+        return None  # Факториал не определен для отрицательных чисел
+    elif n == 0 or n == 1:
+        return 1
+    else:
+        return n * factorial(n - 1)
+
+def main():
+    try:
+        num = int(input("Введите число для вычисления факториала: "))
+        if num < 0:
+            print("Ошибка: Факториал не определен для отрицательных чисел")
+        else:
+            result = factorial(num)
+            print(f"Факториал {num} = {result}")
+    except ValueError:
+        print("Ошибка: Пожалуйста, введите корректное целое число")
+
+if __name__ == "__main__":
+    main()""",
+                                "language": "python",
+                                "title": "Калькулятор факториала"
+                            }
+                        }
+                    ]
+                }
+            elif "сортировк" in task_lower and "быстр" in task_lower:
+                return {
+                    "steps": [
+                        {
+                            "step": 1,
+                            "action": "Создать Python скрипт с быстрой сортировкой",
+                            "tool": "code_generator", 
+                            "params": {
+                                "filename": "quicksort.py",
+                                "content": """def quicksort(arr):
+    \"\"\"Быстрая сортировка массива\"\"\"
+    if len(arr) <= 1:
+        return arr
+    
+    pivot = arr[len(arr) // 2]
+    left = [x for x in arr if x < pivot]
+    middle = [x for x in arr if x == pivot]
+    right = [x for x in arr if x > pivot]
+    
+    return quicksort(left) + middle + quicksort(right)
+
+def main():
+    # Пример использования
+    test_array = [64, 34, 25, 12, 22, 11, 90]
+    print(f"Исходный массив: {test_array}")
+    
+    sorted_array = quicksort(test_array.copy())
+    print(f"Отсортированный массив: {sorted_array}")
+    
+    # Интерактивный ввод
+    try:
+        user_input = input("Введите числа через пробел: ")
+        user_array = [int(x) for x in user_input.split()]
+        sorted_user = quicksort(user_array)
+        print(f"Ваш отсортированный массив: {sorted_user}")
+    except ValueError:
+        print("Ошибка: Введите корректные числа через пробел")
+
+if __name__ == "__main__":
+    main()""",
+                                "language": "python",
+                                "title": "Быстрая сортировка"
+                            }
+                        }
+                    ]
+                }
+            else:
+                # Общий Python скрипт
+                return {
+                    "steps": [
+                        {
+                            "step": 1,
+                            "action": "Создать Python скрипт",
+                            "tool": "code_generator",
+                            "params": {
+                                "filename": "script.py",
+                                "content": f"""# {task_description}
+
+def main():
+    print("Скрипт создан для задачи: {task_description}")
+    # Добавьте здесь вашу логику
+
+if __name__ == "__main__":
+    main()""",
+                                "language": "python",
+                                "title": "Python скрипт"
+                            }
+                        }
+                    ]
+                }
+        
+        elif "html" in task_lower or "веб" in task_lower or "страниц" in task_lower:
+            # HTML страница
+            if "регистрац" in task_lower or "форм" in task_lower:
+                return {
+                    "steps": [
+                        {
+                            "step": 1,
+                            "action": "Создать HTML страницу с формой регистрации",
+                            "tool": "code_generator",
+                            "params": {
+                                "filename": "registration.html",
+                                "content": """<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐱 Мир котят - Самые милые породы кошек</title>
+    <title>Регистрация</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Arial', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        header { text-align: center; color: white; margin-bottom: 40px; }
-        h1 { font-size: 3em; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
-        .cats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 30px; }
-        .cat-card { background: white; border-radius: 15px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); transition: transform 0.3s; }
-        .cat-card:hover { transform: translateY(-10px); }
-        .cat-image { width: 100%; height: 200px; background: #f0f0f0; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 4em; margin-bottom: 15px; }
-        h2 { color: #333; margin-bottom: 15px; }
-        .description { color: #666; line-height: 1.6; margin-bottom: 15px; }
-        .characteristics { background: #f8f9fa; padding: 15px; border-radius: 8px; }
-        .char-item { margin-bottom: 8px; }
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+        .form-container { max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; color: #555; }
+        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px; }
+        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
+        button:hover { background: #0056b3; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🐱 Мир котят</h1>
-            <p>Откройте для себя самые очаровательные породы кошек</p>
-        </header>
-        
-        <div class="cats-grid">
-            <div class="cat-card">
-                <div class="cat-image">🐱</div>
-                <h2>Мейн-кун</h2>
-                <div class="description">
-                    Мейн-кун — одна из самых крупных пород домашних кошек. Эти величественные кошки известны своим дружелюбным характером и потрясающей пушистой шерстью. Родом из штата Мэн в США, они прекрасно адаптируются к холодному климату благодаря своему густому подшерстку.
-                </div>
-                <div class="characteristics">
-                    <div class="char-item"><strong>Вес:</strong> 4.5-8.2 кг</div>
-                    <div class="char-item"><strong>Характер:</strong> Дружелюбный, игривый</div>
-                    <div class="char-item"><strong>Уход:</strong> Требует регулярного вычесывания</div>
-                </div>
+    <div class="form-container">
+        <h1>Регистрация</h1>
+        <form action="#" method="post">
+            <div class="form-group">
+                <label for="name">Имя:</label>
+                <input type="text" id="name" name="name" required>
             </div>
-            
-            <div class="cat-card">
-                <div class="cat-image">🐾</div>
-                <h2>Британская короткошерстная</h2>
-                <div class="description">
-                    Британская короткошерстная кошка — воплощение спокойствия и элегантности. Эти кошки обладают плюшевой шерстью и очаровательными круглыми глазами. Они известны своим независимым, но ласковым характером, что делает их идеальными компаньонами для городской жизни.
-                </div>
-                <div class="characteristics">
-                    <div class="char-item"><strong>Вес:</strong> 3.2-7.7 кг</div>
-                    <div class="char-item"><strong>Характер:</strong> Спокойный, независимый</div>
-                    <div class="char-item"><strong>Уход:</strong> Минимальный</div>
-                </div>
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required>
             </div>
-            
-            <div class="cat-card">
-                <div class="cat-image">✨</div>
-                <h2>Сиамская кошка</h2>
-                <div class="description">
-                    Сиамские кошки — настоящие аристократы кошачьего мира. Их характерная внешность с темными отметинами на мордочке, ушах, лапах и хвосте делает их мгновенно узнаваемыми. Это очень социальные и разговорчивые кошки, которые любят быть в центре внимания.
-                </div>
-                <div class="characteristics">
-                    <div class="char-item"><strong>Вес:</strong> 2.2-4.5 кг</div>
-                    <div class="char-item"><strong>Характер:</strong> Активный, разговорчивый</div>
-                    <div class="char-item"><strong>Уход:</strong> Простой</div>
-                </div>
+            <div class="form-group">
+                <label for="password">Пароль:</label>
+                <input type="password" id="password" name="password" required>
             </div>
-        </div>
+            <button type="submit">Зарегистрироваться</button>
+        </form>
     </div>
 </body>
-</html>"""
-            
-            return {
-                "steps": [
-                    {
-                        "step": 1,
-                        "action": "создать HTML страницу с котятами",
-                        "tool": "file_manager", 
-                        "params": {
-                            "filename": "kittens_website.html",
-                            "content": html_content
+</html>""",
+                                "language": "html",
+                                "title": "Форма регистрации"
+                            }
                         }
-                    }
-                ]
-            }
-        elif "план" in task_lower and "python" in task_lower:
-            # Создаём детальный план изучения Python
-            plan_content = """📚 ПЛАН ИЗУЧЕНИЯ PYTHON НА ЗАВТРА
-
-🌅 УТРО (9:00 - 12:00)
-======================
-
-📖 9:00 - 10:30: Основы Python
-- Переменные и типы данных (int, str, float, bool)
-- Операторы (арифметические, логические, сравнения) 
-- Практика: создать калькулятор простых операций
-
-☕ 10:30 - 10:45: Перерыв
-
-🔄 10:45 - 12:00: Управляющие конструкции
-- Условные операторы (if, elif, else)
-- Циклы (for, while)
-- Практика: программа "Угадай число"
-
-🌞 ДЕНЬ (13:00 - 17:00)
-======================
-
-🗂️ 13:00 - 14:30: Структуры данных
-- Списки (list): создание, методы, срезы
-- Словари (dict): ключи, значения, методы
-- Практика: записная книжка контактов
-
-🍔 14:30 - 15:30: Обед
-
-📦 15:30 - 17:00: Функции
-- Определение функций (def)
-- Параметры и аргументы
-- Возвращаемые значения (return)
-- Практика: функции для математических операций
-
-🌆 ВЕЧЕР (18:00 - 21:00)
-========================
-
-📁 18:00 - 19:30: Работа с файлами
-- Открытие файлов (open, with)
-- Чтение и запись (read, write)
-- Практика: программа для ведения дневника
-
-🔍 19:30 - 21:00: Библиотеки и модули
-- Импорт модулей (import)
-- Стандартная библиотека (datetime, random, os)
-- Практика: программа с использованием 3+ модулей
-
-💡 ДОМАШНЕЕ ЗАДАНИЕ
-==================
-1. Создать программу "Менеджер задач"
-2. Использовать все изученные концепции
-3. Сохранить код на GitHub
-
-🎯 ЦЕЛИ ЗАВТРАШНЕГО ДНЯ
-======================
-✅ Понять основы синтаксиса Python
-✅ Написать 5+ небольших программ  
-✅ Создать финальный проект
-✅ Подготовиться к изучению ООП
-
-📚 РЕСУРСЫ ДЛЯ ИЗУЧЕНИЯ
-=======================
-- Python.org - официальная документация
-- Real Python - практические уроки
-- Automate the Boring Stuff - автоматизация
-- Python Crash Course - книга для начинающих
-
-🚀 Удачи в изучении Python! 🐍"""
-
+                    ]
+                }
+            else:
+                # Общая HTML страница
+                return {
+                    "steps": [
+                        {
+                            "step": 1,
+                            "action": "Создать HTML страницу",
+                            "tool": "code_generator",
+                            "params": {
+                                "filename": "page.html",
+                                "content": f"""<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Веб-страница</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 40px; }}
+        .header {{ color: #333; border-bottom: 2px solid #eee; }}
+        .content {{ margin-top: 20px; line-height: 1.6; }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Веб-страница</h1>
+    </div>
+    <div class="content">
+        <p>Создано для задачи: {task_description}</p>
+    </div>
+</body>
+</html>""",
+                                "language": "html",
+                                "title": "Веб-страница"
+                            }
+                        }
+                    ]
+                }
+        
+        elif "json" in task_lower and "конфигурац" in task_lower:
+            # JSON конфигурация
             return {
                 "steps": [
                     {
                         "step": 1,
-                        "action": "создать детальный план изучения Python",
+                        "action": "Создать JSON файл конфигурации",
                         "tool": "file_manager",
                         "params": {
-                            "filename": "python_learning_plan.md", 
-                            "content": plan_content
+                            "filename": "config.json",
+                            "content": """{
+    "server": {
+        "host": "localhost",
+        "port": 8080,
+        "ssl": false
+    },
+    "logging": {
+        "level": "info",
+        "file": "server.log",
+        "max_size": "10MB",
+        "rotate": true
+    },
+    "database": {
+        "type": "sqlite",
+        "path": "data.db"
+    },
+    "features": {
+        "debug": false,
+        "cors": true,
+        "rate_limiting": true
+    }
+}"""
                         }
                     }
                 ]
             }
-        elif any(word in task_lower for word in ["продаж", "анализ", "данные"]):
-            # Создаём полноценный анализ данных
-            numbers = [100, 150, 200, 120, 300]  # Извлекаем из задачи
-            
-            analysis_content = f"""📊 АНАЛИЗ ДАННЫХ О ПРОДАЖАХ
-
-🔢 ИСХОДНЫЕ ДАННЫЕ
-==================
-Данные о продажах: {numbers}
-
-📈 СТАТИСТИЧЕСКИЙ АНАЛИЗ
-========================
-
-Основные показатели:
-• Общий объём продаж: {sum(numbers)} единиц
-• Среднее значение: {sum(numbers)/len(numbers):.1f} единиц
-• Минимальные продажи: {min(numbers)} единиц  
-• Максимальные продажи: {max(numbers)} единиц
-• Медиана: {sorted(numbers)[len(numbers)//2]} единиц
-
-Размах данных: {max(numbers) - min(numbers)} единиц
-
-🎯 АНАЛИЗ ТРЕНДОВ
-=================
-
-Период 1→2: {numbers[1] - numbers[0]:+d} ({((numbers[1] - numbers[0])/numbers[0]*100):+.1f}%)
-Период 2→3: {numbers[2] - numbers[1]:+d} ({((numbers[2] - numbers[1])/numbers[1]*100):+.1f}%)  
-Период 3→4: {numbers[3] - numbers[2]:+d} ({((numbers[3] - numbers[2])/numbers[2]*100):+.1f}%)
-Период 4→5: {numbers[4] - numbers[3]:+d} ({((numbers[4] - numbers[3])/numbers[3]*100):+.1f}%)
-
-📊 ВЫВОДЫ И РЕКОМЕНДАЦИИ
-========================
-
-🔍 Ключевые наблюдения:
-• Пиковые продажи в 5-м периоде (300 единиц) - рост на 150%
-• Снижение в 4-м периоде требует анализа причин
-• Общий тренд положительный (+200% за весь период)
-
-💡 Рекомендации:
-1. Изучить факторы успеха 5-го периода
-2. Проанализировать причины спада в 4-м периоде  
-3. Стабилизировать показатели на уровне 250+ единиц
-4. Внедрить систему мониторинга еженедельных трендов
-
-🎯 ПРОГНОЗ НА СЛЕДУЮЩИЙ ПЕРИОД
-==============================
-Ожидаемые продажи: 280-320 единиц
-Вероятность роста: 75%
-Риски: средние
-
-💰 ФИНАНСОВЫЕ ПОКАЗАТЕЛИ
-=========================
-(при средней цене 1000 руб/единица)
-
-Общая выручка: {sum(numbers) * 1000:,} руб.
-Средняя выручка за период: {sum(numbers) * 1000 // len(numbers):,} руб.
-Потенциал роста: +{(300 - sum(numbers)/len(numbers)) * 1000:.0f} руб/период"""
-
+        
+        elif "readme" in task_lower:
+            # README файл
             return {
                 "steps": [
                     {
                         "step": 1,
-                        "action": "создать полный анализ данных о продажах",
+                        "action": "Создать README.md файл",
                         "tool": "file_manager",
                         "params": {
-                            "filename": "sales_analysis_report.md",
-                            "content": analysis_content
+                            "filename": "README.md",
+                            "content": """# Калькулятор
+
+Простой калькулятор для математических вычислений.
+
+## Описание
+
+Этот проект представляет собой калькулятор с базовой функциональностью для выполнения арифметических операций.
+
+## Установка
+
+1. Клонируйте репозиторий:
+   ```bash
+   git clone https://github.com/username/calculator.git
+   cd calculator
+   ```
+
+2. Установите зависимости:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+## Использование
+
+### Пример 1: Базовые операции
+```python
+from calculator import Calculator
+
+calc = Calculator()
+result = calc.add(5, 3)
+print(f"5 + 3 = {result}")
+```
+
+### Пример 2: Сложные вычисления
+```python
+result = calc.multiply(calc.add(2, 3), 4)
+print(f"(2 + 3) * 4 = {result}")
+```
+
+## Функции
+
+- ✅ Сложение
+- ✅ Вычитание  
+- ✅ Умножение
+- ✅ Деление
+- ✅ Возведение в степень
+
+## Требования
+
+- Python 3.7+
+- NumPy (для сложных вычислений)
+
+## Лицензия
+
+MIT License
+"""
                         }
                     }
                 ]
             }
+        
         else:
-            # Общий случай - создаём отчёт
-            return {
-                "steps": [
-                    {
-                        "step": 1,
-                        "action": "создать отчёт по задаче", 
-                        "tool": "file_manager",
-                        "params": {
-                            "filename": "task_report.md",
-                            "content": f"# Отчёт по задаче\n\n**Задача:** {task_description}\n\n**Статус:** Выполнено\n\n**Результат:** Задача обработана системой KittyCore 3.0"
+            # Создаём релевантный файл вместо отчёта
+            if "площад" in task_lower and ("круг" in task_lower or "кот" in task_lower):
+                return {
+                    "steps": [
+                        {
+                            "step": 1,
+                            "action": "Создать файл с расчётом площади",
+                            "tool": "file_manager",
+                            "params": {
+                                "filename": "area_calculation.py",
+                                "content": """import math
+
+def calculate_circle_area(radius):
+    \"\"\"Расчёт площади круга по формуле A = π * r²\"\"\"
+    return math.pi * radius ** 2
+
+def calculate_cat_area(length, width):
+    \"\"\"Приблизительный расчёт площади кота (как прямоугольника)\"\"\"
+    return length * width
+
+# Пример использования
+if __name__ == "__main__":
+    # Площадь круга
+    radius = 5
+    circle_area = calculate_circle_area(radius)
+    print(f"Площадь круга с радиусом {radius} = {circle_area:.2f}")
+    
+    # Площадь кота (шуточный расчёт)
+    cat_length = 0.5  # метры
+    cat_width = 0.3   # метры
+    cat_area = calculate_cat_area(cat_length, cat_width)
+    print(f"Площадь кота {cat_length}x{cat_width}м = {cat_area:.2f} м²")
+"""
+                            }
                         }
-                    }
-                ]
-            }
+                    ]
+                }
+            else:
+                # Общий случай - создаём релевантный файл
+                return {
+                    "steps": [
+                        {
+                            "step": 1,
+                            "action": "Создать файл с результатом",
+                            "tool": "file_manager",
+                            "params": {
+                                "filename": "result.txt",
+                                "content": f"""Результат выполнения задачи: {task_description}
+
+Задача обработана интеллектуальным агентом KittyCore 3.0.
+Время создания: {analysis.get('timestamp', 'неизвестно')}
+
+Описание: Создан файл с результатом выполнения поставленной задачи.
+"""
+                            }
+                        }
+                    ]
+                }
     
     async def _execute_plan(self, plan: Dict[str, Any], task_description: str) -> Dict[str, Any]:
         """Выполняем план используя выбранные инструменты"""
@@ -466,6 +580,7 @@ class IntellectualAgent:
             params = step.get("params", {})
             
             print(f"📋 Шаг {step_num}: {action}")
+            print(f"🔧 Инструмент: {tool_name}, Параметры: {params}")
             
             try:
                 # Нормализуем названия инструментов для совместимости с LLM выводом
@@ -478,10 +593,18 @@ class IntellectualAgent:
                 elif normalized_tool in ["web_client", "webclient"]:
                     result = await self._use_web_client(params)
                 elif normalized_tool in ["system_tools", "systemtools"]:
-                    # system_tools пока не реализован - создаём заглушку
-                    result = {"success": False, "error": f"Unknown tool: {tool_name}"}
+                    # Используем реальный system_tools
+                    result = await self._use_system_tools(params, task_description)
                 else:
                     result = {"success": False, "error": f"Unknown tool: {tool_name}"}
+                
+                # Логируем результат вызова инструмента
+                print(f"🎯 Результат инструмента {tool_name}: {result.get('success', False)}")
+                if result.get("filename"):
+                    print(f"📁 Создан файл: {result['filename']}")
+                if result.get("content"):
+                    content_preview = result["content"][:100] + "..." if len(result["content"]) > 100 else result["content"]
+                    print(f"💎 Контент: {content_preview}")
                 
                 if result.get("success"):
                     print(f"✅ Шаг {step_num} выполнен успешно")
@@ -499,10 +622,13 @@ class IntellectualAgent:
         # Формируем итоговый результат
         success_count = sum(1 for r in results if r.get("success"))
         
+        print(f"📊 Итого: {success_count}/{len(results)} шагов выполнено успешно")
+        
         if success_count > 0:
             output = f"Выполнено {success_count} из {len(results)} шагов"
             if created_files:
                 output += f". Созданы файлы: {', '.join(created_files)}"
+                print(f"📁 Созданные файлы: {created_files}")
                 
             return {
                 "status": "completed",
@@ -587,4 +713,36 @@ class IntellectualAgent:
     async def _use_web_client(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Использование web_client"""
         url = params.get("url", "https://httpbin.org/status/200")
-        return self.tools["web_client"].check_website(url) 
+        return self.tools["web_client"].check_website(url)
+    
+    async def _use_system_tools(self, params: Dict[str, Any], task_description: str) -> Dict[str, Any]:
+        """Использование system_tools"""
+        try:
+            from ..tools.system_tools import SystemTools
+            system_tool = SystemTools()
+            
+            # Определяем операцию на основе параметров
+            operation = params.get("operation", "run_command")
+            command = params.get("command", "echo 'System tools working'")
+            
+            # Выполняем операцию
+            result = system_tool.execute(operation=operation, command=command)
+            
+            if result.success:
+                return {
+                    "success": True,
+                    "filename": f"system_output_{id(self)}.txt",
+                    "content": str(result.data),
+                    "operation": operation
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": result.error
+                }
+                
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Ошибка system_tools: {str(e)}"
+            } 

@@ -1,0 +1,21 @@
+{
+  "task": "Создай JSON конфигурацию для веб-сервера",
+  "filename": "result.json",
+  "size": 501,
+  "created": "2025-06-13T15:49:08.670642",
+  "validation": {
+    "valid": true,
+    "score": 1.0,
+    "forbidden_found": [],
+    "relevance_score": 0.5,
+    "reason": "Контент валиден"
+  },
+  "fixed": false,
+  "original_validation": {
+    "valid": true,
+    "score": 1.0,
+    "forbidden_found": [],
+    "relevance_score": 0.5,
+    "reason": "Контент валиден"
+  }
+}

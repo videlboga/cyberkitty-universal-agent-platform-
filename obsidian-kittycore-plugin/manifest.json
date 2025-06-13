@@ -1,0 +1,11 @@
+{
+  "id": "kittycore-agent-system",
+  "name": "KittyCore 3.0 - Агентная Система",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Саморедуплицирующаяся агентная система прямо в Obsidian! Агенты создают заметки, выполняют код, строят граф знаний.",
+  "author": "CyberKitty",
+  "authorUrl": "https://github.com/cyberkitty",
+  "fundingUrl": "https://github.com/sponsors/cyberkitty",
+  "isDesktopOnly": false
+} 

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Test Button</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #0f1419; color: #fff; }
+        button { background: #0088ff; color: white; padding: 12px 20px; border: none; border-radius: 6px; cursor: pointer; margin: 10px; font-size: 14px; }
+        button:hover { background: #0066cc; }
+        .log { background: #1a1f2e; padding: 10px; border-radius: 5px; margin: 10px 0; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Button Click</h1>
+    
+    <button id="testBtn">⚡ Тест кнопки</button>
+    <button onclick="testPrompt()">📝 Тест prompt</button>
+    
+    <div id="log" class="log">Логи появятся здесь...</div>
+    
+    <script>
+        function log(message) {
+            const logEl = document.getElementById('log');
+            logEl.innerHTML += `<br/>[${new Date().toLocaleTimeString()}] ${message}`;
+        }
+        
+        function testPrompt() {
+            log('🔍 Тестируем prompt...');
+            const result = prompt('Введите что-нибудь:');
+            if (result) {
+                log(`✅ Получено: ${result}`);
+            } else {
+                log('❌ Отменено пользователем');
+            }
+        }
+        
+        async function executeTask() {
+            log('🚀 executeTask вызван');
+            
+            const task = prompt("Описание задачи:");
+            if (!task) {
+                log('❌ Задача отменена пользователем');
+                return;
+            }
+            
+            log(`📝 Получена задача: ${task}`);
+            
+            try {
+                const response = await fetch('http://localhost:8003/api/status');
+                if (response.ok) {
+                    log('✅ API доступен');
+                    log(`📋 Задача "${task}" была бы отправлена в KittyCore`);
+                } else {
+                    log('❌ API недоступен');
+                }
+            } catch (error) {
+                log(`❌ Ошибка API: ${error}`);
+            }
+        }
+        
+        // Привязываем обработчики
+        document.getElementById('testBtn').addEventListener('click', async (e) => {
+            e.preventDefault();
+            log('🖱️ Кнопка нажата через addEventListener');
+            await executeTask();
+        });
+        
+        document.getElementById('testBtn').onclick = async () => {
+            log('🖱️ onclick сработал');
+            await executeTask();
+        };
+        
+        log('✅ Скрипт загружен, кнопки готовы');
+    </script>
+</body>
+</html> 

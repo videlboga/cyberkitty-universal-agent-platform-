@@ -1,0 +1,14 @@
+{
+  "task": "Создай файл hello_world.py с программой Hello World",
+  "filename": "hello_world_good.py",
+  "content_size": 22,
+  "validation": {
+    "valid": true,
+    "score": 1.0,
+    "forbidden_found": [],
+    "relevance_score": 1.0,
+    "reason": "Валидный контент"
+  },
+  "created_at": "2025-06-13T14:56:20.314453",
+  "content_preview": "print(\"Hello, World!\")"
+}

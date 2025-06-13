@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>KittyCore API Test - Fixed Version</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #0f1419; color: #fff; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: rgba(0, 136, 255, 0.2); border: 1px solid #0088ff; }
+        .error { background: rgba(255, 85, 85, 0.2); border: 1px solid #ff5555; }
+        button { background: #0088ff; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0066cc; }
+        .logs { background: #1a1f2e; padding: 10px; border-radius: 5px; height: 200px; overflow-y: auto; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>🤖 KittyCore API Test - Fixed Version</h1>
+    <p>Тестируем что больше нет ошибок 404 к /api/system/status</p>
+    
+    <button onclick="testCorrectEndpoint()">✅ Тест правильного /api/status</button>
+    <button onclick="testWrongEndpoint()">❌ Тест неправильного /api/system/status</button>
+    <button onclick="clearLogs()">🧹 Очистить логи</button>
+    
+    <div id="status"></div>
+    <div id="logs" class="logs"></div>
+
+    <script>
+        const API_URL = 'http://localhost:8003';
+        
+        function log(message) {
+            const logs = document.getElementById('logs');
+            const time = new Date().toLocaleTimeString();
+            logs.innerHTML += `[${time}] ${message}\n`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+        
+        function setStatus(message, isSuccess) {
+            const status = document.getElementById('status');
+            status.className = `status ${isSuccess ? 'success' : 'error'}`;
+            status.textContent = message;
+        }
+        
+        async function testCorrectEndpoint() {
+            log('🔍 Тестируем правильный эндпоинт /api/status...');
+            
+            try {
+                const response = await fetch(`${API_URL}/api/status`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ SUCCESS: /api/status вернул ${response.status} - ${JSON.stringify(data)}`);
+                    setStatus('✅ Правильный эндпоинт работает!', true);
+                } else {
+                    log(`❌ ERROR: /api/status вернул ${response.status} ${response.statusText}`);
+                    setStatus(`❌ Ошибка: ${response.status}`, false);
+                }
+            } catch (error) {
+                log(`❌ NETWORK ERROR: ${error.message}`);
+                setStatus('❌ Сетевая ошибка', false);
+            }
+        }
+        
+        async function testWrongEndpoint() {
+            log('🔍 Тестируем неправильный эндпоинт /api/system/status...');
+            
+            try {
+                const response = await fetch(`${API_URL}/api/system/status`);
+                
+                if (response.ok) {
+                    log(`❌ UNEXPECTED: /api/system/status вернул ${response.status} (не должен работать!)`);
+                    setStatus('❌ Неправильный эндпоинт работает (плохо!)', false);
+                } else {
+                    log(`✅ EXPECTED: /api/system/status вернул ${response.status} ${response.statusText} (как и ожидалось)`);
+                    setStatus('✅ Неправильный эндпоинт правильно возвращает 404', true);
+                }
+            } catch (error) {
+                log(`❌ NETWORK ERROR: ${error.message}`);
+                setStatus('❌ Сетевая ошибка', false);
+            }
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+            document.getElementById('status').innerHTML = '';
+            log('🧹 Логи очищены');
+        }
+        
+        // Автоматический тест при загрузке
+        window.onload = () => {
+            log('🚀 KittyCore API тест запущен');
+            testCorrectEndpoint();
+        };
+    </script>
+</body>
+</html> 

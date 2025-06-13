@@ -35,8 +35,9 @@ class SmartValidator:
     """
     
     def __init__(self):
-        self.llm_provider = get_llm_provider("deepseek/deepseek-chat")
-        logger.info("🧠 SmartValidator инициализирован")
+        # Используем дешёвый Ministral 8B для валидации ($0.20/M vs $2.00/M)
+        self.llm_provider = get_llm_provider("mistralai/ministral-8b")
+        logger.info("🧠 SmartValidator инициализирован с дешёвым Ministral 8B")
     
     async def validate_result(self, 
                             original_task: str, 
@@ -81,16 +82,9 @@ class SmartValidator:
             return validation_result
             
         except Exception as e:
-            logger.error(f"❌ Ошибка умной валидации: {e}")
-            # Fallback валидация
-            return ValidationResult(
-                is_valid=False,
-                score=0.0,
-                user_benefit="Ошибка валидации - невозможно оценить пользу",
-                issues=[f"Валидатор не смог оценить результат: {e}"],
-                recommendations=["Проверить систему валидации"],
-                verdict="❌ ОШИБКА ВАЛИДАЦИИ"
-            )
+            logger.error(f"❌ КРИТИЧЕСКАЯ ОШИБКА SmartValidator: {e}")
+            # Без fallback - если LLM не работает, система должна знать об этом
+            raise Exception(f"❌ SmartValidator НЕ МОЖЕТ работать без LLM: {e}")
     
     def _create_validation_prompt(self, 
                                 original_task: str, 
@@ -228,6 +222,9 @@ JSON ОТВЕТ:"""
         except Exception as e:
             logger.warning(f"Не удалось угадать задачу: {e}")
             return "неизвестная задача"
+
+
+
 
 
 async def validate_task_result(task: str, 

@@ -1,345 +1,303 @@
 #!/usr/bin/env python3
 """
-🌍 Тест революционной системы самообучения на РЕАЛЬНЫХ задачах
-
-Использует настоящий OrchestratorAgent KittyCore для выполнения реальных задач
-и показывает как система обучается, критикует и улучшается.
+🌍 ТЕСТ СИСТЕМЫ ОБУЧЕНИЯ НА РЕАЛЬНЫХ ЗАДАЧАХ
+Проверяем как агенты учатся на практических примерах
 """
 
 import asyncio
-import time
-import json
-from typing import Dict, Any
+import os
+from pathlib import Path
 
-# Импортируем реальную систему KittyCore
-try:
-    from kittycore.core.orchestrator import OrchestratorAgent
-    from kittycore.core.advanced_self_learning import get_advanced_learning_engine, process_task_with_advanced_learning
-    from kittycore.core.adaptive_rate_control import get_rate_controller
-    print("✅ Все компоненты KittyCore импортированы!")
-except ImportError as e:
-    print(f"❌ Ошибка импорта: {e}")
-    exit(1)
+from kittycore.core.agent_learning_system import learning_system
+from kittycore.core.iterative_improvement import IterativeImprovement
+from agents.smart_validator import SmartValidator
+from kittycore.agents.working_agent import WorkingAgent
 
-class RealWorldTaskExecutor:
-    """Выполнитель реальных задач через OrchestratorAgent"""
+async def test_calculator_task():
+    """Тест создания калькулятора"""
+    print("🧮 ТЕСТ: СОЗДАНИЕ КАЛЬКУЛЯТОРА")
+    print("=" * 40)
     
-    def __init__(self):
-        from kittycore.core.orchestrator import OrchestratorConfig
-        config = OrchestratorConfig(orchestrator_id="real_world_orchestrator")
-        self.orchestrator = OrchestratorAgent(config)
-        
-    async def execute_real_task(self, request_data: Dict[str, Any]) -> Any:
-        """Выполнить реальную задачу через оркестратор"""
-        
-        task = request_data.get('task', '')
-        input_data = request_data.get('input_data', {})
-        agent_id = request_data.get('agent_id', 'unknown')
-        
-        print(f"🎯 Оркестратор выполняет: {task}")
-        
-        try:
-            # Выполняем задачу через настоящий оркестратор
-            result = await self.orchestrator.execute_task(task)
-            
-            print(f"   ✅ Результат получен: {len(str(result))} символов")
-            return result
-            
-        except Exception as e:
-            print(f"   ❌ Ошибка оркестратора: {e}")
-            raise e
-
-async def test_real_file_creation():
-    """Тест создания реальных файлов"""
-    
-    print("\n📝 === ТЕСТ СОЗДАНИЯ РЕАЛЬНЫХ ФАЙЛОВ ===")
-    
-    engine = get_advanced_learning_engine()
-    executor = RealWorldTaskExecutor()
-    session_id = await engine.start_learning_session()
-    
-    # Реальные задачи создания файлов
-    file_tasks = [
-        {
-            "agent_id": "file_creator",
-            "task": "Создай файл hello_world.py с программой 'Hello World' на Python",
-            "input_data": {"file_type": "python", "complexity": "simple"}
-        },
-        {
-            "agent_id": "file_creator", 
-            "task": "Создай HTML страницу с формой регистрации пользователя",
-            "input_data": {"file_type": "html", "complexity": "medium"}
-        },
-        {
-            "agent_id": "file_creator",
-            "task": "Создай JSON файл с конфигурацией веб-сервера",
-            "input_data": {"file_type": "json", "complexity": "simple"}
+    agent = WorkingAgent(
+        role="calculator_developer",
+        subtask={
+            "description": "Создай простой калькулятор на Python",
+            "expected_output": "Рабочий Python файл"
         }
-    ]
+    )
     
-    results = []
+    validator = SmartValidator()
+    improvement = IterativeImprovement()
     
-    for task_data in file_tasks:
-        print(f"\n🔄 Выполняем: {task_data['task']}")
+    print("🎯 Задача: Создай простой калькулятор на Python")
+    
+    # Выполнение
+    result = await agent.execute_task()
+    print(f"📄 Результат: {result.get('output', 'Нет вывода')[:100]}...")
+    
+    # Валидация
+    validation = await validator.validate_result(
+        original_task="Создай простой калькулятор на Python",
+        result=result,
+        created_files=result.get("files_created", [])
+    )
+    
+    print(f"📊 Оценка: {validation.score:.1f}/1.0")
+    print(f"🔍 Проблемы: {', '.join(validation.issues)}")
+    
+    # Улучшение если нужно
+    if validation.score < 0.7:
+        print("\n🔄 Запускаем улучшение...")
         
-        result = await process_task_with_advanced_learning(
-            agent_id=task_data["agent_id"],
-            task=task_data["task"],
-            input_data=task_data["input_data"],
-            execution_func=executor.execute_real_task
+        final_result, attempts = await improvement.improve_agent_iteratively(
+            agent=agent,
+            task="Создай простой калькулятор на Python",
+            initial_result=result,
+            initial_validation=validation,
+            smart_validator=validator
         )
         
-        results.append(result)
-        
-        if result['success']:
-            print(f"   ✅ Выполнено за {result['execution_time']:.2f}с")
-            print(f"   📊 Критики дали {len(result['critiques'])} оценок")
-            
-            # Показываем детали критики
-            for i, critique_data in enumerate(result['critiques']):
-                critique = critique_data
-                score = critique.get('overall_score', 0)
-                priority = critique.get('improvement_priority', 'unknown')
-                print(f"      🎭 Критик {i+1}: балл {score:.2f}, приоритет {priority}")
-                
-            print(f"   ✨ Применено улучшений: {result['improvements_applied']}")
-        else:
-            print(f"   ❌ Ошибка: {result['error']}")
+        print(f"📈 Попыток улучшения: {len(attempts)}")
+        if attempts and attempts[-1].improved_validation:
+            print(f"📊 Финальная оценка: {attempts[-1].improved_validation.score:.1f}")
     
-    completed_session = await engine.end_learning_session()
-    print(f"\n✅ Сессия создания файлов завершена: {completed_session.tasks_processed} задач")
-    
-    return results
+    return validation.score
 
-async def test_real_calculation_tasks():
-    """Тест реальных вычислительных задач"""
+async def test_real_task_2_website():
+    """Тест 2: Создание веб-сайта - от описания к HTML"""
     
-    print("\n🧮 === ТЕСТ РЕАЛЬНЫХ ВЫЧИСЛЕНИЙ ===")
+    print("\n🌐 ТЕСТ 2: СОЗДАНИЕ ВЕБ-САЙТА")
+    print("=" * 50)
     
-    engine = get_advanced_learning_engine()
-    executor = RealWorldTaskExecutor()
-    session_id = await engine.start_learning_session()
-    
-    # Реальные вычислительные задачи
-    calc_tasks = [
-        {
-            "agent_id": "calculator",
-            "task": "Вычисли площадь круга с радиусом 5 метров",
-            "input_data": {"type": "geometry", "difficulty": "easy"}
-        },
-        {
-            "agent_id": "calculator",
-            "task": "Найди корни квадратного уравнения x² - 5x + 6 = 0",
-            "input_data": {"type": "algebra", "difficulty": "medium"}
-        },
-        {
-            "agent_id": "calculator", 
-            "task": "Посчитай сумму чисел от 1 до 100",
-            "input_data": {"type": "arithmetic", "difficulty": "easy"}
+    # Создаём агента для веб-разработки
+    agent = WorkingAgent(
+        role="web_developer", 
+        subtask={
+            "description": "Создай красивый сайт-портфолио для программиста",
+            "expected_output": "HTML файл с CSS стилями"
         }
-    ]
+    )
     
-    results = []
+    validator = SmartValidator()
+    improvement = IterativeImprovement()
     
-    for task_data in calc_tasks:
-        print(f"\n🔄 Вычисляем: {task_data['task']}")
+    print("🎯 Задача: Создай красивый сайт-портфолио для программиста")
+    
+    # Выполнение
+    print("\n1️⃣ Выполнение задачи...")
+    result = await agent.execute_task()
+    print(f"📄 Результат: {result.get('output', 'Нет вывода')[:100]}...")
+    
+    # Валидация
+    validation = await validator.validate_result(
+        original_task="Создай красивый сайт-портфолио для программиста",
+        result=result,
+        created_files=result.get("files_created", [])
+    )
+    
+    print(f"📊 Оценка: {validation.score:.1f}/1.0")
+    print(f"🔍 Проблемы: {', '.join(validation.issues)}")
+    
+    # Улучшение если нужно
+    if validation.score < 0.7:
+        print("\n🔄 Запускаем улучшение...")
         
-        result = await process_task_with_advanced_learning(
-            agent_id=task_data["agent_id"],
-            task=task_data["task"], 
-            input_data=task_data["input_data"],
-            execution_func=executor.execute_real_task
+        final_result, attempts = await improvement.improve_agent_iteratively(
+            agent=agent,
+            task="Создай красивый сайт-портфолио для программиста", 
+            initial_result=result,
+            initial_validation=validation,
+            smart_validator=validator
         )
         
-        results.append(result)
+        print(f"\n📈 РЕЗУЛЬТАТЫ:")
+        print(f"   - Попыток: {len(attempts)}")
+        if attempts and attempts[-1].improved_validation:
+            print(f"   - Финальная оценка: {attempts[-1].improved_validation.score:.1f}")
         
-        if result['success']:
-            print(f"   ✅ Вычислено за {result['execution_time']:.2f}с")
-            print(f"   📊 Получено {len(result['critiques'])} критических оценок")
-            print(f"   ✨ Автоулучшений: {result['improvements_applied']}")
-        else:
-            print(f"   ❌ Ошибка вычисления: {result['error']}")
+        # Проверяем файлы
+        files_created = final_result.get("files_created", [])
+        if files_created:
+            print(f"\n📁 Созданные файлы: {files_created}")
+            for file_path in files_created:
+                if os.path.exists(file_path) and file_path.endswith('.html'):
+                    print(f"🌐 {file_path} - HTML файл создан")
+                    # Проверяем что это реальный HTML
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                            if '<html>' in content.lower() and '<body>' in content.lower():
+                                print("✅ Содержит валидную HTML структуру")
+                            else:
+                                print("⚠️ Возможно не валидный HTML")
+                    except Exception as e:
+                        print(f"❌ Ошибка проверки HTML: {e}")
     
-    completed_session = await engine.end_learning_session()
-    print(f"\n✅ Сессия вычислений завершена: {completed_session.tasks_processed} задач")
-    
-    return results
+    return validation.score
 
-async def test_real_web_tasks():
-    """Тест реальных веб-задач"""
+async def test_real_task_3_data_analysis():
+    """Тест 3: Анализ данных - от CSV к отчёту"""
     
-    print("\n🌐 === ТЕСТ РЕАЛЬНЫХ ВЕБ-ЗАДАЧ ===")
+    print("\n📊 ТЕСТ 3: АНАЛИЗ ДАННЫХ")
+    print("=" * 50)
     
-    engine = get_advanced_learning_engine()
-    executor = RealWorldTaskExecutor()
-    session_id = await engine.start_learning_session()
+    # Создаём тестовый CSV файл
+    test_csv_content = """name,age,salary,department
+Алексей,25,50000,IT
+Мария,30,60000,Marketing
+Иван,35,70000,IT
+Анна,28,55000,HR
+Петр,32,65000,IT
+Елена,29,58000,Marketing"""
     
-    # Реальные веб-задачи
-    web_tasks = [
-        {
-            "agent_id": "web_developer",
-            "task": "Создай простую веб-страницу с котятами",
-            "input_data": {"type": "html", "theme": "cats", "complexity": "simple"}
-        },
-        {
-            "agent_id": "web_developer",
-            "task": "Создай CSS стили для красивой формы входа",
-            "input_data": {"type": "css", "component": "login", "complexity": "medium"}
+    with open("test_data.csv", "w", encoding="utf-8") as f:
+        f.write(test_csv_content)
+    
+    print("📁 Создан тестовый файл test_data.csv")
+    
+    # Создаём агента для анализа данных
+    agent = WorkingAgent(
+        role="data_analyst",
+        subtask={
+            "description": "Проанализируй данные в файле test_data.csv и создай отчёт с выводами",
+            "expected_output": "Python скрипт для анализа + файл с результатами"
         }
-    ]
+    )
     
-    results = []
+    validator = SmartValidator()
+    improvement = IterativeImprovement()
     
-    for task_data in web_tasks:
-        print(f"\n🔄 Разрабатываем: {task_data['task']}")
+    print("🎯 Задача: Проанализируй данные в test_data.csv и создай отчёт")
+    
+    # Выполнение
+    print("\n1️⃣ Выполнение анализа...")
+    result = await agent.execute_task()
+    print(f"📄 Результат: {result.get('output', 'Нет вывода')[:100]}...")
+    
+    # Валидация
+    validation = await validator.validate_result(
+        original_task="Проанализируй данные в test_data.csv и создай отчёт",
+        result=result,
+        created_files=result.get("files_created", [])
+    )
+    
+    print(f"📊 Оценка: {validation.score:.1f}/1.0")
+    print(f"🔍 Проблемы: {', '.join(validation.issues)}")
+    
+    # Улучшение если нужно
+    if validation.score < 0.7:
+        print("\n🔄 Запускаем улучшение...")
         
-        result = await process_task_with_advanced_learning(
-            agent_id=task_data["agent_id"],
-            task=task_data["task"],
-            input_data=task_data["input_data"], 
-            execution_func=executor.execute_real_task
+        final_result, attempts = await improvement.improve_agent_iteratively(
+            agent=agent,
+            task="Проанализируй данные в test_data.csv и создай отчёт",
+            initial_result=result,
+            initial_validation=validation,
+            smart_validator=validator
         )
         
-        results.append(result)
+        print(f"\n📈 РЕЗУЛЬТАТЫ:")
+        print(f"   - Попыток: {len(attempts)}")
+        if attempts and attempts[-1].improved_validation:
+            print(f"   - Финальная оценка: {attempts[-1].improved_validation.score:.1f}")
         
-        if result['success']:
-            print(f"   ✅ Разработано за {result['execution_time']:.2f}с")
-            print(f"   📊 Критики: {len(result['critiques'])} анализов")
-            print(f"   ✨ Улучшений: {result['improvements_applied']}")
-        else:
-            print(f"   ❌ Ошибка разработки: {result['error']}")
+        # Проверяем результаты анализа
+        files_created = final_result.get("files_created", [])
+        if files_created:
+            print(f"\n📁 Созданные файлы: {files_created}")
+            for file_path in files_created:
+                if os.path.exists(file_path):
+                    print(f"✅ {file_path} - создан")
+                    if file_path.endswith('.py'):
+                        print("🐍 Python скрипт для анализа")
+                    elif file_path.endswith(('.txt', '.md')):
+                        print("📄 Файл с результатами анализа")
     
-    completed_session = await engine.end_learning_session()
-    print(f"\n✅ Сессия веб-разработки завершена: {completed_session.tasks_processed} задач")
-    
-    return results
+    return validation.score
 
-async def analyze_learning_results(all_results):
-    """Анализ результатов обучения"""
+async def test_learning_progression():
+    """Тест прогрессии обучения - проверяем что агенты действительно учатся"""
     
-    print("\n🧠 === АНАЛИЗ РЕЗУЛЬТАТОВ ОБУЧЕНИЯ ===")
+    print("\n🧠 ТЕСТ ПРОГРЕССИИ ОБУЧЕНИЯ")
+    print("=" * 50)
     
-    engine = get_advanced_learning_engine()
+    # Получаем знания агентов после всех тестов
+    agents_to_check = ["calculator_developer", "web_developer", "data_analyst"]
     
-    # Общая статистика
-    total_tasks = len(all_results)
-    successful_tasks = sum(1 for r in all_results if r['success'])
-    total_time = sum(r['execution_time'] for r in all_results if r['success'])
-    total_critiques = sum(len(r['critiques']) for r in all_results if r['success'])
-    total_improvements = sum(r['improvements_applied'] for r in all_results if r['success'])
-    
-    print(f"📊 ОБЩАЯ СТАТИСТИКА:")
-    print(f"   🎯 Задач выполнено: {successful_tasks}/{total_tasks} ({successful_tasks/total_tasks*100:.1f}%)")
-    print(f"   ⏱️ Общее время: {total_time:.2f}с (среднее: {total_time/max(1,successful_tasks):.2f}с)")
-    print(f"   🎭 Всего критики: {total_critiques} (среднее: {total_critiques/max(1,successful_tasks):.1f} на задачу)")
-    print(f"   ✨ Всего улучшений: {total_improvements}")
-    
-    # Анализ по агентам
-    print(f"\n📈 АНАЛИЗ ПО АГЕНТАМ:")
-    
-    agent_stats = {}
-    for result in all_results:
-        if not result['success']:
-            continue
-            
-        # Попробуем извлечь agent_id из task_id или другим способом
-        agent_id = "unknown_agent"  # fallback
+    for agent_id in agents_to_check:
+        print(f"\n🤖 Агент: {agent_id}")
         
-        if agent_id not in agent_stats:
-            agent_stats[agent_id] = {
-                'tasks': 0,
-                'total_time': 0,
-                'critiques': 0,
-                'improvements': 0
-            }
+        knowledge = await learning_system.get_agent_knowledge(agent_id)
         
-        stats = agent_stats[agent_id]
-        stats['tasks'] += 1
-        stats['total_time'] += result['execution_time']
-        stats['critiques'] += len(result['critiques'])
-        stats['improvements'] += result['improvements_applied']
-    
-    for agent_id, stats in agent_stats.items():
-        avg_time = stats['total_time'] / stats['tasks']
-        avg_critiques = stats['critiques'] / stats['tasks']
-        print(f"   🤖 {agent_id}: {stats['tasks']} задач, ср.время {avg_time:.2f}с, ср.критик {avg_critiques:.1f}")
-    
-    # Получаем комплексный отчёт системы
-    report = engine.get_comprehensive_report()
-    
-    print(f"\n🔍 СИСТЕМА САМООБУЧЕНИЯ:")
-    print(f"   💪 Здоровье системы: {engine._calculate_system_health_score():.2f}")
-    print(f"   📈 Rate улучшений: {report['improvement_rate']:.3f}")
-    print(f"   🎯 Rate controller: {report['rate_control']['success_rate']} успеха")
-    print(f"   💾 Кеш: {report['rate_control']['cache_hit_rate']} попаданий")
-    
-    # Извлечённые принципы
-    print(f"\n📜 ИЗВЛЕЧЁННЫЕ ПРИНЦИПЫ:")
-    if engine.system_principles:
-        for principle_id, principle in engine.system_principles.items():
-            print(f"   • {principle.title}")
-            print(f"     Уверенность: {principle.confidence:.2f} ({principle.evidence_count} подтверждений)")
-            print(f"     Категория: {principle.category}")
-    else:
-        print("   Принципы ещё не извлечены - нужно больше данных")
-    
-    # Рекомендации по улучшению
-    insights = engine.get_learning_insights()
-    print(f"\n💡 РЕКОМЕНДАЦИИ:")
-    for rec in insights['recommendations']:
-        print(f"   • {rec}")
-    
-    return {
-        'total_tasks': total_tasks,
-        'success_rate': successful_tasks/total_tasks,
-        'avg_time': total_time/max(1,successful_tasks),
-        'system_health': engine._calculate_system_health_score(),
-        'principles_count': len(engine.system_principles)
-    }
+        print(f"   📊 Всего попыток: {knowledge.total_attempts}")
+        print(f"   ✅ Успешные паттерны: {len(knowledge.successful_patterns)}")
+        print(f"   ❌ Паттерны ошибок: {len(knowledge.error_patterns)}")
+        print(f"   🔧 Предпочтения инструментов: {len(knowledge.tool_preferences)}")
+        print(f"   📚 Уроки: {len(knowledge.lessons_learned)}")
+        
+        if knowledge.lessons_learned:
+            print(f"   💡 Последний урок: {knowledge.lessons_learned[-1]}")
+        
+        if knowledge.tool_preferences:
+            best_tool = max(knowledge.tool_preferences.items(), key=lambda x: x[1])
+            print(f"   🏆 Лучший инструмент: {best_tool[0]} ({best_tool[1]} успехов)")
 
 async def main():
-    """Главная функция тестирования на реальных задачах"""
+    """Запускаем все реальные тесты"""
     
-    print("🌍 ТЕСТИРОВАНИЕ СИСТЕМЫ САМООБУЧЕНИЯ НА РЕАЛЬНЫХ ЗАДАЧАХ KITTYCORE")
-    print("=" * 75)
+    print("🌍 ТЕСТИРОВАНИЕ СИСТЕМЫ ОБУЧЕНИЯ НА РЕАЛЬНЫХ ЗАДАЧАХ")
+    print("=" * 70)
     
-    all_results = []
+    scores = []
     
     try:
-        # Тест создания файлов
-        file_results = await test_real_file_creation()
-        all_results.extend(file_results)
+        # Тест 1: Калькулятор
+        score1 = await test_calculator_task()
+        scores.append(("Калькулятор", score1))
         
-        # Небольшая пауза между тестами
-        await asyncio.sleep(2)
+        # Тест 2: Веб-сайт
+        score2 = await test_real_task_2_website()
+        scores.append(("Веб-сайт", score2))
         
-        # Тест вычислений
-        calc_results = await test_real_calculation_tasks()
-        all_results.extend(calc_results)
+        # Тест 3: Анализ данных
+        score3 = await test_real_task_3_data_analysis()
+        scores.append(("Анализ данных", score3))
         
-        await asyncio.sleep(2)
+        # Тест прогрессии обучения
+        await test_learning_progression()
         
-        # Тест веб-задач
-        web_results = await test_real_web_tasks()
-        all_results.extend(web_results)
+        # Итоговая статистика
+        print("\n🏆 ИТОГОВЫЕ РЕЗУЛЬТАТЫ")
+        print("=" * 50)
         
-        # Анализ результатов
-        analysis = await analyze_learning_results(all_results)
+        total_score = 0
+        for task_name, score in scores:
+            print(f"   {task_name}: {score:.1f}/1.0")
+            total_score += score
         
-        print(f"\n🎉 ТЕСТИРОВАНИЕ ЗАВЕРШЕНО!")
-        print(f"📊 Успешность: {analysis['success_rate']*100:.1f}%")
-        print(f"💪 Здоровье системы: {analysis['system_health']:.2f}")
-        print(f"📜 Принципов извлечено: {analysis['principles_count']}")
+        avg_score = total_score / len(scores)
+        print(f"\n📊 Средняя оценка: {avg_score:.1f}/1.0")
         
-        if analysis['success_rate'] > 0.8:
-            print("✅ СИСТЕМА САМООБУЧЕНИЯ РАБОТАЕТ ОТЛИЧНО!")
-        elif analysis['success_rate'] > 0.6:
-            print("🟡 СИСТЕМА РАБОТАЕТ ХОРОШО, ЕСТЬ ТОЧКИ РОСТА")
+        if avg_score >= 0.7:
+            print("🎉 ОТЛИЧНЫЙ РЕЗУЛЬТАТ! Система обучения работает эффективно!")
+        elif avg_score >= 0.5:
+            print("👍 ХОРОШИЙ РЕЗУЛЬТАТ! Система показывает прогресс!")
         else:
-            print("🔴 СИСТЕМА ТРЕБУЕТ ДОРАБОТКИ")
+            print("⚠️ ТРЕБУЕТСЯ ДОРАБОТКА! Система нуждается в улучшении!")
+        
+        # Проверяем файлы в vault
+        vault_path = Path("obsidian_vault/knowledge")
+        if vault_path.exists():
+            learning_files = list(vault_path.glob("learning_*.md"))
+            knowledge_files = list(vault_path.glob("knowledge_*.json"))
             
+            print(f"\n📁 Файлы обучения в vault: {len(learning_files)}")
+            print(f"📁 Файлы знаний в vault: {len(knowledge_files)}")
+        
+        print("\n✅ ВСЕ РЕАЛЬНЫЕ ТЕСТЫ ЗАВЕРШЕНЫ!")
+        
     except Exception as e:
-        print(f"\n❌ КРИТИЧЕСКАЯ ОШИБКА: {e}")
+        print(f"\n❌ ОШИБКА В РЕАЛЬНЫХ ТЕСТАХ: {e}")
         import traceback
         traceback.print_exc()
 

@@ -1,0 +1,15 @@
+{
+  "agent_id": "data_formatter",
+  "total_attempts": 1,
+  "successful_patterns": [
+    "file_creation"
+  ],
+  "error_patterns": [],
+  "tool_preferences": {
+    "file_manager": 1
+  },
+  "lessons_learned": [
+    "Успешная стратегия: file_creation"
+  ],
+  "last_updated": "2025-06-13T23:15:43.245020"
+}

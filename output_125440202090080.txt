@@ -1,0 +1,4 @@
+# Результат работы
+
+Задача: Создай файл hello.py с print('Hello World')
+Выполнено агентом: simple_developer

@@ -1,0 +1,16 @@
+{
+  "agent_id": "text_processor",
+  "total_attempts": 1,
+  "successful_patterns": [],
+  "error_patterns": [
+    "Файл не содержит приветствия на русском языке.",
+    "Файл не соответствует названию greeting.txt."
+  ],
+  "tool_preferences": {
+    "file_manager": 1
+  },
+  "lessons_learned": [
+    "Избегать: Файл не содержит приветствия на русском языке. при использовании Файл не содержит приветствия на русском языке."
+  ],
+  "last_updated": "2025-06-13T23:15:42.371525"
+}

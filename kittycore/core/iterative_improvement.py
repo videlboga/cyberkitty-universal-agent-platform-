@@ -10,6 +10,7 @@ from loguru import logger
 
 from ..llm import get_llm_provider
 from agents.smart_validator import ValidationResult
+from kittycore.core.agent_learning_system import learning_system
 
 
 @dataclass
@@ -107,7 +108,13 @@ class IterativeImprovement:
                 
                 attempts.append(attempt)
                 
-                # 6. Обновляем текущие результаты если есть улучшение
+                # 6. Записываем опыт обучения
+                await self._record_learning_experience(
+                    agent, task, attempt_num, current_validation.score, 
+                    improved_validation.score, feedback, attempt
+                )
+                
+                # 7. Обновляем текущие результаты если есть улучшение
                 if improved_validation.score > current_validation.score:
                     current_result = improved_result
                     current_validation = improved_validation
@@ -140,14 +147,60 @@ class IterativeImprovement:
         
         return current_result, attempts
     
+    async def _record_learning_experience(self, 
+                                        agent: Any, 
+                                        task: str, 
+                                        attempt_number: int,
+                                        score_before: float,
+                                        score_after: float,
+                                        feedback: ImprovementFeedback,
+                                        attempt: ImprovementAttempt):
+        """Записывает опыт обучения агента"""
+        
+        agent_id = getattr(agent, 'agent_id', 'unknown_agent')
+        
+        # Извлекаем паттерны ошибок и успешные действия
+        error_patterns = feedback.issues
+        successful_actions = []
+        failed_actions = []
+        
+        if attempt.success:
+            successful_actions = feedback.recommendations[:2]  # Первые 2 рекомендации как успешные
+        else:
+            failed_actions = feedback.issues[:2]  # Первые 2 проблемы как неудачные
+        
+        # Записываем в систему обучения
+        lesson = await learning_system.record_learning(
+            agent_id=agent_id,
+            task_description=task,
+            attempt_number=attempt_number,
+            score_before=score_before,
+            score_after=score_after,
+            error_patterns=error_patterns,
+            successful_actions=successful_actions,
+            failed_actions=failed_actions,
+            feedback_received=str(feedback.recommendations),
+            tools_used=feedback.tool_suggestions
+        )
+        
+        logger.info(f"🧠 Урок записан для агента {agent_id}: {lesson}")
+    
     async def _generate_improvement_feedback(self, 
                                            task: str, 
                                            result: Dict[str, Any], 
                                            validation: ValidationResult) -> ImprovementFeedback:
-        """Генерирует конкретный фидбек для улучшения агента"""
+        """Генерирует конкретный фидбек для улучшения агента с учётом накопленных знаний"""
         
         # Получаем информацию о доступных инструментах
         available_tools = ["file_manager", "code_generator", "web_client", "system_tools"]
+        
+        # Получаем накопленные знания агента
+        agent_id = "current_agent"  # TODO: получать реальный ID агента
+        learning_suggestions = await learning_system.get_improvement_suggestions(
+            agent_id=agent_id,
+            current_task=task,
+            current_errors=validation.issues
+        )
         
         feedback_prompt = f"""
 Ты эксперт по улучшению AI агентов. Проанализируй неудачное выполнение задачи и дай КОНКРЕТНЫЕ рекомендации.
@@ -162,6 +215,9 @@ class IterativeImprovement:
 - Рекомендации: {', '.join(validation.recommendations)}
 
 ДОСТУПНЫЕ ИНСТРУМЕНТЫ: {', '.join(available_tools)}
+
+НАКОПЛЕННЫЕ ЗНАНИЯ АГЕНТА:
+{chr(10).join(learning_suggestions) if learning_suggestions else "- Нет накопленного опыта"}
 
 АНАЛИЗИРУЙ И ОТВЕЧАЙ ТОЛЬКО В JSON:
 {{

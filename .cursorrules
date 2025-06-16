@@ -22,12 +22,13 @@
 //   ├── TeamComposition - формирование команд агентов
 //   └── AgentEvolution - улучшение агентов по результатам
 //
-// 🧠 CollectiveMemory - Коллективная память системы
-//   ├── WorkingMemory - текущие задачи команды
-//   ├── ShortTermMemory - недавние результаты и контекст
-//   ├── LongTermMemory - база знаний и опыт
-//   ├── CrossAgentMemory - общая память между агентами
-//   └── MemorySync - синхронизация памяти команды
+// 🧠 A-MEM Enhanced Memory - Революционная агентная память
+//   ├── AgenticMemorySystem - автоматическая эволюция памяти через ChromaDB
+//   ├── KittyCoreMemorySystem - обёртка A-MEM для интеграции в KittyCore
+//   ├── TeamMemoryEvolution - эволюция коллективной памяти команд
+//   ├── SemanticSearch - семантический поиск через векторы
+//   ├── MemoryLinking - автоматические связи между воспоминаниями  
+//   └── ZettelkastenPrinciples - сетевая организация знаний
 //
 // 📊 WorkflowGraph - Граф рабочих процессов
 //   ├── TaskDecomposition - разложение задач на подзадачи
@@ -77,11 +78,13 @@
 // │   │   └── ada_agent.py          # Программирование
 // │   └── dynamic/                  # Динамически создаваемые агенты
 // │
-// ├── memory/                       # Система памяти
-// │   ├── working_memory.py         # Рабочая память
-// │   ├── short_term_memory.py      # Краткосрочная память
-// │   ├── long_term_memory.py       # Долгосрочная память
-// │   └── memory_utils.py           # Утилиты памяти
+// ├── memory/                       # A-MEM Enhanced Memory System
+// │   ├── amem_integration.py       # A-MEM интеграция в KittyCore
+// │   ├── enhanced_memory.py        # KittyCoreMemorySystem wrapper
+// │   ├── memory_evolution.py       # TeamMemoryEvolution & автосвязи
+// │   ├── collective_memory.py      # Коллективная память команд (A-MEM)
+// │   ├── vector_memory.py          # Deprecated → заменён на A-MEM
+// │   └── base_memory.py            # Базовые интерфейсы памяти
 // │
 // ├── tools/                        # Инструменты агентов
 // │   ├── base_tool.py              # Базовый класс инструментов
@@ -103,7 +106,9 @@
 // 🔄 ASYNC-FIRST: Все операции асинхронные по умолчанию
 // 📡 EVENT-DRIVEN: Система событий для координации агентов
 // 🔌 PLUGIN ARCHITECTURE: Расширяемость через плагины
-// 💾 MEMORY PERSISTENCE: Постоянная память между сессиями
+// 💾 A-MEM MEMORY: Агентная память с автоэволюцией (ChromaDB + Zettelkasten)
+// 🧠 SEMANTIC SEARCH: Семантический поиск вместо keyword search
+// 🔗 MEMORY LINKING: Автоматические связи между воспоминаниями
 // 🛡️ ERROR RESILIENCE: Graceful degradation при ошибках
 // 📊 REAL-TIME MONITORING: Мониторинг в реальном времени
 
@@ -148,9 +153,11 @@
 
 // === УНИКАЛЬНЫЕ ОСОБЕННОСТИ KITTYCORE 3.0 ===
 // 🎯 Агенты создают агентов под конкретные задачи
-// 🧠 Коллективная память всей команды агентов
+// 🧠 A-MEM Enhanced Memory - революционная агентная память с автоэволюцией
+// 🔗 Автоматические связи между воспоминаниями агентов (Zettelkasten)
+// 🔍 Семантический поиск памяти вместо примитивного keyword search
 // 📊 Визуальное планирование и мониторинг процессов
-// 🔄 Самообучение и эволюция агентов
+// 🔄 Самообучение и эволюция агентов через ChromaDB векторы
 // 👤 Умное сотрудничество с человеком
 // 🎨 Граф-оркестрация сложных рабочих процессов
 

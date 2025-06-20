@@ -11,9 +11,10 @@ import json
 import os
 import sys
 from typing import Any, Dict, List, Optional, Union
-from dataclasses import dataclass
 import tempfile
 import io
+
+from .tools.unified_tool_result import ToolResult
 
 try:
     import pandas as pd
@@ -22,15 +23,6 @@ try:
     PANDAS_AVAILABLE = True
 except ImportError:
     PANDAS_AVAILABLE = False
-
-
-@dataclass
-class ToolResult:
-    """Standard result format for all tools"""
-    success: bool
-    result: Any = None
-    error: str = None
-    metadata: Dict[str, Any] = None
 
 
 class PythonExecutionTool:
@@ -132,7 +124,7 @@ class PythonExecutionTool:
             
             return ToolResult(
                 success=True, 
-                result=stdout_output if stdout_output else "Code executed successfully",
+                data=stdout_output if stdout_output else "Code executed successfully",
                 metadata={"execution_type": "local"}
             )
             
@@ -143,134 +135,7 @@ class PythonExecutionTool:
             sys.stderr = old_stderr
 
 
-class PandasTool:
-    """Tool for data analysis operations using Pandas"""
-    
-    def __init__(self):
-        self.name = "Pandas"
-        self.description = "Perform data analysis operations on datasets"
-    
-    def get_schema(self) -> Dict[str, Any]:
-        return {
-            "name": self.name,
-            "description": self.description,
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "operation": {
-                        "type": "string",
-                        "enum": ["load_csv", "describe", "plot", "correlation", "filter"],
-                        "description": "Analysis operation to perform"
-                    },
-                    "data_path": {
-                        "type": "string",
-                        "description": "Path to data file"
-                    },
-                    "columns": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Columns to analyze"
-                    },
-                    "plot_type": {
-                        "type": "string",
-                        "enum": ["line", "bar", "scatter", "histogram"],
-                        "description": "Type of plot to create"
-                    }
-                },
-                "required": ["operation"]
-            }
-        }
-    
-    def execute(self, operation: str, **kwargs) -> ToolResult:
-        """Execute data analysis operation"""
-        if not PANDAS_AVAILABLE:
-            return ToolResult(success=False, error="Pandas not available. Install with: pip install pandas")
-            
-        try:
-            if operation == "load_csv":
-                return self._load_csv(kwargs.get("data_path"))
-            elif operation == "describe":
-                return self._describe_data(kwargs.get("data_path"))
-            elif operation == "plot":
-                return self._create_plot(kwargs.get("data_path"), 
-                                       kwargs.get("columns", []),
-                                       kwargs.get("plot_type", "line"))
-            elif operation == "correlation":
-                return self._correlation_analysis(kwargs.get("data_path"))
-            else:
-                return ToolResult(success=False, error=f"Unknown operation: {operation}")
-        except Exception as e:
-            return ToolResult(success=False, error=str(e))
-    
-    def _load_csv(self, data_path: str) -> ToolResult:
-        """Load CSV file and return basic info"""
-        if not data_path:
-            return ToolResult(success=False, error="Data path is required")
-        
-        try:
-            df = pd.read_csv(data_path)
-            info = {
-                "shape": df.shape,
-                "columns": df.columns.tolist(),
-                "dtypes": df.dtypes.to_dict(),
-                "head": df.head().to_dict()
-            }
-            return ToolResult(success=True, result=info)
-        except Exception as e:
-            return ToolResult(success=False, error=f"Failed to load CSV: {str(e)}")
-    
-    def _describe_data(self, data_path: str) -> ToolResult:
-        """Generate descriptive statistics"""
-        try:
-            df = pd.read_csv(data_path)
-            description = df.describe(include='all').to_dict()
-            return ToolResult(success=True, result=description)
-        except Exception as e:
-            return ToolResult(success=False, error=f"Failed to describe data: {str(e)}")
-    
-    def _create_plot(self, data_path: str, columns: List[str], plot_type: str) -> ToolResult:
-        """Create visualization"""
-        try:
-            df = pd.read_csv(data_path)
-            
-            plt.figure(figsize=(10, 6))
-            
-            if plot_type == "line":
-                df[columns].plot(kind='line')
-            elif plot_type == "bar":
-                df[columns].plot(kind='bar')
-            elif plot_type == "scatter" and len(columns) >= 2:
-                plt.scatter(df[columns[0]], df[columns[1]])
-            elif plot_type == "histogram":
-                df[columns].plot(kind='hist', alpha=0.7)
-            
-            plt.title(f"{plot_type.capitalize()} Plot")
-            plt.tight_layout()
-            
-            # Save plot to temporary file
-            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
-                plt.savefig(tmp.name)
-                plot_path = tmp.name
-            
-            plt.close()
-            
-            return ToolResult(
-                success=True, 
-                result=f"Plot saved to {plot_path}",
-                metadata={"plot_path": plot_path, "plot_type": plot_type}
-            )
-        except Exception as e:
-            return ToolResult(success=False, error=f"Failed to create plot: {str(e)}")
-    
-    def _correlation_analysis(self, data_path: str) -> ToolResult:
-        """Perform correlation analysis"""
-        try:
-            df = pd.read_csv(data_path)
-            numeric_df = df.select_dtypes(include=[np.number])
-            correlation_matrix = numeric_df.corr().to_dict()
-            return ToolResult(success=True, result=correlation_matrix)
-        except Exception as e:
-            return ToolResult(success=False, error=f"Failed correlation analysis: {str(e)}")
+# PandasTool удален - используйте kittycore.tools.data_tools.PandasTool
 
 
 class WebScrapingTool:
@@ -326,7 +191,7 @@ class WebScrapingTool:
             
             return ToolResult(
                 success=True,
-                result=content,
+                data=content,
                 metadata={
                     "url": url,
                     "status_code": response.status_code,
@@ -338,76 +203,7 @@ class WebScrapingTool:
             return ToolResult(success=False, error=f"Web scraping failed: {str(e)}")
 
 
-class ApiRequestTool:
-    """Tool for making HTTP API requests"""
-    
-    def __init__(self):
-        self.name = "ApiClient"
-        self.description = "Make HTTP requests to APIs"
-    
-    def get_schema(self) -> Dict[str, Any]:
-        return {
-            "name": self.name,
-            "description": self.description,
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "url": {
-                        "type": "string",
-                        "description": "API endpoint URL"
-                    },
-                    "method": {
-                        "type": "string",
-                        "enum": ["GET", "POST", "PUT", "DELETE"],
-                        "description": "HTTP method"
-                    },
-                    "headers": {
-                        "type": "object",
-                        "description": "Request headers"
-                    },
-                    "data": {
-                        "type": "object",
-                        "description": "Request payload"
-                    },
-                    "params": {
-                        "type": "object",
-                        "description": "URL parameters"
-                    }
-                },
-                "required": ["url"]
-            }
-        }
-    
-    def execute(self, url: str, method: str = "GET", headers: Dict = None, 
-               data: Dict = None, params: Dict = None) -> ToolResult:
-        """Make HTTP request"""
-        try:
-            response = requests.request(
-                method=method,
-                url=url,
-                headers=headers,
-                json=data,
-                params=params,
-                timeout=10
-            )
-            
-            try:
-                result = response.json()
-            except:
-                result = response.text
-            
-            return ToolResult(
-                success=True,
-                result=result,
-                metadata={
-                    "status_code": response.status_code,
-                    "headers": dict(response.headers),
-                    "url": response.url
-                }
-            )
-            
-        except Exception as e:
-            return ToolResult(success=False, error=f"API request failed: {str(e)}")
+# ApiRequestTool удален - используйте kittycore.tools.web_tools.ApiRequestTool
 
 
 class MathCalculationTool:
@@ -457,7 +253,7 @@ class MathCalculationTool:
                 }
                 
                 result = eval(expression, {"__builtins__": {}}, allowed_names)
-                return ToolResult(success=True, result=result)
+                return ToolResult(success=True, data=result)
                 
             elif operation == "statistics" and data:
                 if not PANDAS_AVAILABLE:
@@ -479,7 +275,7 @@ class MathCalculationTool:
                         "sum": np.sum(data),
                         "count": len(data)
                     }
-                return ToolResult(success=True, result=stats)
+                return ToolResult(success=True, data=stats)
                 
             elif operation == "linear_algebra" and data:
                 if not PANDAS_AVAILABLE:
@@ -492,7 +288,7 @@ class MathCalculationTool:
                     "norm": np.linalg.norm(arr),
                     "transpose": arr.T.tolist() if arr.ndim > 1 else arr.tolist()
                 }
-                return ToolResult(success=True, result=result)
+                return ToolResult(success=True, data=result)
                 
             else:
                 return ToolResult(success=False, error="Invalid operation or missing parameters")
@@ -502,16 +298,15 @@ class MathCalculationTool:
 
 
 # Collection of all universal tools
+# ВНИМАНИЕ: PandasTool и ApiRequestTool перенесены в специализированные модули
+# Используйте kittycore.tools.data_tools.PandasTool и kittycore.tools.web_tools.ApiRequestTool
 UNIVERSAL_TOOLS = {
     "Python": PythonExecutionTool(),
-    "Pandas": PandasTool(),
     "WebScraper": WebScrapingTool(),
-    "ApiClient": ApiRequestTool(),
     "Calculator": MathCalculationTool(),
     "Telegram": None,  # Will be initialized on demand
     # Aliases for common names
     "Matplotlib": PythonExecutionTool(),  # Matplotlib можно использовать через Python
-    "Excel": PandasTool(),  # Excel files можно читать через Pandas
     "NumPy": PythonExecutionTool(),  # NumPy доступен через Python
     "Seaborn": PythonExecutionTool(),  # Seaborn доступен через Python
     "Plotly": PythonExecutionTool(),  # Plotly доступен через Python
@@ -520,13 +315,6 @@ UNIVERSAL_TOOLS = {
     "Jupyter Notebook (optional)": PythonExecutionTool(),
     "Jupyter": PythonExecutionTool(),
     "notebook": PythonExecutionTool(),
-    # File types
-    "CSV file": PandasTool(),  # CSV обрабатывается через Pandas
-    "CSV": PandasTool(),
-    # APIs and data sources
-    "APIs for financial data": ApiRequestTool(),  # Финансовые API через ApiClient
-    "financial data API": ApiRequestTool(),
-    "API": ApiRequestTool(),
     # Statistical tools
     "SciPy": PythonExecutionTool(),  # SciPy доступен через Python
     "StatsModels": PythonExecutionTool(),  # StatsModels через Python

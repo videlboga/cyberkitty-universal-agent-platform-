@@ -55,7 +55,17 @@ class ObsidianNote:
             
             # Теги
             if self.tags:
-                lines.append(f"tags: [{', '.join(self.tags)}]")
+                # Преобразуем все теги в строки
+                tag_strings = []
+                for tag in self.tags:
+                    if isinstance(tag, str):
+                        tag_strings.append(tag)
+                    elif isinstance(tag, dict):
+                        # Если это dict, преобразуем в строку ключ:значение
+                        tag_strings.append(str(tag))
+                    else:
+                        tag_strings.append(str(tag))
+                lines.append(f"tags: [{', '.join(tag_strings)}]")
             
             # Дополнительные метаданные
             for key, value in self.metadata.items():

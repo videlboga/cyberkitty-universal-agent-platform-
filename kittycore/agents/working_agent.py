@@ -6,7 +6,7 @@
 
 import asyncio
 from typing import Dict, Any, List
-from ..tools.real_tools import REAL_TOOLS
+from kittycore.tools.real_tools import REAL_TOOLS
 
 class WorkingAgent:
     """Агент с реальными инструментами"""
@@ -51,7 +51,7 @@ class WorkingAgent:
             return {
                 "status": "completed",
                 "output": f"Создан исполняемый Python скрипт: {filename}",
-                "files_created": [filename],
+                "created_files": [filename],
                 "executable": True
             }
         else:
@@ -75,7 +75,7 @@ class WorkingAgent:
             return {
                 "status": "completed",
                 "output": f"Создана HTML страница: {filename}",
-                "files_created": [filename]
+                "created_files": [filename]
             }
         else:
             return {
@@ -95,7 +95,7 @@ class WorkingAgent:
             return {
                 "status": "completed",
                 "output": f"Создан файл: {filename}",
-                "files_created": [filename]
+                "created_files": [filename]
             }
         else:
             return {
@@ -149,7 +149,7 @@ class WorkingAgent:
             return {
                 "status": "completed",
                 "output": f"Задача выполнена, создан отчёт: {filename}",
-                "files_created": [filename]
+                "created_files": [filename]
             }
         else:
             return {

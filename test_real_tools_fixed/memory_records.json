@@ -1,0 +1,58 @@
+[
+  {
+    "tool": "enhanced_web_search",
+    "working_action": "search",
+    "correct_params": {
+      "query": "string",
+      "limit": "number"
+    },
+    "notes": "Время: 0.4с, размер: 1155 байт. ✅ Получены реальные результаты поиска",
+    "success": true,
+    "response_size": 4
+  },
+  {
+    "tool": "media_tool",
+    "working_action": "get_info",
+    "correct_params": {
+      "action": "get_info"
+    },
+    "notes": "Время: 0.0с, размер: 347 байт. ✅ Получена информация об инструменте",
+    "success": true,
+    "response_size": 3
+  },
+  {
+    "tool": "network_tool",
+    "working_action": "ping",
+    "correct_params": {
+      "action": "ping",
+      "target": "string",
+      "count": "number"
+    },
+    "notes": "Время: 0.0с, размер: 0 байт. ❌ Ошибка: Неизвестное действие: ping",
+    "success": false,
+    "response_size": 1
+  },
+  {
+    "tool": "code_execution_tool",
+    "working_action": "execute",
+    "correct_params": {
+      "action": "execute",
+      "code": "string",
+      "language": "python"
+    },
+    "notes": "Время: 0.0с, размер: 0 байт. ❌ Ошибка: Неизвестное действие: execute",
+    "success": false,
+    "response_size": 1
+  },
+  {
+    "tool": "data_analysis_tool",
+    "working_action": "analyze_data",
+    "correct_params": {
+      "action": "analyze_data",
+      "data": "list"
+    },
+    "notes": "Время: 0.0с, размер: 0 байт. ❌ Ошибка: Неизвестное действие: analyze_data",
+    "success": false,
+    "response_size": 1
+  }
+]

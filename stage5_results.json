@@ -1,0 +1,85 @@
+{
+  "stage": 5,
+  "description": "Mass testing of remaining tools",
+  "results": [
+    {
+      "tool": "web_client",
+      "success": false,
+      "size_bytes": 0,
+      "execution_time": 0.0,
+      "honest": false,
+      "working_action": null,
+      "result_sample": "NO_DATA"
+    },
+    {
+      "tool": "smart_function",
+      "success": false,
+      "size_bytes": 62,
+      "execution_time": 0.0,
+      "honest": false,
+      "working_action": "get_info",
+      "result_sample": "<coroutine object SmartFunctionTool.execute at 0x7f9557702500>"
+    },
+    {
+      "tool": "smart_code_generator",
+      "success": true,
+      "size_bytes": 215,
+      "execution_time": 0.0,
+      "honest": true,
+      "working_action": "get_info",
+      "result_sample": "{'success': True, 'message': '✅ Python код сгенерирован: generated_code.py', 'filename': 'generated_code.py', 'file_path': 'outputs/generated_code.py', 'code_length': 189, 'functions_count': 1, 'synta"
+    },
+    {
+      "tool": "database",
+      "success": false,
+      "size_bytes": 0,
+      "execution_time": 0.0,
+      "honest": false,
+      "working_action": null,
+      "result_sample": "NO_DATA"
+    },
+    {
+      "tool": "vector_search",
+      "success": false,
+      "size_bytes": 0,
+      "execution_time": 2.2,
+      "honest": false,
+      "working_action": null,
+      "result_sample": "NO_DATA"
+    },
+    {
+      "tool": "computer_use",
+      "success": false,
+      "size_bytes": 0,
+      "execution_time": 0.0,
+      "honest": false,
+      "working_action": null,
+      "result_sample": "NO_DATA"
+    },
+    {
+      "tool": "image_generation",
+      "success": false,
+      "size_bytes": 64,
+      "execution_time": 0.01,
+      "honest": false,
+      "working_action": "get_info",
+      "result_sample": "<coroutine object ImageGenerationTool.execute at 0x7f9403d94a40>"
+    }
+  ],
+  "memory_records": [
+    {
+      "tool": "smart_code_generator",
+      "working_action": "get_info",
+      "timestamp": 1750320418.477965,
+      "status": "MASS_WORKING",
+      "test_pattern": "mass testing success",
+      "notes": "Mass test passed for smart_code_generator with action get_info"
+    }
+  ],
+  "summary": {
+    "total_tests": 7,
+    "honest_tests": 1,
+    "success_rate": 14.285714285714285,
+    "remaining_tools_tested": 7
+  }
+}

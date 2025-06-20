@@ -1,0 +1,2 @@
+[rich.console.Console().print('Создание карточки с Rich-контентом...')]
+[rich.console.Console().print('Карточка с Rich-контентом')].title('Карточка с Rich-контентом')

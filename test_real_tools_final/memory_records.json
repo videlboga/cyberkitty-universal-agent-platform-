@@ -1,0 +1,56 @@
+[
+  {
+    "tool": "enhanced_web_search",
+    "working_action": "search",
+    "correct_params": {
+      "query": "string",
+      "limit": "number"
+    },
+    "notes": "Время: 0.3с, размер: 756 байт. ✅ Получены реальные результаты поиска",
+    "success": true,
+    "response_size": 3
+  },
+  {
+    "tool": "media_tool",
+    "working_action": "get_info",
+    "correct_params": {
+      "action": "get_info"
+    },
+    "notes": "Время: 0.0с, размер: 347 байт. ✅ Получена информация об инструменте",
+    "success": true,
+    "response_size": 3
+  },
+  {
+    "tool": "network_tool",
+    "working_action": "ping_host",
+    "correct_params": {
+      "action": "ping_host",
+      "host": "string",
+      "count": "number"
+    },
+    "notes": "Время: 0.1с, размер: 545 байт. ✅ Реальный ping результат",
+    "success": true,
+    "response_size": 3
+  },
+  {
+    "tool": "code_execution_tool",
+    "working_action": "execute_python",
+    "correct_params": {
+      "action": "execute_python",
+      "code": "string"
+    },
+    "notes": "Время: 0.0с, размер: 0 байт. ❌ Ошибка: asyncio.run() cannot be called from a running event loop",
+    "success": false,
+    "response_size": 1
+  },
+  {
+    "tool": "data_analysis_tool",
+    "working_action": "list_datasets",
+    "correct_params": {
+      "action": "list_datasets"
+    },
+    "notes": "Время: 0.0с, размер: 0 байт. ❌ Исключение: 'coroutine' object has no attribute 'success'",
+    "success": false,
+    "response_size": 1
+  }
+]

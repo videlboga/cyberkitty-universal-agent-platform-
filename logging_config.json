@@ -1,1 +1,0 @@
-{"log_level": "INFO", "log_format": "%{asctime}s - %{msecs}d - %{level}s - %{message}s"}

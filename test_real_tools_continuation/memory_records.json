@@ -1,0 +1,48 @@
+[
+  {
+    "tool": "media_tool",
+    "working_action": "analyze_media_info",
+    "correct_params": {
+      "action": "string",
+      "content": "string"
+    },
+    "notes": "Время: 0.0с, размер: 0 байт. ❌ Ошибка: Неизвестное действие: {'action': 'analyze_media_info', 'content': 'Test media analysis for KittyCore system'}",
+    "success": false,
+    "response_size": 1
+  },
+  {
+    "tool": "network_tool",
+    "working_action": "ping",
+    "correct_params": {
+      "action": "ping",
+      "host": "string",
+      "count": "number"
+    },
+    "notes": "Время: 0.0с, размер: 0 байт. ❌ Исключение: 'coroutine' object has no attribute 'success'",
+    "success": false,
+    "response_size": 1
+  },
+  {
+    "tool": "code_execution_tool",
+    "working_action": "execute_python",
+    "correct_params": {
+      "code": "string",
+      "language": "python"
+    },
+    "notes": "Время: 0.0с, размер: 0 байт. ❌ Ошибка: Неизвестное действие: {'code': \"print('KittyCore Test'); result = 2 + 2; print(f'2 + 2 = {result}')\", 'language': 'python'}",
+    "success": false,
+    "response_size": 1
+  },
+  {
+    "tool": "data_analysis_tool",
+    "working_action": "analyze_basic_stats",
+    "correct_params": {
+      "action": "analyze",
+      "data": "list",
+      "analysis_type": "string"
+    },
+    "notes": "Время: 0.0с, размер: 0 байт. ❌ Ошибка: Неизвестное действие: {'action': 'analyze', 'data': [{'name': 'Agent1', 'performance': 0.85, 'tasks': 10}, {'name': 'Agent2', 'performance': 0.92, 'tasks': 15}, {'name': 'Agent3', 'performance': 0.78, 'tasks': 8}], 'analysis_type': 'basic_stats'}",
+    "success": false,
+    "response_size": 1
+  }
+]

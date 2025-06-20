@@ -1,0 +1,92 @@
+{
+  "stage": 2,
+  "description": "Async/sync fixes",
+  "results": [
+    {
+      "tool": "network_tool_async",
+      "success": false,
+      "size_bytes": 0,
+      "execution_time": 0.0,
+      "honest": false,
+      "error": "'NetworkTool' object has no attribute 'execute_async'",
+      "async_diagnostic": "UNKNOWN_ASYNC: 'networktool' object has no attribute 'execute_async'"
+    },
+    {
+      "tool": "network_tool_sync",
+      "success": true,
+      "size_bytes": 56,
+      "execution_time": 0.0,
+      "honest": true,
+      "result_sample": "<coroutine object NetworkTool.execute at 0x7be40f9e3920>",
+      "async_handled": true
+    },
+    {
+      "tool": "security_tool_async",
+      "success": false,
+      "size_bytes": 0,
+      "execution_time": 0.0,
+      "honest": false,
+      "error": "'SecurityTool' object has no attribute 'execute_async'",
+      "async_diagnostic": "UNKNOWN_ASYNC: 'securitytool' object has no attribute 'execute_async'"
+    },
+    {
+      "tool": "security_tool_sync",
+      "success": true,
+      "size_bytes": 57,
+      "execution_time": 0.0,
+      "honest": true,
+      "result_sample": "<coroutine object SecurityTool.execute at 0x7be40f9e3300>",
+      "async_handled": true
+    },
+    {
+      "tool": "data_analysis_tool_async",
+      "success": false,
+      "size_bytes": 0,
+      "execution_time": 0.0,
+      "honest": false,
+      "error": "'DataAnalysisTool' object has no attribute 'execute_async'",
+      "async_diagnostic": "UNKNOWN_ASYNC: 'dataanalysistool' object has no attribute 'execute_async'"
+    },
+    {
+      "tool": "data_analysis_tool_sync",
+      "success": true,
+      "size_bytes": 296,
+      "execution_time": 0.0,
+      "honest": true,
+      "result_sample": "ToolResult(success=False, data={'available_actions': ['load_data', 'list_datasets', 'analyze_basic',",
+      "async_handled": true
+    }
+  ],
+  "memory_records": [
+    {
+      "tool": "network_tool_sync",
+      "working_action": "test_network_tool_sync",
+      "timestamp": 1750319758.916488,
+      "status": "ASYNC_WORKING",
+      "async_pattern": "await tool.execute() success",
+      "notes": "Async test passed for network_tool_sync"
+    },
+    {
+      "tool": "security_tool_sync",
+      "working_action": "test_security_tool_sync",
+      "timestamp": 1750319758.917258,
+      "status": "ASYNC_WORKING",
+      "async_pattern": "await tool.execute() success",
+      "notes": "Async test passed for security_tool_sync"
+    },
+    {
+      "tool": "data_analysis_tool_sync",
+      "working_action": "test_data_analysis_tool_sync",
+      "timestamp": 1750319758.9173603,
+      "status": "ASYNC_WORKING",
+      "async_pattern": "await tool.execute() success",
+      "notes": "Async test passed for data_analysis_tool_sync"
+    }
+  ],
+  "summary": {
+    "total_tests": 6,
+    "honest_tests": 3,
+    "success_rate": 50.0,
+    "async_tools_tested": 3
+  }
+}

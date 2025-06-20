@@ -18,7 +18,7 @@ from pathlib import Path
 from kittycore import Agent
 from kittycore.tools import WebSearchTool, EmailTool
 from kittycore.memory import PersistentMemory
-from kittycore.config import Config
+from kittycore.config.base_config import Config
 
 # Настройка продакшн логирования
 logging.basicConfig(

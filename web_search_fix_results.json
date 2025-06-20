@@ -1,0 +1,14 @@
+{
+  "tool": "enhanced_web_search_tool",
+  "tests": {
+    "correct_params": true,
+    "simple_params": true,
+    "sources_params": true
+  },
+  "summary": {
+    "total_tests": 3,
+    "passed_tests": 3,
+    "success_rate": 100.0
+  },
+  "timestamp": "2025-06-20 10:30:52"
+}

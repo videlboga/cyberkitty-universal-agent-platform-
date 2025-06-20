@@ -12,7 +12,8 @@ import asyncio
 from typing import Dict, Any, List, Optional, Tuple
 from loguru import logger
 from .base_agent import Agent
-from ..tools.base_tool import default_tool_manager, Tool, ToolResult, FunctionTool
+from ..tools.base_tool import Tool, ToolResult, FunctionTool
+from ..tools import DEFAULT_TOOLS
 from ..llm import LLMProvider
 
 
@@ -32,7 +33,7 @@ class ToolAdapterAgent(Agent):
         self.role = "Адаптер инструментов"
         self.goal = "Найти/создать/адаптировать нужные инструменты"
         self.llm_provider = llm_provider
-        self.tool_manager = default_tool_manager
+        self.tool_manager = DEFAULT_TOOLS
         self.created_tools: Dict[str, Tool] = {}
         
     async def execute_task(self, task: str, context: Dict[str, Any] = None) -> Dict[str, Any]:

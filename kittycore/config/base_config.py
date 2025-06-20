@@ -22,7 +22,7 @@ class Config:
     openrouter_api_key: Optional[str] = None
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     anthropic_api_key: Optional[str] = None  # Не используется
-    default_model: str = "deepseek/deepseek-chat"  # Бесплатная модель DeepSeek
+    default_model: str = "google/gemini-2.5-flash-preview-05-20:thinking"  # Gemini 2.5 Flash с thinking
     max_tokens: int = 1000
     temperature: float = 0.7
     
@@ -64,7 +64,7 @@ class Config:
             openrouter_api_key=os.getenv('OPENROUTER_API_KEY') or os.getenv('OPENAI_API_KEY'),
             openrouter_base_url=os.getenv('OPENROUTER_BASE_URL') or os.getenv('OPENAI_BASE_URL', 'https://openrouter.ai/api/v1'),
             anthropic_api_key=os.getenv('ANTHROPIC_API_KEY'),  # Не используется
-            default_model=os.getenv('DEFAULT_MODEL', 'deepseek/deepseek-chat'),
+            default_model=os.getenv('DEFAULT_MODEL', 'google/gemini-2.5-flash-preview-05-20:thinking'),
             max_tokens=int(os.getenv('MAX_TOKENS', '1000')),
             temperature=float(os.getenv('TEMPERATURE', '0.7')),
             

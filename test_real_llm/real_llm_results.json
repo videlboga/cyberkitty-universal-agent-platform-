@@ -1,0 +1,96 @@
+{
+  "cycles_completed": 3,
+  "total_tasks": 9,
+  "total_successes": 2,
+  "total_llm_calls": 9,
+  "avg_response_time": 0,
+  "generation_progress": [
+    {
+      "cycle": 2,
+      "agents": "PopulationStats(total_agents=20, active_agents=20, retired_agents=0, max_generation=5, avg_generation=2.0, avg_success_rate=0.8611111111111112, best_success_rate=1.0, worst_success_rate=0.16666666666666666, unique_specializations=4, genetic_diversity=0.3259499207149289, total_mutations=2, total_crossovers=26, evolution_events=45, population_health=0.6043591650193401, adaptation_rate=0.0)",
+      "prompts": {
+        "population_size": 3,
+        "avg_success": 0.17500000000000002,
+        "max_generation": 0,
+        "total_mutations": 0,
+        "total_crossovers": 0,
+        "agent_types": [
+          "creative",
+          "code",
+          "analysis"
+        ]
+      },
+      "pheromones": 0.16499999999999998
+    }
+  ],
+  "quality_progression": [
+    0.6666666666666666,
+    0.0,
+    0.0
+  ],
+  "llm_responses": [
+    {
+      "task": "simple_math",
+      "success": false,
+      "quality": 0.0,
+      "response_length": 0,
+      "time": 999.0
+    },
+    {
+      "task": "problem_solving",
+      "success": true,
+      "quality": 1.0,
+      "response_length": 536,
+      "time": 5.998913049697876
+    },
+    {
+      "task": "simple_math",
+      "success": true,
+      "quality": 1.0,
+      "response_length": 80,
+      "time": 3.537266731262207
+    },
+    {
+      "task": "text_analysis",
+      "success": false,
+      "quality": 0.0,
+      "response_length": 0,
+      "time": 999.0
+    },
+    {
+      "task": "problem_solving",
+      "success": false,
+      "quality": 0.0,
+      "response_length": 0,
+      "time": 999.0
+    },
+    {
+      "task": "text_analysis",
+      "success": false,
+      "quality": 0.0,
+      "response_length": 0,
+      "time": 999.0
+    },
+    {
+      "task": "code_generation",
+      "success": false,
+      "quality": 0.0,
+      "response_length": 0,
+      "time": 999.0
+    },
+    {
+      "task": "problem_solving",
+      "success": false,
+      "quality": 0.0,
+      "response_length": 0,
+      "time": 999.0
+    },
+    {
+      "task": "text_analysis",
+      "success": false,
+      "quality": 0.0,
+      "response_length": 0,
+      "time": 999.0
+    }
+  ]
+}

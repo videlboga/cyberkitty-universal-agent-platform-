@@ -1,0 +1,32 @@
+[
+  {
+    "tool": "enhanced_web_search",
+    "success": true,
+    "time": 0.28025388717651367,
+    "size": 756
+  },
+  {
+    "tool": "media_tool",
+    "success": true,
+    "time": 5.555152893066406e-05,
+    "size": 347
+  },
+  {
+    "tool": "network_tool",
+    "success": true,
+    "time": 0.07411885261535645,
+    "size": 545
+  },
+  {
+    "tool": "code_execution",
+    "success": false,
+    "time": 0.002618074417114258,
+    "size": 0
+  },
+  {
+    "tool": "data_analysis",
+    "success": false,
+    "time": 7.009506225585938e-05,
+    "size": 0
+  }
+]

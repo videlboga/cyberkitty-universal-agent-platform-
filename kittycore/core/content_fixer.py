@@ -133,7 +133,7 @@ class ContentFixer:
             # Создаём файл если указан
             if fix_data.get("filename") and fix_data.get("content"):
                 self._create_fixed_file(fix_data["filename"], fix_data["content"])
-                fixed_result["files_created"] = [fix_data["filename"]]
+                fixed_result["created_files"] = [fix_data["filename"]]
             
             return fixed_result
             
@@ -210,7 +210,7 @@ if __name__ == "__main__":
             "output": f"✅ Создан исправленный Python скрипт: {filename}",
             "filename": filename,
             "content": content,
-            "files_created": [filename],
+            "created_files": [filename],
             "fixed": True,
             "user_benefit": "Готовый рабочий Python код"
         }
@@ -251,7 +251,7 @@ if __name__ == "__main__":
             "output": f"✅ Создана исправленная HTML страница: {filename}",
             "filename": filename,
             "content": content,
-            "files_created": [filename],
+            "created_files": [filename],
             "fixed": True,
             "user_benefit": "Готовая HTML страница"
         }
@@ -280,7 +280,7 @@ if __name__ == "__main__":
             "output": f"✅ Создан исправленный JSON файл: {filename}",
             "filename": filename,
             "content": content,
-            "files_created": [filename],
+            "created_files": [filename],
             "fixed": True,
             "user_benefit": "Готовый JSON конфигурационный файл"
         }
@@ -307,7 +307,7 @@ if __name__ == "__main__":
             "output": f"✅ Создан исправленный текстовый файл: {filename}",
             "filename": filename,
             "content": content,
-            "files_created": [filename],
+            "created_files": [filename],
             "fixed": True,
             "user_benefit": "Готовый текстовый результат"
         }

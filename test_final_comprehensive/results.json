@@ -1,0 +1,100 @@
+{
+  "summary": {
+    "total_tests": 14,
+    "successful_tests": 4,
+    "success_rate": 28.57142857142857
+  },
+  "results": [
+    {
+      "tool": "api_request_tool",
+      "success": true,
+      "notes": "✅ Время: 8.7с, размер: 1223 байт",
+      "execution_time": 8.665349006652832
+    },
+    {
+      "tool": "super_system_tool",
+      "success": true,
+      "notes": "✅ Время: 0.0с, размер: 546 байт",
+      "execution_time": 0.001667022705078125
+    },
+    {
+      "tool": "email_tool",
+      "success": true,
+      "notes": "✅ Время: 0.0с, размер: 190 байт",
+      "execution_time": 6.270408630371094e-05
+    },
+    {
+      "tool": "computer_use_tool",
+      "success": true,
+      "notes": "✅ Время: 1.2с, размер: 150 байт",
+      "execution_time": 1.1501083374023438
+    },
+    {
+      "tool": "database_tool",
+      "success": false,
+      "notes": "❌ Ошибка: Подключение default не найдено",
+      "execution_time": 3.743171691894531e-05
+    },
+    {
+      "tool": "ai_integration_tool",
+      "success": false,
+      "notes": "❌ Исключение: object ToolResult can't be used in 'await' expression",
+      "execution_time": 0.2333085536956787
+    },
+    {
+      "tool": "security_tool",
+      "success": false,
+      "notes": "❌ Ошибка: Неизвестное действие: system_scan",
+      "execution_time": 0.00040078163146972656
+    },
+    {
+      "tool": "smart_function_tool",
+      "success": false,
+      "notes": "❌ Ошибка: Неизвестное действие: get_info. Доступные: ['create_function', 'execute_function', 'analyze_function', 'list_functions', 'get_function_info', 'delete_function', 'import_module', 'validate_code']",
+      "execution_time": 0.00021386146545410156
+    },
+    {
+      "tool": "vector_search_tool",
+      "success": false,
+      "notes": "❌ Исключение: VectorSearchTool.execute() takes 1 positional argument but 2 were given",
+      "execution_time": 1.8468022346496582
+    },
+    {
+      "tool": "image_generation_tool",
+      "success": false,
+      "notes": "❌ Исключение: 'dict' object has no attribute 'success'",
+      "execution_time": 0.004058361053466797
+    },
+    {
+      "tool": "document_tool",
+      "success": false,
+      "notes": "❌ Исключение: DocumentTool.execute() got an unexpected keyword argument 'command'",
+      "execution_time": 0.0006823539733886719
+    },
+    {
+      "tool": "enhanced_web_scraping_tool",
+      "success": false,
+      "notes": "❌ Исключение: 'dict' object has no attribute 'success'",
+      "execution_time": 3.0517578125e-05
+    },
+    {
+      "tool": "web_client_tool",
+      "success": false,
+      "notes": "❌ Исключение: WebClientTool.execute() got an unexpected keyword argument 'method'",
+      "execution_time": 1.0967254638671875e-05
+    },
+    {
+      "tool": "telegram_tool",
+      "success": false,
+      "notes": "❌ Ошибка: Pyrogram не установлен. Установите: pip install pyrogram",
+      "execution_time": 3.504753112792969e-05
+    }
+  ],
+  "missing_keys": [
+    {
+      "tool": "telegram_tool",
+      "error": "Pyrogram не установлен. Установите: pip install pyrogram",
+      "likely_missing_key": "pip install pyrogram"
+    }
+  ]
+}

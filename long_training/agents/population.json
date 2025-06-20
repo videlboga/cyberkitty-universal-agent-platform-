@@ -1,0 +1,695 @@
+{
+  "active_agents": {
+    "mut_analysis_1750235489_5871_1750235489": {
+      "agent_id": "mut_analysis_1750235489_5871_1750235489",
+      "generation": 1,
+      "parent_ids": [
+        "analysis_1750235489_5871"
+      ],
+      "birth_time": "2025-06-18 11:31:29.447058",
+      "genes": {
+        "agent_type": "analysis",
+        "specialization": [
+          "security_audit"
+        ],
+        "success_rate": 0.3711032877167449,
+        "speed_factor": 0.8501906758393799,
+        "quality_factor": 1.2926683256143563,
+        "preferred_tools": [
+          "general_tools",
+          "data_analysis",
+          "visualization"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.8043319872682504
+        },
+        "learning_rate": 0.1996456775897108,
+        "mutation_resistance": 0.7195633257775986,
+        "collaboration_skill": 0.5463757825566209,
+        "leadership_tendency": 0.27276231857453703
+      },
+      "mutations_count": 1,
+      "crossover_count": 0,
+      "tasks_completed": 1,
+      "total_success_rate": 1.0,
+      "life_span": null
+    },
+    "general_1750235489_9747": {
+      "agent_id": "general_1750235489_9747",
+      "generation": 0,
+      "parent_ids": [],
+      "birth_time": "2025-06-18 11:31:29.447715",
+      "genes": {
+        "agent_type": "general",
+        "specialization": [
+          "general"
+        ],
+        "success_rate": 0.6619162486610303,
+        "speed_factor": 1.075744015269419,
+        "quality_factor": 0.9947147869972256,
+        "preferred_tools": [
+          "general_tools"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.7649214601383313
+        },
+        "learning_rate": 0.1785869012426446,
+        "mutation_resistance": 0.7214906266719967,
+        "collaboration_skill": 0.7763682899591575,
+        "leadership_tendency": 0.20703066715686202
+      },
+      "mutations_count": 0,
+      "crossover_count": 0,
+      "tasks_completed": 0,
+      "total_success_rate": 0.0,
+      "life_span": null
+    },
+    "general_1750235489_7209": {
+      "agent_id": "general_1750235489_7209",
+      "generation": 0,
+      "parent_ids": [],
+      "birth_time": "2025-06-18 11:31:29.448030",
+      "genes": {
+        "agent_type": "general",
+        "specialization": [
+          "general"
+        ],
+        "success_rate": 0.43478349397265037,
+        "speed_factor": 1.0404636047922617,
+        "quality_factor": 0.9579033555546587,
+        "preferred_tools": [
+          "general_tools"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.8103353832296266
+        },
+        "learning_rate": 0.1314474441487059,
+        "mutation_resistance": 0.7678866541050964,
+        "collaboration_skill": 0.6023820683871933,
+        "leadership_tendency": 0.20703265183444897
+      },
+      "mutations_count": 0,
+      "crossover_count": 0,
+      "tasks_completed": 0,
+      "total_success_rate": 0.0,
+      "life_span": null
+    },
+    "mut_cross_mut_anal_general__1750235489_1750235489": {
+      "agent_id": "mut_cross_mut_anal_general__1750235489_1750235489",
+      "generation": 3,
+      "parent_ids": [
+        "cross_mut_anal_general__1750235489"
+      ],
+      "birth_time": "2025-06-18 11:31:29.757879",
+      "genes": {
+        "agent_type": "analysis",
+        "specialization": [
+          "security_audit",
+          "general"
+        ],
+        "success_rate": 0.4855151742794077,
+        "speed_factor": 0.8899115137390478,
+        "quality_factor": 1.2918957295219926,
+        "preferred_tools": [
+          "general_tools",
+          "data_analysis",
+          "visualization"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.8043319872682504
+        },
+        "learning_rate": 0.1891162894161777,
+        "mutation_resistance": 0.7205269762247977,
+        "collaboration_skill": 0.7763682899591575,
+        "leadership_tendency": 0.23989649286569953
+      },
+      "mutations_count": 1,
+      "crossover_count": 0,
+      "tasks_completed": 1,
+      "total_success_rate": 1.0,
+      "life_span": null
+    },
+    "cross_mut_cros_mut_anal_1750235490": {
+      "agent_id": "cross_mut_cros_mut_anal_1750235490",
+      "generation": 4,
+      "parent_ids": [
+        "mut_cross_mut_anal_general__1750235489_1750235489",
+        "mut_analysis_1750235489_5871_1750235489"
+      ],
+      "birth_time": "2025-06-18 11:31:30.072753",
+      "genes": {
+        "agent_type": "analysis",
+        "specialization": [
+          "security_audit",
+          "general"
+        ],
+        "success_rate": 0.47062970666090326,
+        "speed_factor": 0.8740231785791805,
+        "quality_factor": 1.2922047679589381,
+        "preferred_tools": [
+          "general_tools",
+          "data_analysis",
+          "visualization"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.8043319872682504
+        },
+        "learning_rate": 0.19438098350294425,
+        "mutation_resistance": 0.7200451510011981,
+        "collaboration_skill": 0.7763682899591575,
+        "leadership_tendency": 0.2563294057201183
+      },
+      "mutations_count": 0,
+      "crossover_count": 1,
+      "tasks_completed": 1,
+      "total_success_rate": 1.0,
+      "life_span": null
+    },
+    "cross_mut_cros_cross_mu_1750235490": {
+      "agent_id": "cross_mut_cros_cross_mu_1750235490",
+      "generation": 5,
+      "parent_ids": [
+        "mut_cross_mut_anal_general__1750235489_1750235489",
+        "cross_mut_cros_mut_anal_1750235490"
+      ],
+      "birth_time": "2025-06-18 11:31:30.189160",
+      "genes": {
+        "agent_type": "analysis",
+        "specialization": [
+          "security_audit",
+          "general"
+        ],
+        "success_rate": 0.5002243976398124,
+        "speed_factor": 0.8835561796751008,
+        "quality_factor": 1.292019344896771,
+        "preferred_tools": [
+          "general_tools",
+          "data_analysis",
+          "visualization"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.8043319872682504
+        },
+        "learning_rate": 0.19174863645956097,
+        "mutation_resistance": 0.720286063612998,
+        "collaboration_skill": 0.7763682899591575,
+        "leadership_tendency": 0.24811294929290892
+      },
+      "mutations_count": 0,
+      "crossover_count": 2,
+      "tasks_completed": 1,
+      "total_success_rate": 1.0,
+      "life_span": null
+    },
+    "general_1750235489_2719": {
+      "agent_id": "general_1750235489_2719",
+      "generation": 0,
+      "parent_ids": [],
+      "birth_time": "2025-06-18 11:31:29.447876",
+      "genes": {
+        "agent_type": "general",
+        "specialization": [
+          "general"
+        ],
+        "success_rate": 0.3877745971280231,
+        "speed_factor": 0.9056826855369785,
+        "quality_factor": 1.014853225243086,
+        "preferred_tools": [
+          "general_tools"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.8007041352793328
+        },
+        "learning_rate": 0.19824326239264528,
+        "mutation_resistance": 0.7297818427935412,
+        "collaboration_skill": 0.5365039517472587,
+        "leadership_tendency": 0.278420911622801
+      },
+      "mutations_count": 0,
+      "crossover_count": 0,
+      "tasks_completed": 0,
+      "total_success_rate": 0.0,
+      "life_span": null
+    },
+    "code_1750235490_2047": {
+      "agent_id": "code_1750235490_2047",
+      "generation": 0,
+      "parent_ids": [],
+      "birth_time": "2025-06-18 11:31:30.328782",
+      "genes": {
+        "agent_type": "code",
+        "specialization": [
+          "code_analysis"
+        ],
+        "success_rate": 0.6223892010417114,
+        "speed_factor": 0.9647100842930507,
+        "quality_factor": 1.113735786329242,
+        "preferred_tools": [
+          "general_tools",
+          "code_generator",
+          "file_manager"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.98048907379648,
+          "code_generator": 1.173571019362809,
+          "file_manager": 1.0735485689038953
+        },
+        "learning_rate": 0.13549962646146976,
+        "mutation_resistance": 0.8967234697789493,
+        "collaboration_skill": 0.628101354383127,
+        "leadership_tendency": 0.4317862433818487
+      },
+      "mutations_count": 0,
+      "crossover_count": 0,
+      "tasks_completed": 3,
+      "total_success_rate": 0.0,
+      "life_span": null
+    },
+    "cross_cross_mu_mut_cros_1750235490": {
+      "agent_id": "cross_cross_mu_mut_cros_1750235490",
+      "generation": 6,
+      "parent_ids": [
+        "cross_mut_cros_cross_mu_1750235490",
+        "mut_cross_mut_anal_general__1750235489_1750235489"
+      ],
+      "birth_time": "2025-06-18 11:31:30.647995",
+      "genes": {
+        "agent_type": "analysis",
+        "specialization": [
+          "security_audit",
+          "general"
+        ],
+        "success_rate": 0.5148548769254779,
+        "speed_factor": 0.8860983133006796,
+        "quality_factor": 1.2919698987468595,
+        "preferred_tools": [
+          "general_tools",
+          "data_analysis",
+          "visualization"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.8043319872682504
+        },
+        "learning_rate": 0.19043246293786933,
+        "mutation_resistance": 0.7204065199188978,
+        "collaboration_skill": 0.7763682899591575,
+        "leadership_tendency": 0.2440047210793042
+      },
+      "mutations_count": 0,
+      "crossover_count": 3,
+      "tasks_completed": 1,
+      "total_success_rate": 1.0,
+      "life_span": null
+    },
+    "cross_cross_cr_cross_mu_1750235490": {
+      "agent_id": "cross_cross_cr_cross_mu_1750235490",
+      "generation": 7,
+      "parent_ids": [
+        "cross_cross_mu_mut_cros_1750235490",
+        "cross_mut_cros_cross_mu_1750235490"
+      ],
+      "birth_time": "2025-06-18 11:31:30.756905",
+      "genes": {
+        "agent_type": "analysis",
+        "specialization": [
+          "security_audit",
+          "general"
+        ],
+        "success_rate": 0.5295747881096498,
+        "speed_factor": 0.885081459850448,
+        "quality_factor": 1.291989677206824,
+        "preferred_tools": [
+          "general_tools",
+          "data_analysis",
+          "visualization"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.8043319872682504
+        },
+        "learning_rate": 0.19109054969871514,
+        "mutation_resistance": 0.7203462917659479,
+        "collaboration_skill": 0.7763682899591575,
+        "leadership_tendency": 0.24605883518610655
+      },
+      "mutations_count": 0,
+      "crossover_count": 4,
+      "tasks_completed": 1,
+      "total_success_rate": 1.0,
+      "life_span": null
+    },
+    "cross_cross_cr_cross_cr_1750235490": {
+      "agent_id": "cross_cross_cr_cross_cr_1750235490",
+      "generation": 8,
+      "parent_ids": [
+        "cross_cross_cr_cross_mu_1750235490",
+        "cross_cross_mu_mut_cros_1750235490"
+      ],
+      "birth_time": "2025-06-18 11:31:30.863135",
+      "genes": {
+        "agent_type": "analysis",
+        "specialization": [
+          "security_audit",
+          "general"
+        ],
+        "success_rate": 0.5156207394384835,
+        "speed_factor": 0.8854882012305405,
+        "quality_factor": 1.2919817658228383,
+        "preferred_tools": [
+          "general_tools",
+          "data_analysis",
+          "visualization"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.8043319872682504
+        },
+        "learning_rate": 0.19076150631829225,
+        "mutation_resistance": 0.7203764058424229,
+        "collaboration_skill": 0.7763682899591575,
+        "leadership_tendency": 0.24503177813270538
+      },
+      "mutations_count": 0,
+      "crossover_count": 5,
+      "tasks_completed": 1,
+      "total_success_rate": 0.0,
+      "life_span": null
+    },
+    "cross_cross_cr_cross_cr_1750235491": {
+      "agent_id": "cross_cross_cr_cross_cr_1750235491",
+      "generation": 8,
+      "parent_ids": [
+        "cross_cross_cr_cross_mu_1750235490",
+        "cross_cross_mu_mut_cros_1750235490"
+      ],
+      "birth_time": "2025-06-18 11:31:31.184018",
+      "genes": {
+        "agent_type": "analysis",
+        "specialization": [
+          "security_audit",
+          "general"
+        ],
+        "success_rate": 0.5156207394384835,
+        "speed_factor": 0.8854882012305405,
+        "quality_factor": 1.2919817658228383,
+        "preferred_tools": [
+          "general_tools",
+          "data_analysis",
+          "visualization"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.8043319872682504
+        },
+        "learning_rate": 0.19076150631829225,
+        "mutation_resistance": 0.7203764058424229,
+        "collaboration_skill": 0.7763682899591575,
+        "leadership_tendency": 0.24503177813270538
+      },
+      "mutations_count": 0,
+      "crossover_count": 5,
+      "tasks_completed": 1,
+      "total_success_rate": 0.0,
+      "life_span": null
+    },
+    "mut_cross_mut_cros_mut_anal_1750235489_1750235491": {
+      "agent_id": "mut_cross_mut_cros_mut_anal_1750235489_1750235491",
+      "generation": 5,
+      "parent_ids": [
+        "cross_mut_cros_mut_anal_1750235489"
+      ],
+      "birth_time": "2025-06-18 11:31:31.292931",
+      "genes": {
+        "agent_type": "analysis",
+        "specialization": [
+          "security_audit",
+          "general"
+        ],
+        "success_rate": 0.3472999727839576,
+        "speed_factor": 0.8740231785791805,
+        "quality_factor": 1.2493902807202633,
+        "preferred_tools": [
+          "general_tools",
+          "data_analysis",
+          "visualization"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.8043319872682504
+        },
+        "learning_rate": 0.19438098350294425,
+        "mutation_resistance": 0.7200451510011981,
+        "collaboration_skill": 0.7763682899591575,
+        "leadership_tendency": 0.2563294057201183
+      },
+      "mutations_count": 1,
+      "crossover_count": 0,
+      "tasks_completed": 0,
+      "total_success_rate": 0.0,
+      "life_span": null
+    },
+    "cross_cross_mu_mut_anal_1750235490": {
+      "agent_id": "cross_cross_mu_mut_anal_1750235490",
+      "generation": 5,
+      "parent_ids": [
+        "cross_mut_cros_mut_anal_1750235490",
+        "mut_analysis_1750235489_5871_1750235489"
+      ],
+      "birth_time": "2025-06-18 11:31:30.310518",
+      "genes": {
+        "agent_type": "analysis",
+        "specialization": [
+          "security_audit",
+          "general"
+        ],
+        "success_rate": 0.44077178097765574,
+        "speed_factor": 0.8644901774832603,
+        "quality_factor": 1.2923901910211053,
+        "preferred_tools": [
+          "general_tools",
+          "data_analysis",
+          "visualization"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.8043319872682504
+        },
+        "learning_rate": 0.19701333054632753,
+        "mutation_resistance": 0.7198042383893983,
+        "collaboration_skill": 0.7763682899591575,
+        "leadership_tendency": 0.26454586214732767
+      },
+      "mutations_count": 0,
+      "crossover_count": 2,
+      "tasks_completed": 0,
+      "total_success_rate": 0.0,
+      "life_span": null
+    },
+    "cross_mut_anal_analysis_1750235489": {
+      "agent_id": "cross_mut_anal_analysis_1750235489",
+      "generation": 2,
+      "parent_ids": [
+        "mut_analysis_1750235489_5871_1750235489",
+        "analysis_1750235489_5871"
+      ],
+      "birth_time": "2025-06-18 11:31:29.653582",
+      "genes": {
+        "agent_type": "analysis",
+        "specialization": [
+          "security_audit"
+        ],
+        "success_rate": 0.37801592280194063,
+        "speed_factor": 0.8812418196333818,
+        "quality_factor": 1.247644670197661,
+        "preferred_tools": [
+          "general_tools",
+          "data_analysis",
+          "visualization"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.8043319872682504
+        },
+        "learning_rate": 0.1996456775897108,
+        "mutation_resistance": 0.7195633257775986,
+        "collaboration_skill": 0.5463757825566209,
+        "leadership_tendency": 0.27276231857453703
+      },
+      "mutations_count": 0,
+      "crossover_count": 1,
+      "tasks_completed": 1,
+      "total_success_rate": 0.0,
+      "life_span": null
+    }
+  },
+  "retired_agents": {
+    "cross_mut_anal_analysis_1750235489": {
+      "agent_id": "cross_mut_anal_analysis_1750235489",
+      "generation": 2,
+      "parent_ids": [
+        "mut_analysis_1750235489_5871_1750235489",
+        "analysis_1750235489_5871"
+      ],
+      "birth_time": "2025-06-18 11:31:29.653582",
+      "genes": {
+        "agent_type": "analysis",
+        "specialization": [
+          "security_audit"
+        ],
+        "success_rate": 0.37801592280194063,
+        "speed_factor": 0.8812418196333818,
+        "quality_factor": 1.247644670197661,
+        "preferred_tools": [
+          "general_tools",
+          "data_analysis",
+          "visualization"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.8043319872682504
+        },
+        "learning_rate": 0.1996456775897108,
+        "mutation_resistance": 0.7195633257775986,
+        "collaboration_skill": 0.5463757825566209,
+        "leadership_tendency": 0.27276231857453703
+      },
+      "mutations_count": 0,
+      "crossover_count": 1,
+      "tasks_completed": 1,
+      "total_success_rate": 0.0,
+      "life_span": null
+    },
+    "general_1750235489_2719": {
+      "agent_id": "general_1750235489_2719",
+      "generation": 0,
+      "parent_ids": [],
+      "birth_time": "2025-06-18 11:31:29.447876",
+      "genes": {
+        "agent_type": "general",
+        "specialization": [
+          "general"
+        ],
+        "success_rate": 0.3877745971280231,
+        "speed_factor": 0.9056826855369785,
+        "quality_factor": 1.014853225243086,
+        "preferred_tools": [
+          "general_tools"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.8007041352793328
+        },
+        "learning_rate": 0.19824326239264528,
+        "mutation_resistance": 0.7297818427935412,
+        "collaboration_skill": 0.5365039517472587,
+        "leadership_tendency": 0.278420911622801
+      },
+      "mutations_count": 0,
+      "crossover_count": 0,
+      "tasks_completed": 0,
+      "total_success_rate": 0.0,
+      "life_span": null
+    },
+    "analysis_1750235489_5871": {
+      "agent_id": "analysis_1750235489_5871",
+      "generation": 0,
+      "parent_ids": [],
+      "birth_time": "2025-06-18 11:31:29.344539",
+      "genes": {
+        "agent_type": "analysis",
+        "specialization": [
+          "security_audit"
+        ],
+        "success_rate": 0.42741968426568244,
+        "speed_factor": 0.9278185353243846,
+        "quality_factor": 1.180109187072618,
+        "preferred_tools": [
+          "general_tools",
+          "data_analysis",
+          "visualization"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.8043319872682504
+        },
+        "learning_rate": 0.1996456775897108,
+        "mutation_resistance": 0.7195633257775986,
+        "collaboration_skill": 0.5463757825566209,
+        "leadership_tendency": 0.27276231857453703
+      },
+      "mutations_count": 0,
+      "crossover_count": 0,
+      "tasks_completed": 1,
+      "total_success_rate": 0.0,
+      "life_span": null
+    },
+    "cross_mut_cros_mut_anal_1750235489": {
+      "agent_id": "cross_mut_cros_mut_anal_1750235489",
+      "generation": 4,
+      "parent_ids": [
+        "mut_cross_mut_anal_general__1750235489_1750235489",
+        "mut_analysis_1750235489_5871_1750235489"
+      ],
+      "birth_time": "2025-06-18 11:31:29.968357",
+      "genes": {
+        "agent_type": "analysis",
+        "specialization": [
+          "security_audit",
+          "general"
+        ],
+        "success_rate": 0.44147255913546163,
+        "speed_factor": 0.8740231785791805,
+        "quality_factor": 1.2922047679589381,
+        "preferred_tools": [
+          "general_tools",
+          "data_analysis",
+          "visualization"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.8043319872682504
+        },
+        "learning_rate": 0.19438098350294425,
+        "mutation_resistance": 0.7200451510011981,
+        "collaboration_skill": 0.7763682899591575,
+        "leadership_tendency": 0.2563294057201183
+      },
+      "mutations_count": 0,
+      "crossover_count": 1,
+      "tasks_completed": 1,
+      "total_success_rate": 0.0,
+      "life_span": null
+    },
+    "cross_cross_mu_mut_anal_1750235490": {
+      "agent_id": "cross_cross_mu_mut_anal_1750235490",
+      "generation": 5,
+      "parent_ids": [
+        "cross_mut_cros_mut_anal_1750235490",
+        "mut_analysis_1750235489_5871_1750235489"
+      ],
+      "birth_time": "2025-06-18 11:31:30.310518",
+      "genes": {
+        "agent_type": "analysis",
+        "specialization": [
+          "security_audit",
+          "general"
+        ],
+        "success_rate": 0.44077178097765574,
+        "speed_factor": 0.8644901774832603,
+        "quality_factor": 1.2923901910211053,
+        "preferred_tools": [
+          "general_tools",
+          "data_analysis",
+          "visualization"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.8043319872682504
+        },
+        "learning_rate": 0.19701333054632753,
+        "mutation_resistance": 0.7198042383893983,
+        "collaboration_skill": 0.7763682899591575,
+        "leadership_tendency": 0.26454586214732767
+      },
+      "mutations_count": 0,
+      "crossover_count": 2,
+      "tasks_completed": 0,
+      "total_success_rate": 0.0,
+      "life_span": null
+    }
+  },
+  "settings": {
+    "max_population": 20,
+    "min_population": 5,
+    "retirement_age_days": 30
+  }
+}

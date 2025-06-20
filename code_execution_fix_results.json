@@ -1,0 +1,15 @@
+{
+  "tool": "code_execution_tool",
+  "tests": {
+    "python_execution": true,
+    "shell_execution": true,
+    "code_validation": false,
+    "info_actions": false
+  },
+  "summary": {
+    "total_tests": 4,
+    "passed_tests": 2,
+    "success_rate": 50.0
+  },
+  "timestamp": "2025-06-20 11:49:09"
+}

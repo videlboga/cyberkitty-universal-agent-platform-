@@ -1,0 +1,37 @@
+{
+  "timestamp": 1750285697,
+  "total_time": 7.432991027832031,
+  "results": [
+    {
+      "tool_name": "media_tool",
+      "action": "get_info",
+      "success": true,
+      "execution_time": 7.427351951599121,
+      "data_size": 347,
+      "honesty": "✅ ЧЕСТНО"
+    },
+    {
+      "tool_name": "super_system_tool",
+      "action": "run_command",
+      "success": true,
+      "execution_time": 0.003312826156616211,
+      "data_size": 213,
+      "honesty": "✅ ЧЕСТНО"
+    },
+    {
+      "tool_name": "network_tool",
+      "action": "get_info",
+      "success": true,
+      "execution_time": 0.0006346702575683594,
+      "data_size": 0,
+      "honesty": "❌ ПОДОЗРИТЕЛЬНО"
+    }
+  ],
+  "honest_tools": [
+    "media_tool",
+    "super_system_tool"
+  ],
+  "dishonest_tools": [
+    "network_tool"
+  ]
+}

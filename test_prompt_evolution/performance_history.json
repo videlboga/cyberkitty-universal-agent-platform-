@@ -1,0 +1,50 @@
+[
+  {
+    "prompt_id": "prompt_code_1750229620_8923",
+    "task_type": "programming",
+    "success": true,
+    "quality_score": 0.8,
+    "execution_time": 15.0,
+    "timestamp": "2025-06-18 09:53:40.427048",
+    "user_feedback": null,
+    "error_details": null,
+    "output_length": 0,
+    "context_relevance": 0.0
+  },
+  {
+    "prompt_id": "prompt_code_1750229620_8923",
+    "task_type": "programming",
+    "success": true,
+    "quality_score": 0.9,
+    "execution_time": 12.0,
+    "timestamp": "2025-06-18 09:53:40.427645",
+    "user_feedback": null,
+    "error_details": null,
+    "output_length": 0,
+    "context_relevance": 0.0
+  },
+  {
+    "prompt_id": "prompt_web_1750229620_5044",
+    "task_type": "web_development",
+    "success": false,
+    "quality_score": 0.4,
+    "execution_time": 25.0,
+    "timestamp": "2025-06-18 09:53:40.428186",
+    "user_feedback": null,
+    "error_details": null,
+    "output_length": 0,
+    "context_relevance": 0.0
+  },
+  {
+    "prompt_id": "prompt_analysis_1750229620_7991",
+    "task_type": "data_analysis",
+    "success": true,
+    "quality_score": 0.7,
+    "execution_time": 20.0,
+    "timestamp": "2025-06-18 09:53:40.428613",
+    "user_feedback": null,
+    "error_details": null,
+    "output_length": 0,
+    "context_relevance": 0.0
+  }
+]

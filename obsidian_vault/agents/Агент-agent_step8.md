@@ -1,14 +1,14 @@
 ---
-created: 2025-06-13T20:00:33.421009
-updated: 2025-06-13T20:00:33.421034
-tags: [agent, active, agent_step8, 07b3b4f4]
-created: 2025-06-13T20:00:33.419527
-updated: 2025-06-13T20:00:33.419544
+created: 2025-06-14T17:47:48.549063
+updated: 2025-06-14T17:47:48.549139
+tags: [agent, active, agent_step8, ce6ebdbc]
+created: 2025-06-14T17:47:48.546975
+updated: 2025-06-14T17:47:48.547018
 agent_id: agent_step8
-task_id: 07b3b4f4
+task_id: ce6ebdbc
 subtask_id: step8
 agent_type: Agent
-skills: ["testing", "validation", "quality_control"]
+skills: ["coding", "implementation", "problem_solving"]
 status: active
 folder: agents
 ---
@@ -22,14 +22,14 @@ folder: agents
 **Тип:** Agent
 
 ## Назначенная подзадача
-Исключить ошибки и исключения из вычисления факториала
+Разработать функцию обновления и удаления карточек и кнопок
 
 ## Требуемые навыки
-testing, validation, quality_control
+coding, implementation, problem_solving
 
 ## Статус
-- **Создан:** 2025-06-13T20:00:33.419521
-- **Задача:** 07b3b4f4
+- **Создан:** 2025-06-14T17:47:48.546955
+- **Задача:** ce6ebdbc
 - **Статус:** Активен
 
 ## Результаты работы
@@ -37,4 +37,4 @@ testing, validation, quality_control
 
 ## Связанные заметки
 
-[[Декомпозиция-задачи-07b3b4f4|Декомпозиция задачи 07b3b4f4]]
+[[Декомпозиция-задачи-ce6ebdbc|Декомпозиция задачи ce6ebdbc]]

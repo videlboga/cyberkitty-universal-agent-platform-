@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from loguru import logger
 
 from ..llm import get_llm_provider
-from agents.smart_validator import ValidationResult
+from kittycore.agents.smart_validator import ValidationResult
 from kittycore.core.agent_learning_system import learning_system
 
 

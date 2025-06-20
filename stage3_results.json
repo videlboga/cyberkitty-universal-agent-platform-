@@ -1,0 +1,49 @@
+{
+  "stage": 3,
+  "description": "Web tools parameter fixes",
+  "results": [
+    {
+      "tool": "web_search_limit",
+      "success": false,
+      "size_bytes": 0,
+      "execution_time": 0.0,
+      "honest": false,
+      "error": "EnhancedWebSearchTool.execute() got an unexpected keyword argument 'action'",
+      "web_diagnostic": "PARAMETER_ERROR: Неправильные параметры для web_search_limit"
+    },
+    {
+      "tool": "web_search_max_results",
+      "success": false,
+      "size_bytes": 91,
+      "execution_time": 0.0,
+      "honest": false,
+      "result_sample": "EXPECTED_ERROR: EnhancedWebSearchTool.execute() got an unexpected keyword argument 'action'",
+      "web_data": true
+    },
+    {
+      "tool": "web_scraping_real",
+      "success": false,
+      "size_bytes": 68,
+      "execution_time": 0.0,
+      "honest": false,
+      "result_sample": "<coroutine object EnhancedWebScrapingTool.execute at 0x7459004acf40>",
+      "web_data": true
+    },
+    {
+      "tool": "web_scraping_info",
+      "success": false,
+      "size_bytes": 68,
+      "execution_time": 0.0,
+      "honest": false,
+      "result_sample": "<coroutine object EnhancedWebScrapingTool.execute at 0x7459004ace00>",
+      "web_data": true
+    }
+  ],
+  "memory_records": [],
+  "summary": {
+    "total_tests": 4,
+    "honest_tests": 0,
+    "success_rate": 0.0,
+    "web_tools_tested": 2
+  }
+}

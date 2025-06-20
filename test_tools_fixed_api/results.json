@@ -1,0 +1,52 @@
+{
+  "summary": {
+    "total_tests": 7,
+    "successful_tests": 3,
+    "success_rate": 42.857142857142854
+  },
+  "results": [
+    {
+      "tool": "api_request_tool",
+      "success": true,
+      "notes": "✅ Время: 1.0с, размер: 1223 байт",
+      "execution_time": 0.9573395252227783
+    },
+    {
+      "tool": "super_system_tool",
+      "success": true,
+      "notes": "✅ Время: 0.0с, размер: 553 байт",
+      "execution_time": 0.0010633468627929688
+    },
+    {
+      "tool": "computer_use_tool",
+      "success": false,
+      "notes": "❌ Исключение: 'ComputerUseTool' object has no attribute 'take_screenshot'",
+      "execution_time": 6.127357482910156e-05
+    },
+    {
+      "tool": "database_tool",
+      "success": false,
+      "notes": "❌ Исключение: 'coroutine' object has no attribute 'success'",
+      "execution_time": 1.811981201171875e-05
+    },
+    {
+      "tool": "email_tool",
+      "success": true,
+      "notes": "✅ Время: 0.0с, размер: 190 байт",
+      "execution_time": 3.409385681152344e-05
+    },
+    {
+      "tool": "telegram_tool",
+      "success": false,
+      "notes": "❌ Ошибка: Pyrogram не установлен. Установите: pip install pyrogram",
+      "execution_time": 4.553794860839844e-05
+    },
+    {
+      "tool": "ai_integration_tool",
+      "success": false,
+      "notes": "❌ Исключение: object ToolResult can't be used in 'await' expression",
+      "execution_time": 0.22932648658752441
+    }
+  ],
+  "missing_keys": []
+}

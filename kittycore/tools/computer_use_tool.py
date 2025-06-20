@@ -129,9 +129,10 @@ class ComputerUseTool(BaseTool):
     """
     
     def __init__(self):
-        super().__init__()
-        self.name = "computer_use"
-        self.description = "Инструмент для автоматизации GUI - скриншоты, клики, ввод текста"
+        super().__init__(
+            name="computer_use",
+            description="Инструмент для автоматизации GUI - скриншоты, клики, ввод текста"
+        )
         
         # Инициализация среды
         self.env_info = EnvironmentDetector.detect()
@@ -362,7 +363,12 @@ class ComputerUseTool(BaseTool):
                 
             # Информационные действия
             elif action == "get_screen_info":
-                return await self._get_screen_info()
+                screen_info = self._get_screen_info()
+                return {
+                    "success": True,
+                    "screen_info": asdict(screen_info),
+                    "backend": self.backend
+                }
             elif action == "get_mouse_position":
                 return await self._get_mouse_position()
             elif action == "get_active_window":
@@ -1949,22 +1955,11 @@ class ComputerUseTool(BaseTool):
             print(f"⚠️ Не удалось определить размер экрана: {e}")
             return ScreenInfo(width=1920, height=1080)
 
-    @property
-    def name(self) -> str:
-        return "computer_use"
+    def get_schema(self) -> Dict[str, Any]:
+        """JSON Schema для ComputerUseTool - переименован из json_schema"""
+        return self.json_schema
 
-    @property
-    def description(self) -> str:
-        return """
-        Универсальный инструмент автоматизации GUI для взаимодействия с рабочим столом.
-        
-        Поддерживает:
-        - Скриншоты экрана и поиск элементов
-        - Клики мыши (левый, правый, двойной)
-        - Движения и перетаскивание мыши
-        - Ввод текста и нажатие клавиш
-        - Прокрутка и жесты
-        - Работа с окнами (i3wm интеграция)
-        
-        Оптимизирован для Manjaro Linux i3 X11.
-        """ 
+
+def create_computer_use_tool() -> ComputerUseTool:
+    """Фабричная функция для создания ComputerUseTool"""
+    return ComputerUseTool() 

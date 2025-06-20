@@ -1,0 +1,299 @@
+{
+  "active_agents": {
+    "code_1750233586_1436": {
+      "agent_id": "code_1750233586_1436",
+      "generation": 0,
+      "parent_ids": [],
+      "birth_time": "2025-06-18 10:59:46.208251",
+      "genes": {
+        "agent_type": "code",
+        "specialization": [
+          "programming"
+        ],
+        "success_rate": 0.7008836425032051,
+        "speed_factor": 0.9111342869067159,
+        "quality_factor": 1.0255887324100852,
+        "preferred_tools": [
+          "general_tools",
+          "code_generator",
+          "file_manager"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.7645190901007162,
+          "code_generator": 0.9594473727928181,
+          "file_manager": 0.7893901802075646
+        },
+        "learning_rate": 0.11180130949174667,
+        "mutation_resistance": 0.8154926869317876,
+        "collaboration_skill": 0.5550229276708049,
+        "leadership_tendency": 0.4955797165225326
+      },
+      "mutations_count": 0,
+      "crossover_count": 0,
+      "tasks_completed": 2,
+      "total_success_rate": 1.0,
+      "life_span": null
+    },
+    "web_1750233586_1487": {
+      "agent_id": "web_1750233586_1487",
+      "generation": 0,
+      "parent_ids": [],
+      "birth_time": "2025-06-18 10:59:46.209855",
+      "genes": {
+        "agent_type": "web",
+        "specialization": [
+          "web_development"
+        ],
+        "success_rate": 0.5888102337829618,
+        "speed_factor": 1.1521041149704554,
+        "quality_factor": 0.9051783065285621,
+        "preferred_tools": [
+          "general_tools",
+          "web_search",
+          "web_scraping"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.704660654194956,
+          "web_search": 1.012309697059549,
+          "web_scraping": 1.066414780080806
+        },
+        "learning_rate": 0.166999793617585,
+        "mutation_resistance": 0.8491784103772586,
+        "collaboration_skill": 0.5757857526733836,
+        "leadership_tendency": 0.4500972241200161
+      },
+      "mutations_count": 0,
+      "crossover_count": 0,
+      "tasks_completed": 3,
+      "total_success_rate": 0.6666666666666666,
+      "life_span": null
+    },
+    "general_1750233586_6901": {
+      "agent_id": "general_1750233586_6901",
+      "generation": 0,
+      "parent_ids": [],
+      "birth_time": "2025-06-18 10:59:46.210463",
+      "genes": {
+        "agent_type": "general",
+        "specialization": [
+          "general"
+        ],
+        "success_rate": 0.6848804613735088,
+        "speed_factor": 1.1051764871928214,
+        "quality_factor": 1.0448316221241782,
+        "preferred_tools": [
+          "general_tools"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.7367071542042044
+        },
+        "learning_rate": 0.15523835593511218,
+        "mutation_resistance": 0.726490646127426,
+        "collaboration_skill": 0.6961218531786397,
+        "leadership_tendency": 0.464775227529752
+      },
+      "mutations_count": 0,
+      "crossover_count": 0,
+      "tasks_completed": 0,
+      "total_success_rate": 0.0,
+      "life_span": null
+    },
+    "general_1750233586_3805": {
+      "agent_id": "general_1750233586_3805",
+      "generation": 0,
+      "parent_ids": [],
+      "birth_time": "2025-06-18 10:59:46.210581",
+      "genes": {
+        "agent_type": "general",
+        "specialization": [
+          "general"
+        ],
+        "success_rate": 0.3897581138234123,
+        "speed_factor": 1.1707024100145953,
+        "quality_factor": 1.028199186596514,
+        "preferred_tools": [
+          "general_tools"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.944895398477941
+        },
+        "learning_rate": 0.08228111902036128,
+        "mutation_resistance": 0.8335264104175562,
+        "collaboration_skill": 0.5326356847202202,
+        "leadership_tendency": 0.39705292081842136
+      },
+      "mutations_count": 0,
+      "crossover_count": 0,
+      "tasks_completed": 0,
+      "total_success_rate": 0.0,
+      "life_span": null
+    },
+    "mut_code_1750233586_1436_1750233586": {
+      "agent_id": "mut_code_1750233586_1436_1750233586",
+      "generation": 1,
+      "parent_ids": [
+        "code_1750233586_1436"
+      ],
+      "birth_time": "2025-06-18 10:59:46.225841",
+      "genes": {
+        "agent_type": "code",
+        "specialization": [
+          "programming"
+        ],
+        "success_rate": 0.6952935770286178,
+        "speed_factor": 0.9111342869067159,
+        "quality_factor": 1.0255887324100852,
+        "preferred_tools": [
+          "general_tools",
+          "code_generator",
+          "file_manager"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.7645190901007162,
+          "code_generator": 0.9594473727928181,
+          "file_manager": 0.7893901802075646
+        },
+        "learning_rate": 0.11180130949174667,
+        "mutation_resistance": 0.8154926869317876,
+        "collaboration_skill": 0.5797002130090614,
+        "leadership_tendency": 0.4955797165225326
+      },
+      "mutations_count": 1,
+      "crossover_count": 0,
+      "tasks_completed": 1,
+      "total_success_rate": 0.0,
+      "life_span": null
+    },
+    "analysis_1750233586_3823": {
+      "agent_id": "analysis_1750233586_3823",
+      "generation": 0,
+      "parent_ids": [],
+      "birth_time": "2025-06-18 10:59:46.212628",
+      "genes": {
+        "agent_type": "analysis",
+        "specialization": [
+          "data_analysis"
+        ],
+        "success_rate": 0.33376984199300125,
+        "speed_factor": 0.9555338688800038,
+        "quality_factor": 0.921430035016561,
+        "preferred_tools": [
+          "general_tools",
+          "data_analysis",
+          "visualization"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.701478117645443
+        },
+        "learning_rate": 0.1710946822483751,
+        "mutation_resistance": 0.7749717013341905,
+        "collaboration_skill": 0.5840011442313838,
+        "leadership_tendency": 0.45788507922229044
+      },
+      "mutations_count": 0,
+      "crossover_count": 0,
+      "tasks_completed": 2,
+      "total_success_rate": 0.5,
+      "life_span": null
+    },
+    "general_1750233586_7876": {
+      "agent_id": "general_1750233586_7876",
+      "generation": 0,
+      "parent_ids": [],
+      "birth_time": "2025-06-18 10:59:46.210333",
+      "genes": {
+        "agent_type": "general",
+        "specialization": [
+          "general"
+        ],
+        "success_rate": 0.33072144009663446,
+        "speed_factor": 0.8411526543070661,
+        "quality_factor": 1.0326883782488319,
+        "preferred_tools": [
+          "general_tools"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.91010074661029
+        },
+        "learning_rate": 0.15570098212423672,
+        "mutation_resistance": 0.7398134166710331,
+        "collaboration_skill": 0.7398292119449956,
+        "leadership_tendency": 0.34406333269242106
+      },
+      "mutations_count": 0,
+      "crossover_count": 0,
+      "tasks_completed": 0,
+      "total_success_rate": 0.0,
+      "life_span": null
+    }
+  },
+  "retired_agents": {
+    "analysis_1750233586_3823": {
+      "agent_id": "analysis_1750233586_3823",
+      "generation": 0,
+      "parent_ids": [],
+      "birth_time": "2025-06-18 10:59:46.212628",
+      "genes": {
+        "agent_type": "analysis",
+        "specialization": [
+          "data_analysis"
+        ],
+        "success_rate": 0.33376984199300125,
+        "speed_factor": 0.9555338688800038,
+        "quality_factor": 0.921430035016561,
+        "preferred_tools": [
+          "general_tools",
+          "data_analysis",
+          "visualization"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.701478117645443
+        },
+        "learning_rate": 0.1710946822483751,
+        "mutation_resistance": 0.7749717013341905,
+        "collaboration_skill": 0.5840011442313838,
+        "leadership_tendency": 0.45788507922229044
+      },
+      "mutations_count": 0,
+      "crossover_count": 0,
+      "tasks_completed": 2,
+      "total_success_rate": 0.5,
+      "life_span": null
+    },
+    "general_1750233586_7876": {
+      "agent_id": "general_1750233586_7876",
+      "generation": 0,
+      "parent_ids": [],
+      "birth_time": "2025-06-18 10:59:46.210333",
+      "genes": {
+        "agent_type": "general",
+        "specialization": [
+          "general"
+        ],
+        "success_rate": 0.33072144009663446,
+        "speed_factor": 0.8411526543070661,
+        "quality_factor": 1.0326883782488319,
+        "preferred_tools": [
+          "general_tools"
+        ],
+        "tool_efficiency": {
+          "general_tools": 0.91010074661029
+        },
+        "learning_rate": 0.15570098212423672,
+        "mutation_resistance": 0.7398134166710331,
+        "collaboration_skill": 0.7398292119449956,
+        "leadership_tendency": 0.34406333269242106
+      },
+      "mutations_count": 0,
+      "crossover_count": 0,
+      "tasks_completed": 0,
+      "total_success_rate": 0.0,
+      "life_span": null
+    }
+  },
+  "settings": {
+    "max_population": 20,
+    "min_population": 5,
+    "retirement_age_days": 30
+  }
+}

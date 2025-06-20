@@ -1,0 +1,94 @@
+[
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 10:55:54.198035",
+    "agent_id": "code_1750233354_7283",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": null,
+    "fitness_before": 0.0,
+    "fitness_after": 0.5,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 10:55:54.300118",
+    "agent_id": "web_1750233354_5450",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": null,
+    "fitness_before": 0.0,
+    "fitness_after": 0.5,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 10:55:54.300576",
+    "agent_id": "general_1750233354_1911",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": "population_minimum",
+    "fitness_before": 0.0,
+    "fitness_after": 0.5,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 10:55:54.300783",
+    "agent_id": "general_1750233354_1520",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": "population_minimum",
+    "fitness_before": 0.0,
+    "fitness_after": 0.5,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 10:55:54.300937",
+    "agent_id": "general_1750233354_7944",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": "population_minimum",
+    "fitness_before": 0.0,
+    "fitness_after": 0.5,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 10:55:54.403058",
+    "agent_id": "analysis_1750233354_1242",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": null,
+    "fitness_before": 0.0,
+    "fitness_after": 0.5,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 10:55:54.505958",
+    "agent_id": "code_1750233354_7283",
+    "parent_ids": [
+      "code_1750233354_7283"
+    ],
+    "mutation_details": null,
+    "selection_reason": null,
+    "fitness_before": 0.0,
+    "fitness_after": 0.43073211301871306,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 10:55:54.610108",
+    "agent_id": "web_1750233354_5450",
+    "parent_ids": [
+      "web_1750233354_5450"
+    ],
+    "mutation_details": null,
+    "selection_reason": null,
+    "fitness_before": 0.0,
+    "fitness_after": 0.469550803893112,
+    "success_improvement": 0.0
+  }
+]

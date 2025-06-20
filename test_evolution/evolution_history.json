@@ -1,0 +1,114 @@
+[
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 01:12:56.292632",
+    "agent_id": "code_1750198376_8097",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": null,
+    "fitness_before": 0.0,
+    "fitness_after": 0.5,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 01:12:56.292700",
+    "agent_id": "analysis_1750198376_6820",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": null,
+    "fitness_before": 0.0,
+    "fitness_after": 0.5,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 01:12:56.292775",
+    "agent_id": "general_1750198376_2558",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": "population_minimum",
+    "fitness_before": 0.0,
+    "fitness_after": 0.5,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 01:12:56.292847",
+    "agent_id": "general_1750198376_6550",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": "population_minimum",
+    "fitness_before": 0.0,
+    "fitness_after": 0.5,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 01:12:56.292881",
+    "agent_id": "general_1750198376_3800",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": "population_minimum",
+    "fitness_before": 0.0,
+    "fitness_after": 0.5,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 01:12:56.292970",
+    "agent_id": "mut_code_1750198376_8097_1750198376",
+    "parent_ids": [
+      "code_1750198376_8097"
+    ],
+    "mutation_details": null,
+    "selection_reason": null,
+    "fitness_before": 0.0,
+    "fitness_after": 0.5348099010785554,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "learning",
+    "timestamp": "2025-06-18 01:12:56.293023",
+    "agent_id": "code_1750198376_8097",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": null,
+    "fitness_before": 0.0,
+    "fitness_after": 1.0,
+    "success_improvement": 1.0
+  },
+  {
+    "event_type": "learning",
+    "timestamp": "2025-06-18 01:12:56.296138",
+    "agent_id": "mut_code_1750198376_8097_1750198376",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": null,
+    "fitness_before": 0.0,
+    "fitness_after": 1.0,
+    "success_improvement": 1.0
+  },
+  {
+    "event_type": "replacement",
+    "timestamp": "2025-06-18 01:12:56.296910",
+    "agent_id": "analysis_1750198376_6820",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": "replaced_analysis_1750198376_6820",
+    "fitness_before": 0.0,
+    "fitness_after": 0.0,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "replacement",
+    "timestamp": "2025-06-18 01:12:56.297006",
+    "agent_id": "cross_mut_code_code_175_1750198376",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": "replaced_analysis_1750198376_6820",
+    "fitness_before": 0.0,
+    "fitness_after": 0.0,
+    "success_improvement": 0.0
+  }
+]

@@ -1,0 +1,14 @@
+{
+  "summary": {
+    "total_tests": 14,
+    "successful_tests": 1,
+    "success_rate": 7.142857142857142
+  },
+  "results": [
+    {
+      "tool": "enhanced_web_scraping",
+      "success": false,
+      "execution_time": 8.344650268554688e-06,
+      "notes": "❌ Ошибка: Неизвестная ошибка",
+      "test_config": {
+        "tool_class": 

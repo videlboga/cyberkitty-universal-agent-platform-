@@ -1,0 +1,189 @@
+[
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 13:10:03.787161",
+    "agent_id": "cross_web_1750_cross_we_1750241403",
+    "parent_ids": [
+      "web_1750239644_5531",
+      "cross_web_1750_cross_we_1750240285"
+    ],
+    "mutation_details": null,
+    "selection_reason": null,
+    "fitness_before": 0.0,
+    "fitness_after": 0.5999166770762716,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "retirement",
+    "timestamp": "2025-06-18 13:10:03.787431",
+    "agent_id": "general_1750239644_4469",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": "population_limit",
+    "fitness_before": 0.0,
+    "fitness_after": 0.0,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 13:10:41.929841",
+    "agent_id": "system_1750240284_6971",
+    "parent_ids": [
+      "system_1750240284_6971"
+    ],
+    "mutation_details": null,
+    "selection_reason": null,
+    "fitness_before": 0.0,
+    "fitness_after": 0.6147856344730329,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 13:10:48.834065",
+    "agent_id": "cross_web_1750_cross_we_1750241448",
+    "parent_ids": [
+      "web_1750239644_5531",
+      "cross_web_1750_cross_we_1750241403"
+    ],
+    "mutation_details": null,
+    "selection_reason": null,
+    "fitness_before": 0.0,
+    "fitness_after": 0.5999188583152992,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "retirement",
+    "timestamp": "2025-06-18 13:10:48.834417",
+    "agent_id": "security_1750240595_4692",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": "population_limit",
+    "fitness_before": 0.0,
+    "fitness_after": 0.0,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 13:11:26.885235",
+    "agent_id": "mut_code_1750239645_7163_1750241486",
+    "parent_ids": [
+      "code_1750239645_7163"
+    ],
+    "mutation_details": null,
+    "selection_reason": null,
+    "fitness_before": 0.0,
+    "fitness_after": 0.5323743105356259,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "retirement",
+    "timestamp": "2025-06-18 13:11:26.885396",
+    "agent_id": "cross_mut_anal_analysis_1750239943",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": "population_limit",
+    "fitness_before": 0.0,
+    "fitness_after": 0.0,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 13:12:04.997183",
+    "agent_id": "cross_code_175_mut_code_1750241524",
+    "parent_ids": [
+      "code_1750239645_7163",
+      "mut_code_1750239645_7163_1750241486"
+    ],
+    "mutation_details": null,
+    "selection_reason": null,
+    "fitness_before": 0.0,
+    "fitness_after": 0.5661394889883453,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "retirement",
+    "timestamp": "2025-06-18 13:12:04.997416",
+    "agent_id": "cross_mut_anal_cross_mu_1750239943",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": "population_limit",
+    "fitness_before": 0.0,
+    "fitness_after": 0.0,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 13:12:43.035690",
+    "agent_id": "cross_cross_mu_cross_cr_1750241563",
+    "parent_ids": [
+      "cross_mut_anal_cross_mu_1750240540",
+      "cross_cross_mu_cross_cr_1750240671"
+    ],
+    "mutation_details": null,
+    "selection_reason": null,
+    "fitness_before": 0.0,
+    "fitness_after": 0.44745461256693425,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "retirement",
+    "timestamp": "2025-06-18 13:12:43.036066",
+    "agent_id": "cross_mut_anal_cross_mu_1750240283",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": "population_limit",
+    "fitness_before": 0.0,
+    "fitness_after": 0.0,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 13:12:45.938385",
+    "agent_id": "cross_cross_mu_cross_cr_1750241565",
+    "parent_ids": [
+      "cross_mut_anal_cross_mu_1750240540",
+      "cross_cross_mu_cross_cr_1750241563"
+    ],
+    "mutation_details": null,
+    "selection_reason": null,
+    "fitness_before": 0.0,
+    "fitness_after": 0.44745770314889166,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "retirement",
+    "timestamp": "2025-06-18 13:12:45.938615",
+    "agent_id": "cross_cross_mu_cross_cr_1750241565",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": "population_limit",
+    "fitness_before": 0.0,
+    "fitness_after": 0.0,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "birth",
+    "timestamp": "2025-06-18 13:13:23.848661",
+    "agent_id": "cross_web_1750_cross_we_1750241603",
+    "parent_ids": [
+      "web_1750239644_5531",
+      "cross_web_1750_cross_we_1750241448"
+    ],
+    "mutation_details": null,
+    "selection_reason": null,
+    "fitness_before": 0.0,
+    "fitness_after": 0.5999197018597141,
+    "success_improvement": 0.0
+  },
+  {
+    "event_type": "retirement",
+    "timestamp": "2025-06-18 13:13:23.849242",
+    "agent_id": "mut_analysis_1750239644_7442_1750239941",
+    "parent_ids": null,
+    "mutation_details": null,
+    "selection_reason": "population_limit",
+    "fitness_before": 0.0,
+    "fitness_after": 0.0,
+    "success_improvement": 0.0
+  }
+]

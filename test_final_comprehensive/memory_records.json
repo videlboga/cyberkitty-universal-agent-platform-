@@ -1,0 +1,41 @@
+[
+  {
+    "tool": "api_request_tool",
+    "working_action": "request",
+    "correct_params": {
+      "url": "string",
+      "method": "GET|POST|PUT|DELETE"
+    },
+    "notes": "✅ Время: 8.7с, размер: 1223 байт",
+    "success": true
+  },
+  {
+    "tool": "super_system_tool",
+    "working_action": "get_system_info",
+    "correct_params": {
+      "action": "get_system_info|get_processes|get_resource_usage"
+    },
+    "notes": "✅ Время: 0.0с, размер: 546 байт",
+    "success": true
+  },
+  {
+    "tool": "email_tool",
+    "working_action": "send_email",
+    "correct_params": {
+      "to": "string",
+      "subject": "string",
+      "body": "string"
+    },
+    "notes": "✅ Время: 0.0с, размер: 190 байт",
+    "success": true
+  },
+  {
+    "tool": "computer_use_tool",
+    "working_action": "screenshot",
+    "correct_params": {
+      "action": "screenshot|click|type_text|key_press"
+    },
+    "notes": "✅ Время: 1.2с, размер: 150 байт",
+    "success": true
+  }
+]

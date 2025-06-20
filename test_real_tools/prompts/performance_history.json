@@ -1,0 +1,98 @@
+[
+  {
+    "prompt_id": "prompt_web_1750239644_2338",
+    "task_type": "web",
+    "success": false,
+    "quality_score": 0.0,
+    "execution_time": 999.0,
+    "timestamp": "2025-06-18 13:10:41.428323",
+    "user_feedback": null,
+    "error_details": null,
+    "output_length": 0,
+    "context_relevance": 0.0
+  },
+  {
+    "prompt_id": "prompt_system_1750240284_5623",
+    "task_type": "system",
+    "success": false,
+    "quality_score": 0.0,
+    "execution_time": 6.394906759262085,
+    "timestamp": "2025-06-18 13:10:48.329538",
+    "user_feedback": null,
+    "error_details": null,
+    "output_length": 0,
+    "context_relevance": 0.0
+  },
+  {
+    "prompt_id": "prompt_web_1750239644_2338",
+    "task_type": "web",
+    "success": false,
+    "quality_score": 0.0,
+    "execution_time": 999.0,
+    "timestamp": "2025-06-18 13:11:26.383236",
+    "user_feedback": null,
+    "error_details": null,
+    "output_length": 0,
+    "context_relevance": 0.0
+  },
+  {
+    "prompt_id": "prompt_code_1750239645_9471",
+    "task_type": "code",
+    "success": false,
+    "quality_score": 0.0,
+    "execution_time": 999.0,
+    "timestamp": "2025-06-18 13:12:04.495251",
+    "user_feedback": null,
+    "error_details": null,
+    "output_length": 0,
+    "context_relevance": 0.0
+  },
+  {
+    "prompt_id": "prompt_code_1750239645_9471",
+    "task_type": "code",
+    "success": false,
+    "quality_score": 0.0,
+    "execution_time": 999.0,
+    "timestamp": "2025-06-18 13:12:42.533560",
+    "user_feedback": null,
+    "error_details": null,
+    "output_length": 0,
+    "context_relevance": 0.0
+  },
+  {
+    "prompt_id": "prompt_analysis_1750239644_2973",
+    "task_type": "documents",
+    "success": false,
+    "quality_score": 0.0,
+    "execution_time": 2.397237777709961,
+    "timestamp": "2025-06-18 13:12:45.435769",
+    "user_feedback": null,
+    "error_details": null,
+    "output_length": 0,
+    "context_relevance": 0.0
+  },
+  {
+    "prompt_id": "prompt_analysis_1750239644_2973",
+    "task_type": "data",
+    "success": false,
+    "quality_score": 0.0,
+    "execution_time": 999.0,
+    "timestamp": "2025-06-18 13:13:23.345925",
+    "user_feedback": null,
+    "error_details": null,
+    "output_length": 0,
+    "context_relevance": 0.0
+  },
+  {
+    "prompt_id": "prompt_web_1750239644_2338",
+    "task_type": "web",
+    "success": false,
+    "quality_score": 0.0,
+    "execution_time": 999.0,
+    "timestamp": "2025-06-18 13:14:01.373903",
+    "user_feedback": null,
+    "error_details": null,
+    "output_length": 0,
+    "context_relevance": 0.0
+  }
+]

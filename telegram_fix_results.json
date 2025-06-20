@@ -1,0 +1,16 @@
+{
+  "tool": "telegram_tool",
+  "pyrogram_available": false,
+  "tests": {
+    "health_check": true,
+    "send_message": true,
+    "get_me": true,
+    "schema": true
+  },
+  "summary": {
+    "total_tests": 4,
+    "passed_tests": 4,
+    "success_rate": 100.0
+  },
+  "timestamp": "2025-06-20 10:49:30"
+}

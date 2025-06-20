@@ -36,7 +36,7 @@ from .orchestrator import (
 )
 
 # Импорт SmartValidator и IterativeImprovement
-from agents.smart_validator import SmartValidator
+from kittycore.agents.smart_validator import SmartValidator
 from .iterative_improvement import IterativeImprovement
 
 class ObsidianTaskAnalyzer(TaskAnalyzer):

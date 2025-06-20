@@ -1,0 +1,91 @@
+{
+  "test_results": [
+    {
+      "tool_name": "media_tool",
+      "action": "get_info",
+      "execution_time": 0.00014400482177734375,
+      "original_success": true,
+      "honest_success": true,
+      "honesty_score": 1.0,
+      "honesty_status": "ЧЕСТНЫЙ",
+      "is_fake": false,
+      "fake_indicators_count": 0,
+      "fake_indicators": [],
+      "data_size": 347,
+      "original_data_preview": "ToolResult(success=True, data={'image_formats': ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.webp'], 'video_formats': ['.mp4', '.avi', '.mov', '.mkv', '.webm'], 'audio_formats': ['.mp3', '.wav..."
+    },
+    {
+      "tool_name": "super_system_tool",
+      "action": "run_command",
+      "execution_time": 0.0032470226287841797,
+      "original_success": true,
+      "honest_success": true,
+      "honesty_score": 1.0,
+      "honesty_status": "ЧЕСТНЫЙ",
+      "is_fake": false,
+      "fake_indicators_count": 0,
+      "fake_indicators": [],
+      "data_size": 259,
+      "original_data_preview": "ToolResult(success=True, data={'command': \"echo 'KittyCore Final Honest Test'\", 'return_code': 0, 'stdout': 'KittyCore Final Honest Test\\n', 'stderr': '', 'execution_time_seconds': 0.0, 'timeout': 30,..."
+    },
+    {
+      "tool_name": "api_request_manual",
+      "action": "get",
+      "execution_time": 0.8771979808807373,
+      "original_success": true,
+      "honest_success": true,
+      "honesty_score": 1.0,
+      "honesty_status": "ЧЕСТНЫЙ",
+      "is_fake": false,
+      "fake_indicators_count": 0,
+      "fake_indicators": [],
+      "data_size": 361,
+      "original_data_preview": "<__main__.Result object at 0x7de4c24f56a0>"
+    }
+  ],
+  "honest_tools": [
+    "super_system_tool",
+    "media_tool",
+    "api_request_manual"
+  ],
+  "dishonest_tools": [],
+  "suspicious_tools": [],
+  "memory_records": [
+    {
+      "tool": "media_tool",
+      "working_action": "get_info",
+      "correct_params": {
+        "action": "get_info"
+      },
+      "notes": "✅ ФИНАЛЬНЫЙ УСПЕХ: локальная обработка 347 байт",
+      "timestamp": 1750283822.2167313
+    },
+    {
+      "tool": "super_system_tool",
+      "working_action": "run_command",
+      "correct_params": {
+        "action": "run_command",
+        "command": "string"
+      },
+      "notes": "✅ ФИНАЛЬНЫЙ УСПЕХ: системная команда 259 байт",
+      "timestamp": 1750283822.2202315
+    },
+    {
+      "tool": "api_request_manual",
+      "working_action": "get",
+      "correct_params": {
+        "url": "string",
+        "method": "GET"
+      },
+      "notes": "✅ ФИНАЛЬНЫЙ УСПЕХ: HTTP запрос 361 байт",
+      "timestamp": 1750283823.0975554
+    }
+  ],
+  "honesty_threshold": 0.7,
+  "summary_stats": {
+    "total_tests": 3,
+    "honest_percentage": 100.0,
+    "average_honesty": 1.0
+  },
+  "generated_at": 1750283823.0977046
+}

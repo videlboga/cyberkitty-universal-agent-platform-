@@ -190,6 +190,10 @@ class WorkflowGraph:
             mermaid.append(f"    {edge.from_node} --> {edge.to_node}")
         
         return "\n".join(mermaid)
+    
+    def to_mermaid(self) -> str:
+        """Алиас для generate_mermaid для совместимости"""
+        return self.generate_mermaid()
 
 
 class GraphVisualizationEngine:
@@ -418,6 +422,10 @@ class GraphVisualizationEngine:
 
 class WorkflowPlanner:
     """Планировщик рабочих процессов"""
+    
+    def create_workflow_graph(self, subtasks: List[Dict], agents: Dict) -> WorkflowGraph:
+        """Создаёт граф рабочего процесса (алиас для совместимости)"""
+        return self.create_workflow_from_subtasks(subtasks, agents)
     
     def create_workflow_from_subtasks(self, subtasks: List[Dict], agents: Dict) -> WorkflowGraph:
         """Создаёт граф рабочего процесса из подзадач"""

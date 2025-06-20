@@ -113,9 +113,27 @@ class CodeExecutionTool(Tool):
         """Выполнить операцию с кодом"""
         try:
             if action == "execute_python":
-                return asyncio.run(self._execute_python(**kwargs))
+                # Проверяем есть ли уже запущенный event loop
+                try:
+                    loop = asyncio.get_running_loop()
+                    # Если да - создаём задачу
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(asyncio.run, self._execute_python(**kwargs))
+                        return future.result(timeout=kwargs.get("timeout", self.python_timeout) + 5)
+                except RuntimeError:
+                    # Нет запущенного loop - можем использовать asyncio.run
+                    return asyncio.run(self._execute_python(**kwargs))
             elif action == "execute_shell":
-                return asyncio.run(self._execute_shell(**kwargs))
+                # Аналогично для shell
+                try:
+                    loop = asyncio.get_running_loop()
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(asyncio.run, self._execute_shell(**kwargs))
+                        return future.result(timeout=kwargs.get("timeout", self.shell_timeout) + 5)
+                except RuntimeError:
+                    return asyncio.run(self._execute_shell(**kwargs))
             elif action == "validate_python":
                 return self._validate_python_code(**kwargs)
             elif action == "validate_shell":
@@ -184,7 +202,8 @@ class CodeExecutionTool(Tool):
                     "dict": dict, "tuple": tuple, "set": set, "abs": abs,
                     "min": min, "max": max, "sum": sum, "sorted": sorted,
                     "reversed": reversed, "enumerate": enumerate, "zip": zip,
-                    "round": round, "pow": pow, "divmod": divmod
+                    "round": round, "pow": pow, "divmod": divmod,
+                    "__import__": __import__  # Добавляем __import__ для импорта модулей
                 }
             }
             
@@ -192,7 +211,9 @@ class CodeExecutionTool(Tool):
             for lib in libraries:
                 if lib in self.allowed_libraries:
                     try:
-                        sandbox_globals[lib] = __import__(lib)
+                        # Используем __import__ напрямую для импорта в sandbox
+                        module = __import__(lib)
+                        sandbox_globals[lib] = module
                     except ImportError:
                         logger.warning(f"Библиотека {lib} недоступна")
             

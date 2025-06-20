@@ -71,9 +71,6 @@ class ImageGenerationTool(BaseTool):
     - И многие другие
     """
     
-    name = "image_generation"
-    description = "Генерация изображений через AI модели (FLUX, Imagen, Ideogram, etc.)"
-    
     # Топовые модели 2025 года
     MODELS = {
         # FLUX семейство - лучший баланс цены/качества
@@ -191,13 +188,20 @@ class ImageGenerationTool(BaseTool):
     }
     
     def __init__(self, replicate_api_token: Optional[str] = None):
-        super().__init__()
+        super().__init__(
+            name="image_generation",
+            description="Генерация изображений через AI модели (FLUX, Imagen, Ideogram, etc.)"
+        )
         self.api_token = replicate_api_token or os.getenv("REPLICATE_API_TOKEN")
         self.base_url = "https://api.replicate.com/v1"
         self.client = httpx.AsyncClient()
         
         if not self.api_token:
-            self.logger.warning("⚠️ REPLICATE_API_TOKEN не найден - будет использован демо режим")
+            print("⚠️ REPLICATE_API_TOKEN не найден - будет использован демо режим")
+    
+    def get_schema(self) -> Dict[str, Any]:
+        """Схема параметров ImageGenerationTool"""
+        return self.get_json_schema()
     
     async def execute(self, action: str, **kwargs) -> Dict[str, Any]:
         """Выполнение действия генерации изображений"""
@@ -224,7 +228,7 @@ class ImageGenerationTool(BaseTool):
                     ]
                 }
         except Exception as e:
-            self.logger.error(f"❌ Ошибка в ImageGenerationTool.{action}: {e}")
+            print(f"❌ Ошибка в ImageGenerationTool.{action}: {e}")
             return {"success": False, "error": str(e)}
     
     async def _generate_image(
@@ -295,7 +299,7 @@ class ImageGenerationTool(BaseTool):
             return result
             
         except Exception as e:
-            self.logger.error(f"❌ Ошибка генерации изображения: {e}")
+            print(f"❌ Ошибка генерации изображения: {e}")
             return {
                 "success": False,
                 "error": str(e),
@@ -531,10 +535,10 @@ class ImageGenerationTool(BaseTool):
                         continue
                 
                 saved_paths.append(str(file_path))
-                self.logger.info(f"💾 Изображение сохранено: {file_path}")
+                print(f"💾 Изображение сохранено: {file_path}")
                 
             except Exception as e:
-                self.logger.error(f"❌ Ошибка сохранения изображения {i}: {e}")
+                print(f"❌ Ошибка сохранения изображения {i}: {e}")
         
         return saved_paths
     
@@ -674,7 +678,7 @@ class ImageGenerationTool(BaseTool):
         total_time = 0
         
         for i, prompt in enumerate(prompts):
-            self.logger.info(f"🎨 Генерация {i+1}/{len(prompts)}: {prompt[:50]}...")
+            print(f"🎨 Генерация {i+1}/{len(prompts)}: {prompt[:50]}...")
             
             result = await self._generate_image(
                 prompt=prompt,

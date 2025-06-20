@@ -1,0 +1,38 @@
+{
+  "timestamp": 1750285788,
+  "total_time": 7.980436563491821,
+  "results": [
+    {
+      "tool_name": "enhanced_web_search",
+      "action": "search",
+      "success": false,
+      "execution_time": 7.289754152297974,
+      "error": "EnhancedWebSearchTool.execute() got an unexpected keyword argument 'max_results'",
+      "honesty": "❌ ОШИБКА"
+    },
+    {
+      "tool_name": "api_request",
+      "action": "get_request",
+      "success": true,
+      "execution_time": 0.6887273788452148,
+      "data_size": 307,
+      "status_code": 200,
+      "honesty": "✅ ЧЕСТНО"
+    },
+    {
+      "tool_name": "enhanced_web_scraping",
+      "action": "get_text",
+      "success": true,
+      "execution_time": 0.0013136863708496094,
+      "data_size": 0,
+      "honesty": "❌ ПОДОЗРИТЕЛЬНО"
+    }
+  ],
+  "honest_tools": [
+    "api_request"
+  ],
+  "dishonest_tools": [
+    "enhanced_web_scraping",
+    "enhanced_web_search"
+  ]
+}

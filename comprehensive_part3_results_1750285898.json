@@ -1,0 +1,45 @@
+{
+  "timestamp": 1750285898,
+  "total_time": 7.214718580245972,
+  "results": [
+    {
+      "tool_name": "code_execution",
+      "action": "python_execute",
+      "success": false,
+      "execution_time": 7.213528871536255,
+      "error": "No module named 'kittycore.tools.code_execution_tool'",
+      "honesty": "❌ ОШИБКА"
+    },
+    {
+      "tool_name": "security_tool",
+      "action": "get_info",
+      "success": true,
+      "execution_time": 0.00015473365783691406,
+      "data_size": 0,
+      "honesty": "❌ ПОДОЗРИТЕЛЬНО"
+    },
+    {
+      "tool_name": "email_tool",
+      "action": "get_info",
+      "success": false,
+      "execution_time": 3.981590270996094e-05,
+      "error": "No module named 'kittycore.tools.email_tool'",
+      "honesty": "❌ ОШИБКА"
+    },
+    {
+      "tool_name": "data_analysis",
+      "action": "analyze_data",
+      "success": false,
+      "execution_time": 0.0002872943878173828,
+      "error": "a coroutine was expected, got ToolResult(success=False, data={'available_actions': ['load_data', 'li",
+      "honesty": "❌ ОШИБКА"
+    }
+  ],
+  "honest_tools": [],
+  "dishonest_tools": [
+    "email_tool",
+    "code_execution",
+    "security_tool",
+    "data_analysis"
+  ]
+}

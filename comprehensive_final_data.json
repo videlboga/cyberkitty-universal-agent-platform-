@@ -1,0 +1,122 @@
+{
+  "part1": {
+    "timestamp": 1750285697,
+    "total_time": 7.432991027832031,
+    "results": [
+      {
+        "tool_name": "media_tool",
+        "action": "get_info",
+        "success": true,
+        "execution_time": 7.427351951599121,
+        "data_size": 347,
+        "honesty": "✅ ЧЕСТНО"
+      },
+      {
+        "tool_name": "super_system_tool",
+        "action": "run_command",
+        "success": true,
+        "execution_time": 0.003312826156616211,
+        "data_size": 213,
+        "honesty": "✅ ЧЕСТНО"
+      },
+      {
+        "tool_name": "network_tool",
+        "action": "get_info",
+        "success": true,
+        "execution_time": 0.0006346702575683594,
+        "data_size": 0,
+        "honesty": "❌ ПОДОЗРИТЕЛЬНО"
+      }
+    ],
+    "honest_tools": [
+      "media_tool",
+      "super_system_tool"
+    ],
+    "dishonest_tools": [
+      "network_tool"
+    ]
+  },
+  "part2": {
+    "timestamp": 1750285788,
+    "total_time": 7.980436563491821,
+    "results": [
+      {
+        "tool_name": "enhanced_web_search",
+        "action": "search",
+        "success": false,
+        "execution_time": 7.289754152297974,
+        "error": "EnhancedWebSearchTool.execute() got an unexpected keyword argument 'max_results'",
+        "honesty": "❌ ОШИБКА"
+      },
+      {
+        "tool_name": "api_request",
+        "action": "get_request",
+        "success": true,
+        "execution_time": 0.6887273788452148,
+        "data_size": 307,
+        "status_code": 200,
+        "honesty": "✅ ЧЕСТНО"
+      },
+      {
+        "tool_name": "enhanced_web_scraping",
+        "action": "get_text",
+        "success": true,
+        "execution_time": 0.0013136863708496094,
+        "data_size": 0,
+        "honesty": "❌ ПОДОЗРИТЕЛЬНО"
+      }
+    ],
+    "honest_tools": [
+      "api_request"
+    ],
+    "dishonest_tools": [
+      "enhanced_web_scraping",
+      "enhanced_web_search"
+    ]
+  },
+  "part3": {
+    "timestamp": 1750285898,
+    "total_time": 7.214718580245972,
+    "results": [
+      {
+        "tool_name": "code_execution",
+        "action": "python_execute",
+        "success": false,
+        "execution_time": 7.213528871536255,
+        "error": "No module named 'kittycore.tools.code_execution_tool'",
+        "honesty": "❌ ОШИБКА"
+      },
+      {
+        "tool_name": "security_tool",
+        "action": "get_info",
+        "success": true,
+        "execution_time": 0.00015473365783691406,
+        "data_size": 0,
+        "honesty": "❌ ПОДОЗРИТЕЛЬНО"
+      },
+      {
+        "tool_name": "email_tool",
+        "action": "get_info",
+        "success": false,
+        "execution_time": 3.981590270996094e-05,
+        "error": "No module named 'kittycore.tools.email_tool'",
+        "honesty": "❌ ОШИБКА"
+      },
+      {
+        "tool_name": "data_analysis",
+        "action": "analyze_data",
+        "success": false,
+        "execution_time": 0.0002872943878173828,
+        "error": "a coroutine was expected, got ToolResult(success=False, data={'available_actions': ['load_data', 'li",
+        "honesty": "❌ ОШИБКА"
+      }
+    ],
+    "honest_tools": [],
+    "dishonest_tools": [
+      "email_tool",
+      "code_execution",
+      "security_tool",
+      "data_analysis"
+    ]
+  }
+}

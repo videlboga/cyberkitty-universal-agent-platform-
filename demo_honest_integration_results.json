@@ -1,0 +1,88 @@
+{
+  "test_results": [
+    {
+      "tool_name": "media_tool",
+      "action": "analyze_file",
+      "execution_time": 2.4318695068359375e-05,
+      "original_success": true,
+      "honest_success": true,
+      "honesty_score": 1.0,
+      "honesty_status": "ЧЕСТНЫЙ",
+      "is_fake": false,
+      "fake_indicators_count": 0,
+      "fake_indicators": [],
+      "data_size": 33,
+      "original_data_preview": "<__main__.Result object at 0x7ee050f58c20>"
+    },
+    {
+      "tool_name": "email_tool",
+      "action": "send_email",
+      "execution_time": 1.7404556274414062e-05,
+      "original_success": true,
+      "honest_success": false,
+      "honesty_score": 0.0,
+      "honesty_status": "НЕЧЕСТНЫЙ",
+      "is_fake": true,
+      "fake_indicators_count": 4,
+      "fake_indicators": [
+        {
+          "type": "missing_key",
+          "severity": "critical",
+          "description": "Успех без обязательного API ключа: SMTP_SERVER",
+          "confidence": 1.0
+        },
+        {
+          "type": "missing_key",
+          "severity": "critical",
+          "description": "Успех без обязательного API ключа: SMTP_USERNAME",
+          "confidence": 1.0
+        },
+        {
+          "type": "missing_key",
+          "severity": "critical",
+          "description": "Успех без обязательного API ключа: SMTP_PASSWORD",
+          "confidence": 1.0
+        },
+        {
+          "type": "no_side_effect",
+          "severity": "critical",
+          "description": "Email отправлен без побочных эффектов",
+          "confidence": 0.95
+        }
+      ],
+      "data_size": 25,
+      "original_data_preview": "<__main__.Result object at 0x7ee050f58c20>"
+    },
+    {
+      "tool_name": "broken_tool",
+      "action": "test_action",
+      "execution_time": 8.106231689453125e-06,
+      "original_success": false,
+      "honest_success": false,
+      "honesty_score": 0.0,
+      "honesty_status": "ОШИБКА",
+      "is_fake": true,
+      "fake_indicators_count": 0,
+      "fake_indicators": [],
+      "data_size": 0,
+      "error": "API key missing",
+      "original_data_preview": "Ошибка: API key missing"
+    }
+  ],
+  "honest_tools": [
+    "media_tool"
+  ],
+  "dishonest_tools": [
+    "broken_tool",
+    "email_tool"
+  ],
+  "suspicious_tools": [],
+  "memory_records": [],
+  "honesty_threshold": 0.7,
+  "summary_stats": {
+    "total_tests": 3,
+    "honest_percentage": 33.33333333333333,
+    "average_honesty": 0.3333333333333333
+  },
+  "generated_at": 1750279885.5429692
+}

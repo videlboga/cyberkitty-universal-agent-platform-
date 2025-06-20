@@ -1,0 +1,39 @@
+{
+  "timestamp": "2025-06-16T21:38:34.476238",
+  "test_summary": {
+    "total_tasks": 3,
+    "successful_tasks": 0,
+    "avg_completeness": 0.0,
+    "total_memory_growth": 0
+  },
+  "individual_results": [
+    {
+      "task_id": "task_1_baseline",
+      "success": false,
+      "error": "unexpected indent (intellectual_agent.py, line 862)",
+      "memory_before": 0,
+      "memory_after": 0,
+      "memory_growth": 0
+    },
+    {
+      "task_id": "task_2_analysis",
+      "success": false,
+      "error": "unexpected indent (intellectual_agent.py, line 862)",
+      "memory_before": 0,
+      "memory_after": 0,
+      "memory_growth": 0
+    },
+    {
+      "task_id": "task_3_bitrix_repeat",
+      "success": false,
+      "error": "unexpected indent (intellectual_agent.py, line 862)",
+      "memory_before": 0,
+      "memory_after": 0,
+      "memory_growth": 0
+    }
+  ],
+  "amem_status": {
+    "available": true,
+    "type": "KittyCoreMemorySystem"
+  }
+}

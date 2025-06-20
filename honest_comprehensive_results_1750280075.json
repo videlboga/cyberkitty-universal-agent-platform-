@@ -1,0 +1,123 @@
+{
+  "test_results": [
+    {
+      "tool_name": "enhanced_web_search",
+      "action": "search",
+      "execution_time": 5.9604644775390625e-05,
+      "original_success": false,
+      "honest_success": false,
+      "honesty_score": 0.0,
+      "honesty_status": "ОШИБКА",
+      "is_fake": true,
+      "fake_indicators_count": 0,
+      "fake_indicators": [],
+      "data_size": 0,
+      "error": "asyncio.run() cannot be called from a running event loop",
+      "original_data_preview": "Ошибка: asyncio.run() cannot be called from a running event loop"
+    },
+    {
+      "tool_name": "media_tool",
+      "action": "get_info",
+      "execution_time": 0.00010395050048828125,
+      "original_success": true,
+      "honest_success": true,
+      "honesty_score": 1.0,
+      "honesty_status": "ЧЕСТНЫЙ",
+      "is_fake": false,
+      "fake_indicators_count": 0,
+      "fake_indicators": [],
+      "data_size": 347,
+      "original_data_preview": "ToolResult(success=True, data={'image_formats': ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.webp'], 'video_formats': ['.mp4', '.avi', '.mov', '.mkv', '.webm'], 'audio_formats': ['.mp3', '.wav..."
+    },
+    {
+      "tool_name": "network_tool",
+      "action": "ping_host",
+      "execution_time": 0.00023031234741210938,
+      "original_success": false,
+      "honest_success": false,
+      "honesty_score": 0.0,
+      "honesty_status": "ОШИБКА",
+      "is_fake": true,
+      "fake_indicators_count": 0,
+      "fake_indicators": [],
+      "data_size": 0,
+      "error": "asyncio.run() cannot be called from a running event loop",
+      "original_data_preview": "Ошибка: asyncio.run() cannot be called from a running event loop"
+    },
+    {
+      "tool_name": "api_request_tool",
+      "action": "get",
+      "execution_time": 4.410743713378906e-05,
+      "original_success": false,
+      "honest_success": false,
+      "honesty_score": 0.0,
+      "honesty_status": "ОШИБКА",
+      "is_fake": true,
+      "fake_indicators_count": 0,
+      "fake_indicators": [],
+      "data_size": 0,
+      "error": "ApiRequestTool.execute() got an unexpected keyword argument 'action'",
+      "original_data_preview": "Ошибка: ApiRequestTool.execute() got an unexpected keyword argument 'action'"
+    },
+    {
+      "tool_name": "super_system_tool",
+      "action": "run_command",
+      "execution_time": 0.00027251243591308594,
+      "original_success": false,
+      "honest_success": true,
+      "honesty_score": 0.88,
+      "honesty_status": "ЧЕСТНЫЙ",
+      "is_fake": false,
+      "fake_indicators_count": 1,
+      "fake_indicators": [
+        {
+          "type": "suspicious_data",
+          "severity": "medium",
+          "description": "Подозрительно маленький размер данных: 4 байт",
+          "confidence": 0.6
+        }
+      ],
+      "data_size": 4,
+      "original_data_preview": "ToolResult(success=False, data=None, error=\"Ошибка выполнения run_command: SuperSystemTool._run_command() got an unexpected keyword argument 'safe_mode'\", execution_time=None, metadata={}, timestamp=d..."
+    }
+  ],
+  "honest_tools": [
+    "media_tool",
+    "super_system_tool"
+  ],
+  "dishonest_tools": [
+    "enhanced_web_search",
+    "network_tool",
+    "api_request_tool"
+  ],
+  "suspicious_tools": [],
+  "memory_records": [
+    {
+      "tool": "media_tool",
+      "working_action": "get_info",
+      "correct_params": {
+        "action": "get_info"
+      },
+      "notes": "Честный медиа-инструмент: локальная обработка без API ключей",
+      "timestamp": 1750280075.213726
+    },
+    {
+      "tool": "super_system_tool",
+      "working_action": "run_command",
+      "correct_params": {
+        "action": "run_command",
+        "command": "string",
+        "safe_mode": "boolean"
+      },
+      "notes": "Честная системная команда: реальное выполнение",
+      "timestamp": 1750280075.2144554
+    }
+  ],
+  "honesty_threshold": 0.7,
+  "summary_stats": {
+    "total_tests": 5,
+    "honest_percentage": 40.0,
+    "average_honesty": 0.376
+  },
+  "generated_at": 1750280075.2145581
+}

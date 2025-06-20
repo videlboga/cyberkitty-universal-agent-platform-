@@ -272,6 +272,10 @@ class ConsoleInterventionHandler(InterventionHandler):
         """Отмена вмешательства (для консоли не поддерживается)"""
         print(f"⚠️ Отмена вмешательства {request_id} не поддерживается в консольном режиме")
         return False
+    
+    async def handle_request(self, request: InterventionRequest) -> InterventionResponse:
+        """Алиас для handle_intervention для совместимости"""
+        return await self.handle_intervention(request)
 
 
 # === УТИЛИТЫ ===

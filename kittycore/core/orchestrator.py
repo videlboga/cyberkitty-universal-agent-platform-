@@ -45,15 +45,11 @@ class TaskAnalyzer:
         """Инициализация LLM для анализа"""
         try:
             # Используем новый LLM модуль
-            from ..llm import get_llm_provider
-            return get_llm_provider()
-        except ImportError:
-            try:
-                # Fallback на старый модуль
-                from ..llm import get_default_provider
-                return get_default_provider()
-            except ImportError:
-                raise Exception("❌ LLM провайдер не найден! Требуется настройка LLM.")
+            from ..llm import get_llm_provider, LLMConfig
+            config = LLMConfig()
+            return get_llm_provider(config=config)
+        except Exception as e:
+            raise Exception(f"❌ LLM провайдер не найден! Ошибка: {e}")
     
     def analyze_task_complexity(self, task: str) -> Dict[str, Any]:
         """Анализирует сложность задачи с помощью LLM"""
@@ -185,15 +181,11 @@ class TaskDecomposer:
         """Инициализация LLM"""
         try:
             # Используем новый LLM модуль
-            from ..llm import get_llm_provider
-            return get_llm_provider()
-        except ImportError:
-            try:
-                # Fallback на старый модуль
-                from ..llm import get_default_provider
-                return get_default_provider()
-            except ImportError:
-                raise Exception("❌ LLM провайдер не найден! Требуется настройка LLM.")
+            from ..llm import get_llm_provider, LLMConfig
+            config = LLMConfig()
+            return get_llm_provider(config=config)
+        except Exception as e:
+            raise Exception(f"❌ LLM провайдер не найден! Ошибка: {e}")
     
     def decompose_task(self, task: str, complexity: str) -> List[Dict[str, Any]]:
         """Разбивает задачу на подзадачи с помощью LLM"""
@@ -357,13 +349,11 @@ class AgentSpawner:
     """Динамическое создание агентов под задачи"""
     
     def __init__(self):
-        from ..agents import AgentFactory
-        self.factory = AgentFactory()
         self.spawned_agents = {}
     
     def spawn_agent_for_task(self, subtask: Dict, skills: List[str]) -> Any:
-        """Создаёт агента для конкретной подзадачи"""
-        from ..agents import AgentSpecification
+        """Создаёт IntellectualAgent для конкретной подзадачи"""
+        from ..agents.intellectual_agent import IntellectualAgent
         
         # Определяем роль агента по типу задачи
         role_map = {
@@ -374,20 +364,14 @@ class AgentSpawner:
         }
         
         role = role_map.get(subtask.get("type"), "generalist")
+        agent_role = f"{role}_agent"
         
-        spec = AgentSpecification(
-            role=f"{role}_agent",
-            expertise=skills,
-            prompt_template=f"Ты специалист по {role}. Твоя задача: {subtask['description']}",
-            tools=["basic", "communication"],
-            context={"subtask": subtask}
-        )
-        
-        agent = self.factory.create_agent(spec)
+        # Создаём IntellectualAgent вместо старого Agent
+        agent = IntellectualAgent(agent_role, subtask)
         agent_id = f"{role}_{subtask['id']}"
         self.spawned_agents[agent_id] = agent
         
-        logger.info(f"🤖 Создан агент {agent_id} для задачи: {subtask['description'][:50]}...")
+        logger.info(f"🤖 Создан IntellectualAgent {agent_id} для задачи: {subtask['description'][:50]}...")
         return agent
 
 class TeamComposer:
@@ -498,7 +482,8 @@ class ExecutionManager:
                     "result": step_result,
                     "status": step_status,
                     "timestamp": datetime.now().isoformat(),
-                    "agent": agent_id
+                    "agent": agent_id,
+                    "files_created": execution_result.get("files_created", [])
                 }
                 
                 results["steps_completed"] += 1
